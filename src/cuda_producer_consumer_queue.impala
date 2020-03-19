@@ -1,0 +1,115 @@
+
+struct ProducerConsumerQueue
+{
+	push: fn (gpu_thread_context, fn (u32) -> u32) -> i32,
+	pop: fn (gpu_thread_context, fn (u32, u32) -> ()) -> i32,
+	// size: fn() -> i32,
+	reset: fn () -> (),
+	validate: fn (&mut[1]u32) -> (),
+	release: fn () -> ()
+};
+
+// note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently
+//                  this is fine as long as a warp only ever acts as either a producer or consumer at a time
+fn @createProducerConsumerQueue(device: i32, buffer_size: i32) -> ProducerConsumerQueue {
+	let buffer_data_offset = 4;
+
+	let queue_device_state_alloc = alloc_cuda(device, (buffer_data_offset + buffer_size) * sizeof[u32]());
+	let queue_device_memory = queue_device_state_alloc.data;
+	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
+
+	let size = bitcast[&mut[1]i32](&mut queue_counters(0));
+	let head = &mut queue_counters(1);
+	let tail = &mut queue_counters(2);
+	let buffer = bitcast[&mut[1][u32]](&mut queue_counters(buffer_data_offset));
+
+	let FREE = !0u32;
+
+	ProducerConsumerQueue {
+		push: @|thread, source| -> i32 {
+			let new_size = thread.atomic_add_global_i32(size, 1) + 1;
+
+			if new_size > buffer_size {
+				thread.atomic_sub_global_i32(size, 1);
+				0
+			}
+			else
+			{
+				let i = thread.atomic_inc_global_u32(tail, (buffer_size - 1) as u32);
+
+				let value = source(i);
+
+				while thread.atomic_cas_global_u32(&mut buffer(i), FREE, value) != FREE {
+					thread.yield();
+				}
+
+				new_size
+			}
+		},
+
+		pop: @|thread, sink| -> i32 {
+			let old_size = thread.atomic_sub_global_i32(size, 1);
+
+			if old_size <= 0 {
+				thread.atomic_add_global_i32(size, 1);
+				0
+			}
+			else
+			{
+				let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
+
+				let tryDequeue = @|sink, i| {
+					let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
+					if el != FREE {
+						sink(i, el);
+						true
+					}
+					else {
+						false
+					}
+				};
+
+				while !tryDequeue(sink, i) {
+					thread.yield();
+				}
+
+				1
+			}
+		},
+
+		// size: @|| {
+		// 	cuda_atomic_add_global_i32(size, 0)
+		// },
+
+		reset: @|| {
+			let block_dim = 512;
+
+			with cuda(device, (round_up(buffer_size as i32, block_dim), 1, 1), (block_dim, 1, 1)) {
+				let tid = cuda_blockIdx_x() * block_dim + cuda_threadIdx_x();
+
+				for i in range_step(tid, buffer_size as i32, block_dim) {
+					buffer(i) = FREE;
+				}
+			}
+		},
+
+		validate: @|corrupted: &mut[1]u32| {
+			let block_dim = 512;
+
+			with cuda(device, (round_up(buffer_size as i32, block_dim), 1, 1), (block_dim, 1, 1)) {
+				let tid = cuda_blockIdx_x() * block_dim + cuda_threadIdx_x();
+
+				for i in range_step(tid, buffer_size as i32, block_dim) {
+					if buffer(i) != FREE {
+						cuda_atomic_or_global_u32(corrupted, 1u32);
+						cuda_device_print_i32("inconsistent queue state at %d\n", i);
+					}
+				}
+			}
+		},
+
+		release: @|| {
+			release(queue_device_state_alloc);
+		}
+	}
+}

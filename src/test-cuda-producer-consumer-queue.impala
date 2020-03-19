@@ -1,0 +1,125 @@
+
+
+fn @xorshift32(state: u32) -> u32 {
+	let mut x = state;
+	x ^= x << 13u32;
+	x ^= x >> 17u32;
+	x ^= x << 5u32;
+	x
+}
+
+fn main() -> i32 {
+	let queue_size = 1024 * 1024;
+	let queue_test = createQueueTest(0, queue_size * sizeof[u32]());
+
+	with device, queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
+		with grid in cuda_launch_1d(device, 42, 512) {
+			with wave in grid.waves() {
+				with thread in wave.threads() {
+					let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
+
+					for i in range(0, 64) {
+						rand_state = xorshift32(rand_state);
+
+						let should_push = (rand_state as i32 < 0);
+
+						if wave.shfl_i32(if rand_state as i32 < 0 { 1 } else { 0 }, 0, 32) != 0 {
+							// if lane.idx() == 0u32 {
+							// 	// cuda_device_print_i32("pushing %d\n", warp_id);
+							// 	// queue.push((i + 1) as u32);
+							// 	;
+							// }
+
+							// let x = queue.push(|i| {});
+
+							// let x = with i in queue.push() {
+							// 	if lane.idx() == 0u32 {
+							// 		// cuda_device_print_i32("pushing %d\n", warp.idx() as i32);
+							// 	}
+							// };
+
+							// print_i32(x);
+
+							// if with i in queue.push(thread) {
+							// 	// if lane.idx() == 0u32 {
+							// 		// cuda_device_print_i32("pushing %d\n", warp.idx() as i32);
+							// 	// }
+							// 	//break(0);
+							// 	;
+							// } == 0 {
+							// }
+
+							// if should_push {
+
+							// 	with i in queue.push(thread) {
+							// 		thread.idx()
+							// 	}
+
+							// 	;
+							// }
+
+							;
+						}
+						else {
+							// if lane_id == 0 {
+							// with i, element in queue.pop(thread) {
+							// 	// cuda_device_print_i32("popped %d\n", el as i32);
+							// }
+							//) == 0 {
+								// cuda_device_print_i32("nothing to pop %d\n", warp_id);
+							//}
+							// }
+
+							;
+						}
+					}
+
+					// while queue.pop(@|el|{}) != 0 {}
+				}
+			}
+		}
+
+		true
+	}
+
+	// TODO: the following two lines crash the compiler
+	// type source_t = fn () -> producer_t;
+	// type producer_t = fn () -> source_t;
+
+	// type sink_t = fn (u32) -> ();
+	// type source_t = fn (sink_t) -> ();
+
+	// fn @producer_consumer_loop(queue: ProducerConsumerQueue, producer: source_t, consumer: sink_t) -> () {
+	// 	let mut drain = false;
+	// 	while !drain {
+	// 		while
+	// 		let mut did_push = false;
+	// 		let sink = @|el: u32| {
+	// 			queue.push(el);
+	// 			did_push = true;
+	// 		};
+	// 		producer(sink);
+	// 	}
+	// }
+
+	// with device, queue, device_failed_flag in queue_test.run_test(1024 * 1024) {
+	// 	with grid in cuda_launch_1d(device, 42, 512) {
+	// 		with warp in grid.warps() {
+
+	// 			let producer = @|sink| {
+	// 				for i in range(0, 32) {
+	// 					sink(i as u32);
+	// 				}
+	// 			};
+
+	// 			for element in producer_consumer_loop(queue, producer) {
+
+	// 			}
+	// 		}
+	// 	}
+
+	// 	true
+	// }
+
+	queue_test.finish()
+}
