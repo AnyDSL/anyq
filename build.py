@@ -232,7 +232,7 @@ def main(args):
 
 	if args.dependencies:
 		dlls = buildDependencies(dependencies_dir, args.pull)
-		# copyDlls(build_dir, dlls)
+		copyDlls(build_dir, dlls)
 
 
 	buildsystem = selectBuildsystem()
