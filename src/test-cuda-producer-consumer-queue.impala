@@ -8,12 +8,107 @@ fn @xorshift32(state: u32) -> u32 {
 	x
 }
 
+
+// based on Ken Perlin, Noise hardware. In Real-Time Shading SIGGRAPH Course Notes (2001), Olano M., (Ed.).
+// https://www.csee.umbc.edu/~olano/s2002c36/ch02.pdf
+
+type float3 = [f32 * 3];
+
+fn @float3_add(a: float3, b: float3) -> float3 {
+	[a(0) + b(0), a(1) + b(1), a(2) + b(2)]
+}
+
+fn @float3_sub(a: float3, b: float3) -> float3 {
+	[a(0) - b(0), a(1) - b(1), a(2) - b(2)]
+}
+
+fn @float3_scale(a: float3, f: f32) -> float3 {
+	[a(0) * f, a(1) * f, a(2) * f]
+}
+
+fn @float3_dot(a: float3, b: float3) -> f32 {
+	a(0) * b(0) + a(1) * b(1) + a(2) * b(2)
+}
+
+fn @randf(x: u32, intrinsics: gpu_intrinsics) -> f32 {
+	intrinsics.uint_as_float((127u32 << 23u32) | (xorshift32(x) >> 9u32)) * 2.0f32 - 3.0f32
+}
+
+fn @noiseGradient(p: float3, intrinsics: gpu_intrinsics) -> float3 {
+	let seed1 = xorshift32(intrinsics.float_as_uint(p(0)) ^ (intrinsics.float_as_uint(p(2)) << 16u32));
+	let seed2 = xorshift32(intrinsics.float_as_uint(p(1)) ^ (intrinsics.float_as_uint(p(2)) << 16u32));
+	let u = randf(seed1, intrinsics);
+	let theta = randf(seed2, intrinsics) * 3.14159265358979f32;
+
+	let s = intrinsics.sqrtf(1.0f32 - u * u);
+
+	[s * intrinsics.cosf(theta), s * intrinsics.sinf(theta), u]
+}
+
+fn @skew(p: float3) -> float3 {
+	let s = (p(0) + p(1) + p(2)) / 3.0f32;
+	[p(0) + s, p(1) + s, p(2) + s]
+}
+
+fn @unskew(p: float3) -> float3 {
+	let s = (p(0) + p(1) + p(2)) / 6.0f32;
+	[p(0) - s, p(1) - s, p(2) - s]
+}
+
+type simplex_t = [float3 * 4];
+
+fn @simplex(p: float3, intrinsics: gpu_intrinsics) -> simplex_t {
+	let skewed_base = skew(p);
+	let v_0 = unskew([intrinsics.floorf(skewed_base(0)), intrinsics.floorf(skewed_base(1)), intrinsics.floorf(skewed_base(2))]);
+
+	let v = float3_sub(p, v_0);
+
+	let b1 = v(0) < v(1);
+	let b2 = v(1) < v(2);
+	let b3 = v(2) < v(0);
+
+	let e_1 = [ if !b1 &  b3 { 1.0f32 } else { 0.0f32 }, if !b2 &  b1 { 1.0f32 } else { 0.0f32 }, if !b3 &  b2 { 1.0f32 } else { 0.0f32 } ];
+	let e_2 = [ if  b1 ^  b3 { 0.0f32 } else { 1.0f32 }, if  b2 ^  b1 { 0.0f32 } else { 1.0f32 }, if  b3 ^  b2 { 0.0f32 } else { 1.0f32 } ];
+	let e_3 = [ if  b1 & !b3 { 1.0f32 } else { 0.0f32 }, if  b2 & !b1 { 1.0f32 } else { 0.0f32 }, if  b3 & !b2 { 1.0f32 } else { 0.0f32 } ];
+
+	[ v_0, float3_add(v_0, unskew(e_1)), float3_add(v_0, unskew(float3_add(e_1, e_2))), float3_add(v_0, unskew(float3_add(e_1, float3_add(e_2, e_3)))) ]
+}
+
+fn @simplexContribution(d: float3, gradient: float3) -> f32 {
+	let t = 0.5f32 - float3_dot(d, d);
+	let t2 = t * t;
+	let t4 = t2 * t2;
+
+	if t > 0.0f { 8.0f * t4 * float3_dot(gradient, d) } else { 0.0f32 }
+}
+
+fn @simplexNoise(p: float3, intrinsics: gpu_intrinsics) -> f32 {
+	let s = simplex(p, intrinsics);
+
+	simplexContribution(float3_sub(p, s(0)), noiseGradient(s(0), intrinsics)) +
+	simplexContribution(float3_sub(p, s(1)), noiseGradient(s(1), intrinsics)) +
+	simplexContribution(float3_sub(p, s(2)), noiseGradient(s(2), intrinsics)) +
+	simplexContribution(float3_sub(p, s(3)), noiseGradient(s(3), intrinsics))
+}
+
+fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: gpu_intrinsics) -> f32
+{
+	let mut r = 0.0f32;
+
+	for i in range(0, N) {
+		r += (1.0f32 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32), intrinsics);
+	}
+
+	1.0f32 / (2.0f32 - 1.0f32 / (1 << (N - 1)) as f32) * r
+}
+
+
 fn main() -> i32 {
 	let queue_size = 1024 * 1024;
 	let queue_test = createQueueTest(0, queue_size * sizeof[u32]());
 
 	with device, queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		with grid in cuda_launch_1d(device, 42, 512) {
+		with grid, intrinsics in cuda_launch_1d(device, 42, 512) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
 					let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
@@ -22,6 +117,8 @@ fn main() -> i32 {
 						rand_state = xorshift32(rand_state);
 
 						let should_push = (rand_state as i32 < 0);
+						// let should_push = simplexNoiseFractal([randf(rand_state), randf(rand_state), randf(rand_state)], 8) < 0.0f32;
+						// let should_push = simplexNoiseFractal([0.0f32, 0.0f32, 0.0f32], 8) < 0.0f32;
 
 						if wave.shfl_i32(if rand_state as i32 < 0 { 1 } else { 0 }, 0, 32) != 0 {
 							// if lane.idx() == 0u32 {
