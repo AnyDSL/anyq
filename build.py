@@ -85,6 +85,9 @@ class LLVM:
 
 		buildsystem.configure(self.build_dir, self.source_dir/"llvm", *flags)
 
+	def remove(self):
+		shutil.rmtree(self.build_dir)
+
 	def build(self):
 		ninja("-C", str(self.build_dir), "clang", "llvm-as", "lld", "RV", "LLVMRV", "LLVMMCJIT", "LLVMExecutionEngine", "LLVMRuntimeDyld")
 		return []
@@ -113,6 +116,9 @@ class AnyDSL:
 
 		buildsystem.configure(self.build_dir, self.source_dir, *flags)
 
+	def remove(self):
+		shutil.rmtree(self.build_dir)
+
 	def buildRuntime(self):
 		ninja("-C", str(self.build_dir), "runtime")
 		return [self.build_dir/'bin'/'runtime.dll']
@@ -120,6 +126,14 @@ class AnyDSL:
 	def buildImpala(self):
 		ninja("-C", str(self.build_dir), "impala")
 		return []
+
+class Impala:
+	def build(self, anydsl):
+		return anydsl.buildImpala()
+
+class AnyDSLRuntime:
+	def build(self, anydsl):
+		return anydsl.buildRuntime()
 
 class MultiConfigBuild:
 	def __init__(self, build_dir):
@@ -148,6 +162,10 @@ class ZLIB(MultiConfigBuild):
 			]
 			buildsystem.configure(build_dir, self.source_dir, *flags)
 
+	def remove(self):
+		for build_dir, build_type in self.builds():
+			shutil.rmtree(build_dir)
+
 	def build(self):
 		for build_dir, build_type in self.builds():
 			ninja("-C", str(build_dir), "install")
@@ -172,49 +190,79 @@ class LPNG(MultiConfigBuild):
 			]
 			buildsystem.configure(build_dir, self.source_dir, *flags)
 
+	def remove(self):
+		for build_dir, build_type in self.builds():
+			shutil.rmtree(build_dir)
+
 	def build(self):
 		for build_dir, build_type in self.builds():
 			ninja("-C", str(build_dir), "install")
 		return [self.install_dir/'bin'/'libpng16d.dll', self.install_dir/'bin'/'libpng16.dll']
 
-def buildDependencies(dependencies_dir, pull):
-	dependencies_dir.mkdir(parents=True, exist_ok=True)
+class Dependencies:
+	names = {"llvm", "runtime", "anydsl", "impala", "zlib", "libpng"}
 
-	llvm = LLVM(dependencies_dir/"llvm")
-	anydsl = AnyDSL(dependencies_dir/"anydsl")
-	zlib = ZLIB(dependencies_dir/"zlib")
-	libpng = LPNG(dependencies_dir/"libpng")
+	def __init__(self, dir, dependencies = names):
+		dir.mkdir(parents=True, exist_ok=True)
+		self.libpng = LPNG(dir/"libpng") if "libpng" in dependencies else None
+		self.zlib = ZLIB(dir/"zlib") if "zlib" in dependencies or self.libpng else None
+		self.impala = Impala() if "impala" in dependencies else None
+		self.runtime = AnyDSLRuntime() if "runtime" in dependencies else None
+		self.anydsl = AnyDSL(dir/"anydsl") if "anydsl" in dependencies or self.impala or self.runtime else None
+		self.llvm = LLVM(dir/"llvm") if "llvm" in dependencies or self.anydsl else None
 
-	if pull:
-		llvm.pull()
-		anydsl.pull()
-		zlib.pull()
-		libpng.pull()
+	def pull(self):
+		if self.llvm:
+			self.llvm.pull()
+		if self.anydsl:
+			self.anydsl.pull()
+		if self.zlib:
+			self.zlib.pull()
+		if self.libpng:
+			self.libpng.pull()
 
-	buildsystem = NinjaBuild()
+	def remove(self):
+		if self.llvm:
+			self.llvm.remove()
+		if self.anydsl:
+			self.anydsl.remove()
+		if self.zlib:
+			self.zlib.remove()
+		if self.libpng:
+			self.libpng.remove()
 
-	dlls = []
-	llvm.configure(buildsystem)
-	dlls.extend(llvm.build())
+	def build(self, buildsystem):
+		dlls = []
 
-	anydsl.configure(buildsystem, llvm)
-	dlls.extend(anydsl.buildRuntime())
-	dlls.extend(anydsl.buildImpala())
+		if self.llvm:
+			self.llvm.configure(buildsystem)
+			dlls.extend(self.llvm.build())
 
-	zlib.configure(buildsystem)
-	dlls.extend(zlib.build())
+		if self.anydsl:
+			self.anydsl.configure(buildsystem, self.llvm)
+		
+		if self.impala:
+			dlls.extend(self.anydsl.buildImpala())
+		
+		if self.runtime:
+			dlls.extend(self.anydsl.buildRuntime())
 
-	libpng.configure(buildsystem, zlib)
-	dlls.extend(libpng.build())
+		if self.zlib:
+			self.zlib.configure(buildsystem)
+			dlls.extend(self.zlib.build())
 
-	return dlls
+		if self.libpng:
+			self.libpng.configure(buildsystem, self.zlib)
+			dlls.extend(self.libpng.build())
+
+		return dlls
+
 
 def copyDlls(build_dir, deps):
 	for bin_dir in [build_dir/"bin"/"Debug", build_dir/"bin"/"Release"]:
 		bin_dir.mkdir(parents=True, exist_ok=True)
 		for d in deps:
 			shutil.copy(d, bin_dir)
-
 
 def selectBuildsystem():
 	if os.name == "nt":
@@ -229,10 +277,19 @@ def main(args):
 
 	build_dir.mkdir(parents=True, exist_ok=True)
 
-
 	if args.dependencies:
-		dlls = buildDependencies(dependencies_dir, args.pull)
-		copyDlls(build_dir, dlls)
+		dependencies = Dependencies(dependencies_dir, args.dependency if args.dependency else Dependencies.names)
+
+		if args.pull:
+			dependencies.pull()
+
+		buildsystem = NinjaBuild()
+
+		if args.remove:
+			dependencies.remove()
+		else:
+			dlls = dependencies.build(buildsystem)
+			copyDlls(build_dir, dlls)
 
 
 	buildsystem = selectBuildsystem()
@@ -255,7 +312,7 @@ if __name__ == "__main__":
 	args = argparse.ArgumentParser()
 	args.add_argument("-pull", "--pull", action="store_true")
 	args.add_argument("-deps", "--dependencies", action="store_true")
-	# args.add_argument("-dep", "--dependency", action="append", choices={"llvm", "runtime", "impala", "zlib", "libpng"})
+	args.add_argument("-dep", "--dependency", action="append", choices=Dependencies.names)
 	args.add_argument("-conf", "--configure", action="store_true")
 	args.add_argument("-rm", "--remove", action="store_true")
 	main(args.parse_args())
