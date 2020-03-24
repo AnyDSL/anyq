@@ -1,0 +1,176 @@
+
+struct gpu_intrinsics {
+	expf: fn(f32) -> f32,
+	exp2f: fn(f32) -> f32,
+	logf: fn(f32) -> f32,
+	log2f: fn(f32) -> f32,
+	powf: fn(f32, f32) -> f32,
+	rsqrtf: fn(f32) -> f32,
+	sqrtf: fn(f32) -> f32,
+	fabsf: fn(f32) -> f32,
+	sinf: fn(f32) -> f32,
+	cosf: fn(f32) -> f32,
+	tanf: fn(f32) -> f32,
+	asinf: fn(f32) -> f32,
+	acosf: fn(f32) -> f32,
+	atanf: fn(f32) -> f32,
+	erff: fn(f32) -> f32,
+	atan2f: fn(f32, f32) -> f32,
+	fmaxf: fn(f32, f32) -> f32,
+	fminf: fn(f32, f32) -> f32,
+	fmodf: fn(f32, f32) -> f32,
+	floorf: fn(f32) -> f32,
+	fmaf: fn(f32, f32, f32) -> f32,
+	madf: fn(f32, f32, f32) -> f32,
+	isinff: fn(f32) -> i32,
+	isnanf: fn(f32) -> i32,
+	isfinitef: fn(f32) -> i32,
+	copysignf: fn(f32, f32) -> f32,
+
+	float_as_uint: fn(f32) -> u32,
+	uint_as_float: fn(u32) -> f32
+}
+
+struct gpu_grid_context {
+	device: i32,
+
+	groups: fn (fn (gpu_group_context) -> ()) -> (),
+	waves: fn (fn (gpu_wave_context) -> ()) -> (),
+	threads: fn (fn (gpu_thread_context) -> ()) -> (),
+
+	num_groups: fn () -> u32,
+	num_waves: fn () -> u32,
+	num_threads: fn () -> u32,
+}
+
+struct gpu_group_context {
+	idx: fn () -> u32,
+
+	waves: fn (fn (gpu_wave_context) -> ()) -> (),
+	threads: fn (fn (gpu_thread_context) -> ()) -> (),
+
+	barrier: fn () -> (),
+	barrier_all: fn (i32) -> i32,
+	barrier_any: fn (i32) -> i32,
+	barrier_count: fn (i32) -> i32,
+
+	num_waves: fn () -> u32,
+	num_threads: fn () -> u32,
+}
+
+struct gpu_wave_context {
+	idx: fn () -> u32,
+
+	membermask: fn () -> u32,
+
+	threads: fn (fn (gpu_thread_context) -> ()) -> (),
+
+	num_threads: fn () -> u32,
+
+	barrier: fn () -> (),
+	barrier_all: fn (i32) -> i32,
+	barrier_any: fn (i32) -> i32,
+	barrier_count: fn (i32) -> i32,
+	barrier_vote: fn (i32) -> u32,
+
+	// activemask: fn () -> u32,
+
+	shfl_i32: fn (i32, i32, i32) -> i32,
+	shfl_u32: fn (u32, i32, i32) -> u32,
+	shfl_i64: fn (i64, i32, i32) -> i64,
+	shfl_u64: fn (u64, i32, i32) -> u64,
+	shfl_f32: fn (f32, i32, i32) -> f32,
+	// shfl_f64: fn (f64, i32, i32) -> f64,
+
+	shfl_up_i32: fn (i32, u32, i32) -> i32,
+	shfl_up_u32: fn (u32, u32, i32) -> u32,
+	shfl_up_i64: fn (i64, u32, i32) -> i64,
+	shfl_up_u64: fn (u64, u32, i32) -> u64,
+	shfl_up_f32: fn (f32, u32, i32) -> f32,
+	// shfl_up_f64: fn (f64, u32, i32) -> f64,
+
+	shfl_down_i32: fn (i32, u32, i32) -> i32,
+	shfl_down_u32: fn (u32, u32, i32) -> u32,
+	shfl_down_i64: fn (i64, u32, i32) -> i64,
+	shfl_down_u64: fn (u64, u32, i32) -> u64,
+	shfl_down_f32: fn (f32, u32, i32) -> f32,
+	// shfl_down_f64: fn (f64, u32, i32) -> f64,
+
+	shfl_xor_i32: fn (i32, i32, i32) -> i32,
+	shfl_xor_u32: fn (u32, i32, i32) -> u32,
+	shfl_xor_i64: fn (i64, i32, i32) -> i64,
+	shfl_xor_u64: fn (u64, i32, i32) -> u64,
+	shfl_xor_f32: fn (f32, i32, i32) -> f32,
+	// shfl_xor_f64: fn (f64, i32, i32) -> f64,
+
+	// match_any_i32: fn (i32) -> u32,
+	// match_any_u32: fn (u32) -> u32,
+	// match_any_i64: fn (i64) -> u32,
+	// match_any_u64: fn (u64) -> u32,
+	// match_any_f32: fn (f32) -> u32,
+	// match_any_f64: fn (f64) -> u32,
+
+	// match_all_i32: fn (i32, &mut i32) -> u32,
+	// match_all_u32: fn (u32, &mut i32) -> u32,
+	// match_all_i64: fn (i64, &mut i32) -> u32,
+	// match_all_u64: fn (u64, &mut i32) -> u32,
+	// match_all_f32: fn (f32, &mut i32) -> u32,
+	// match_all_f64: fn (f64, &mut i32) -> u32,
+
+	lanemask: fn () -> u32,
+	lanemask_le: fn () -> u32,
+	lanemask_lt: fn () -> u32,
+	lanemask_ge: fn () -> u32,
+	lanemask_gt: fn () -> u32
+}
+
+struct gpu_thread_context {
+	idx: fn () -> u32,
+
+	atomic_add_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_add_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_add_global_u64: fn (&mut[1]u64, u64) -> u64,
+	atomic_add_global_f32: fn (&mut[1]f32, f32) -> f32,
+	// atomic_add_global_f64: fn (&mut[1]f64, f64) -> f64,
+
+	atomic_sub_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_sub_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_sub_global_u64: fn (&mut[1]u64, u64) -> u64,
+	atomic_sub_global_f32: fn (&mut[1]f32, f32) -> f32,
+	// atomic_sub_global_f64: fn (&mut[1]f64, f64) -> f64,
+
+	atomic_and_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_and_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_and_global_u64: fn (&mut[1]u64, u64) -> u64,
+
+	atomic_or_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_or_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_or_global_u64: fn (&mut[1]u64, u64) -> u64,
+
+	atomic_xor_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_xor_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_xor_global_u64: fn (&mut[1]u64, u64) -> u64,
+
+	atomic_exch_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_exch_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_exch_global_u64: fn (&mut[1]u64, u64) -> u64,
+	atomic_exch_global_f32: fn (&mut[1]f32, f32) -> f32,
+
+	atomic_min_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_min_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_min_global_u64: fn (&mut[1]u64, u64) -> u64,
+
+	atomic_max_global_i32: fn (&mut[1]i32, i32) -> i32,
+	atomic_max_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_max_global_u64: fn (&mut[1]u64, u64) -> u64,
+
+	// atomic_cas_global_u16: fn (&mut[1]u16, u16, u16) -> u16,
+	atomic_cas_global_i32: fn (&mut[1]i32, i32, i32) -> i32,
+	atomic_cas_global_u32: fn (&mut[1]u32, u32, u32) -> u32,
+	atomic_cas_global_i64: fn (&mut[1]u64, u64, u64) -> u64,
+
+	atomic_inc_global_u32: fn (&mut[1]u32, u32) -> u32,
+	atomic_dec_global_u32: fn (&mut[1]u32, u32) -> u32,
+
+	yield: fn () -> ()
+}

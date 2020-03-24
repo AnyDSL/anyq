@@ -17,7 +17,9 @@ function(offline_graph _target)
 endfunction()
 
 set(COMMON_IMPALA_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/cuda_utils.impala
+	${CMAKE_CURRENT_SOURCE_DIR}/gpu.impala
+	${CMAKE_CURRENT_SOURCE_DIR}/cuda_mapping.impala
+	# ${CMAKE_CURRENT_SOURCE_DIR}/nvvm_mapping.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/cuda_producer_consumer_queue.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.impala
