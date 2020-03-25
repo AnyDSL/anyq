@@ -1,0 +1,214 @@
+
+
+fn @nvvm_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
+	@@body(gpu_thread_context {
+		idx: idx,
+
+		atomic_add_global_i32: nvvm_atomic_add_global_i32,
+		atomic_add_global_u32: nvvm_atomic_add_global_u32,
+		atomic_add_global_u64: nvvm_atomic_add_global_u64,
+		atomic_add_global_f32: nvvm_atomic_add_global_f32,
+		// atomic_add_global_f64: nvvm_atomic_add_global_f64,
+
+		atomic_sub_global_i32: nvvm_atomic_sub_global_i32,
+		atomic_sub_global_u32: nvvm_atomic_sub_global_u32,
+		atomic_sub_global_u64: nvvm_atomic_sub_global_u64,
+		atomic_sub_global_f32: nvvm_atomic_sub_global_f32,
+		// atomic_sub_global_f64: nvvm_atomic_sub_global_f64,
+
+		atomic_and_global_i32: nvvm_atomic_and_global_i32,
+		atomic_and_global_u32: nvvm_atomic_and_global_u32,
+		atomic_and_global_u64: nvvm_atomic_and_global_u64,
+
+		atomic_or_global_i32: nvvm_atomic_or_global_i32,
+		atomic_or_global_u32: nvvm_atomic_or_global_u32,
+		atomic_or_global_u64: nvvm_atomic_or_global_u64,
+
+		atomic_xor_global_i32: nvvm_atomic_xor_global_i32,
+		atomic_xor_global_u32: nvvm_atomic_xor_global_u32,
+		atomic_xor_global_u64: nvvm_atomic_xor_global_u64,
+
+		atomic_exch_global_i32: nvvm_atomic_exch_global_i32,
+		atomic_exch_global_u32: nvvm_atomic_exch_global_u32,
+		atomic_exch_global_u64: nvvm_atomic_exch_global_u64,
+		atomic_exch_global_f32: nvvm_atomic_exch_global_f32,
+
+		atomic_min_global_i32: nvvm_atomic_min_global_i32,
+		atomic_min_global_u32: nvvm_atomic_min_global_u32,
+		atomic_min_global_u64: nvvm_atomic_min_global_u64,
+
+		atomic_max_global_i32: nvvm_atomic_max_global_i32,
+		atomic_max_global_u32: nvvm_atomic_max_global_u32,
+		atomic_max_global_u64: nvvm_atomic_max_global_u64,
+
+		// atomic_cas_global_u16: nvvm_atomic_cas_global_u16,
+		atomic_cas_global_i32: nvvm_atomic_cas_global_i32,
+		atomic_cas_global_u32: nvvm_atomic_cas_global_u32,
+		atomic_cas_global_i64: nvvm_atomic_cas_global_u64,
+
+		atomic_inc_global_u32: nvvm_atomic_inc_global_u32,
+		atomic_dec_global_u32: nvvm_atomic_dec_global_u32,
+
+		yield: @|| nvvm_nanosleep(0u32)
+	});
+}
+
+fn @nvvm_subwarp(membermask: u32, num_threads: u32, idx: fn () -> u32, body: fn (gpu_wave_context) -> ()) -> () {
+	@@body(gpu_wave_context{
+		idx: idx,
+
+		membermask: @|| membermask,
+
+		threads: @|body| nvvm_thread(nvvm_laneid, body),
+
+		num_threads: @|| num_threads,
+
+		barrier: @|| nvvm_warp_sync(membermask),
+		barrier_all: @|predicate| if nvvm_warp_sync_all(membermask, predicate != 0) {1} else {0},
+		barrier_any: @|predicate| if nvvm_warp_sync_any(membermask, predicate != 0) {1} else {0},
+		barrier_count: @|predicate| nvvm_popc_i(nvvm_warp_sync_vote(membermask, predicate != 0) as i32),
+		barrier_vote: @|predicate| nvvm_warp_sync_vote(membermask, predicate != 0),
+
+		// activemask: nvvm_warp_activemask,
+
+		shfl_i32: @|x:i32, src_lane:i32, width:i32| nvvm_warp_shfl_i32(membermask, x, src_lane, width),
+		shfl_u32: @|x:u32, src_lane:i32, width:i32| nvvm_warp_shfl_u32(membermask, x, src_lane, width),
+		// shfl_i64: @|x:i64, src_lane:i32, width:i32| nvvm_warp_shfl_i64(membermask, x, src_lane, width),
+		// shfl_u64: @|x:u64, src_lane:i32, width:i32| nvvm_warp_shfl_u64(membermask, x, src_lane, width),
+		shfl_f32: @|x:f32, src_lane:i32, width:i32| nvvm_warp_shfl_f32(membermask, x, src_lane, width),
+		// shfl_f64: @|x:f64, src_lane:i32, width:i32| nvvm_warp_shfl_f64(membermask, x, src_lane, width),
+
+		shfl_up_i32: @|x:i32, delta:u32, width:i32| nvvm_warp_shfl_up_i32(membermask, x, delta, width),
+		shfl_up_u32: @|x:u32, delta:u32, width:i32| nvvm_warp_shfl_up_u32(membermask, x, delta, width),
+		// shfl_up_i64: @|x:i64, delta:u32, width:i32| nvvm_warp_shfl_up_i64(membermask, x, delta, width),
+		// shfl_up_u64: @|x:u64, delta:u32, width:i32| nvvm_warp_shfl_up_u64(membermask, x, delta, width),
+		shfl_up_f32: @|x:f32, delta:u32, width:i32| nvvm_warp_shfl_up_f32(membermask, x, delta, width),
+		// shfl_up_f64: @|x:f64, delta:u32, width:i32| nvvm_warp_shfl_up_f64(membermask, x, delta, width),
+
+		shfl_down_i32: @|x:i32, delta:u32, width:i32| nvvm_warp_shfl_down_i32(membermask, x, delta, width),
+		shfl_down_u32: @|x:u32, delta:u32, width:i32| nvvm_warp_shfl_down_u32(membermask, x, delta, width),
+		// shfl_down_i64: @|x:i64, delta:u32, width:i32| nvvm_warp_shfl_down_i64(membermask, x, delta, width),
+		// shfl_down_u64: @|x:u64, delta:u32, width:i32| nvvm_warp_shfl_down_u64(membermask, x, delta, width),
+		shfl_down_f32: @|x:f32, delta:u32, width:i32| nvvm_warp_shfl_down_f32(membermask, x, delta, width),
+		// shfl_down_f64: @|x:f64, delta:u32, width:i32| nvvm_warp_shfl_down_f64(membermask, x, delta, width),
+
+		shfl_xor_i32: @|x:i32, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_i32(membermask, x, lane_mask, width),
+		shfl_xor_u32: @|x:u32, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_u32(membermask, x, lane_mask, width),
+		// shfl_xor_i64: @|x:i64, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_i64(membermask, x, lane_mask, width),
+		// shfl_xor_u64: @|x:u64, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_u64(membermask, x, lane_mask, width),
+		shfl_xor_f32: @|x:f32, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_f32(membermask, x, lane_mask, width),
+		// shfl_xor_f64: @|x:f64, lane_mask:i32, width:i32| nvvm_warp_shfl_xor_f64(membermask, x, lane_mask, width),
+
+		// match_any_i32: @|x:i32| nvvm_warp_match_any_i32(membermask, x),
+		// match_any_u32: @|x:u32| nvvm_warp_match_any_u32(membermask, x),
+		// match_any_i64: @|x:i64| nvvm_warp_match_any_i64(membermask, x),
+		// match_any_u64: @|x:u64| nvvm_warp_match_any_u64(membermask, x),
+		// match_any_f32: @|x:f32| nvvm_warp_match_any_f32(membermask, x),
+		// match_any_f64: @|x:f64| nvvm_warp_match_any_f64(membermask, x),
+
+		// match_all_i32: @|x:i32, predicate:&mut i32| nvvm_warp_match_all_i32(membermask, x, predicate),
+		// match_all_u32: @|x:u32, predicate:&mut i32| nvvm_warp_match_all_u32(membermask, x, predicate),
+		// match_all_i64: @|x:i64, predicate:&mut i32| nvvm_warp_match_all_i64(membermask, x, predicate),
+		// match_all_u64: @|x:u64, predicate:&mut i32| nvvm_warp_match_all_u64(membermask, x, predicate),
+		// match_all_f32: @|x:f32, predicate:&mut i32| nvvm_warp_match_all_f32(membermask, x, predicate),
+		// match_all_f64: @|x:f64, predicate:&mut i32| nvvm_warp_match_all_f64(membermask, x, predicate),
+
+		lanemask: nvvm_lanemask,
+		lanemask_le: nvvm_lanemask_le,
+		lanemask_lt: nvvm_lanemask_lt,
+		lanemask_ge: nvvm_lanemask_ge,
+		lanemask_gt: nvvm_lanemask_gt
+	});
+}
+
+fn @nvvm_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group_context) -> ()) -> () {
+	@@body(gpu_group_context {
+		idx: idx,
+		waves: @|body| nvvm_subwarp(!0u32, 32u32, @|| nvvm_read_ptx_sreg_tid_x() as u32 / 32u32, body),
+		threads: @|body| nvvm_thread(@|| nvvm_read_ptx_sreg_tid_x() as u32, body),
+		num_waves: @|| (num_threads() + 31u32) / 32u32,
+		num_threads: num_threads,
+		barrier: nvvm_block_sync,
+		barrier_all: nvvm_block_sync_all,
+		barrier_any: nvvm_block_sync_any,
+		barrier_count: nvvm_block_sync_count
+	});
+}
+
+fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, gpu_intrinsics) -> ()) -> () {
+	// TODO: assert(warp_size == 32)
+
+	let num_threads_per_block = @|| {
+		if ?(block_dim as u32) {
+			block_dim as u32
+		}
+		else {
+			nvvm_read_ptx_sreg_ntid_x() as u32
+		}
+	};
+
+	let num_warps_per_block = @|| {
+		(num_threads_per_block() + 31u32) / 32u32
+	};
+
+	let num_blocks = @|| {
+		if ?(grid_dim as u32) {
+			grid_dim as u32
+		}
+		else {
+			nvvm_read_ptx_sreg_nctaid_x() as u32
+		}
+	};
+
+	let num_warps = @|| {
+		num_blocks() * num_warps_per_block()
+	};
+
+	let num_threads = @|| {
+		num_blocks() * num_threads_per_block()
+	};
+
+	nvvm(device, (grid_dim * block_dim, 1, 1), (block_dim, 1, 1), @|| @@body(gpu_grid_context {
+		device: device,
+		groups: @|body| nvvm_block(num_threads_per_block, @|| nvvm_read_ptx_sreg_ctaid_x() as u32, body),
+		waves: @|body| nvvm_subwarp(!0u32, 32u32, @|| nvvm_read_ptx_sreg_ctaid_x() as u32 * num_warps_per_block() + nvvm_read_ptx_sreg_tid_x() as u32 / 32u32, body),
+		threads: @|body| nvvm_thread(@|| nvvm_read_ptx_sreg_ctaid_x() as u32 * num_threads_per_block() + nvvm_read_ptx_sreg_tid_x() as u32, body),
+		num_groups: num_blocks,
+		num_waves: num_warps,
+		num_threads: num_threads
+	}, nvvm_gpu_intrinsics()));
+}
+
+fn @nvvm_gpu_intrinsics() -> gpu_intrinsics {
+	gpu_intrinsics {
+		expf: nvvm_expf,
+		exp2f: nvvm_exp2f,
+		logf: nvvm_logf,
+		log2f: nvvm_log2f,
+		powf: nvvm_powf,
+		rsqrtf: nvvm_rsqrtf,
+		sqrtf: nvvm_sqrtf,
+		fabsf: nvvm_fabsf,
+		sinf: nvvm_sinf,
+		cosf: nvvm_cosf,
+		tanf: nvvm_tanf,
+		asinf: nvvm_asinf,
+		acosf: nvvm_acosf,
+		atanf: nvvm_atanf,
+		erff: nvvm_erff,
+		atan2f: nvvm_atan2f,
+		fmaxf: nvvm_fmaxf,
+		fminf: nvvm_fminf,
+		fmodf: nvvm_fmodf,
+		floorf: nvvm_floorf,
+		fmaf: nvvm_fmaf,
+		madf: nvvm_madf,
+		isinff: nvvm_isinff,
+		isnanf: nvvm_isnanf,
+		isfinitef: nvvm_isfinitef,
+		copysignf: nvvm_copysignf,
+
+		float_as_uint: @|x: f32| nvvm_bitcast_f2i(x) as u32,
+		uint_as_float : @|x: u32| nvvm_bitcast_i2f(x as i32)
+	}
+}

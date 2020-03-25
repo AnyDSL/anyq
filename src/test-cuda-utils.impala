@@ -7,7 +7,7 @@ fn main() -> i32 {
 	let num_groups = 42;
 
 	with device, device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in cuda_launch_1d(device, num_groups, group_size) {
+		with grid, intrinsics in nvvm_launch_1d(device, num_groups, group_size) {
 			with thread in grid.threads() {
 				thread.atomic_add_global_u32(device_failed_flag, thread.idx() as u32);
 			}
@@ -17,7 +17,7 @@ fn main() -> i32 {
 	}
 
 	with device, device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in cuda_launch_1d(device, num_groups, group_size) {
+		with grid, intrinsics in nvvm_launch_1d(device, num_groups, group_size) {
 			with group in grid.groups() {
 				with wave in group.waves() {
 					with thread in wave.threads() {
@@ -31,7 +31,7 @@ fn main() -> i32 {
 	}
 
 	with device, device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in cuda_launch_1d(device, num_groups, group_size) {
+		with grid, intrinsics in nvvm_launch_1d(device, num_groups, group_size) {
 			with group in grid.groups() {
 				with thread in group.threads() {
 					thread.atomic_add_global_u32(device_failed_flag, (group.idx() * group.num_threads() + thread.idx()) as u32);
@@ -43,7 +43,7 @@ fn main() -> i32 {
 	}
 
 	with device, device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in cuda_launch_1d(device, num_groups, group_size) {
+		with grid, intrinsics in nvvm_launch_1d(device, num_groups, group_size) {
 			with wave in grid.groups() {
 				with thread in wave.threads() {
 					thread.atomic_sub_global_u32(device_failed_flag, (wave.idx() * wave.num_threads() + thread.idx()) as u32);
