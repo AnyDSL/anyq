@@ -11,10 +11,10 @@ struct ProducerConsumerQueue
 
 // note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently
 //                  this is fine as long as a warp only ever acts as either a producer or consumer at a time
-fn @createProducerConsumerQueue(device: i32, buffer_size: i32) -> ProducerConsumerQueue {
+fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> ProducerConsumerQueue {
 	let buffer_data_offset = 4;
 
-	let queue_device_state_alloc = alloc_cuda(device, (buffer_data_offset + buffer_size) * sizeof[u32]());
+	let queue_device_state_alloc = device.alloc((buffer_data_offset + buffer_size) * sizeof[u32]());
 	let queue_device_memory = queue_device_state_alloc.data;
 	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
 
@@ -82,27 +82,31 @@ fn @createProducerConsumerQueue(device: i32, buffer_size: i32) -> ProducerConsum
 		// },
 
 		reset: @|| {
-			let block_dim = 512;
+			let block_dim = 256;
+			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
 
-			with cuda(device, (round_up(buffer_size as i32, block_dim), 1, 1), (block_dim, 1, 1)) {
-				let tid = cuda_blockIdx_x() * block_dim + cuda_threadIdx_x();
-
-				for i in range_step(tid, buffer_size as i32, block_dim) {
-					buffer(i) = FREE;
+			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
+				with thread in grid.threads() {
+					let idx = thread.idx() as i32;
+					if idx < buffer_size {
+						buffer(idx) = FREE;
+					}
 				}
 			}
 		},
 
 		validate: @|corrupted: &mut[1]u32| {
-			let block_dim = 512;
+			let block_dim = 256;
+			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
 
-			with cuda(device, (round_up(buffer_size as i32, block_dim), 1, 1), (block_dim, 1, 1)) {
-				let tid = cuda_blockIdx_x() * block_dim + cuda_threadIdx_x();
-
-				for i in range_step(tid, buffer_size as i32, block_dim) {
-					if buffer(i) != FREE {
-						cuda_atomic_or_global_u32(corrupted, 1u32);
-						cuda_device_print_i32("inconsistent queue state at %d\n", i);
+			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
+				with thread in grid.threads() {
+					let idx = thread.idx() as i32;
+					if idx < buffer_size {
+						if buffer(idx) != FREE {
+							thread.atomic_or_global_u32(corrupted, 1u32);
+							device.print_i32("inconsistent queue state at %d\n", idx);
+						}
 					}
 				}
 			}

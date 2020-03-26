@@ -8,7 +8,8 @@ fn @createAccDevice() -> AccDevice {
 			opencl_launch_1d(opencl_device, num_groups, group_size, body)
 		},
 		alloc: @|size| alloc_opencl(opencl_device, size),
-		platform_device: runtime_device(2, opencl_device)
+		platform_device: runtime_device(2, opencl_device),
+		print_i32: @|msg: &[u8], i: i32| { opencl_print_i32(msg, i); }
 	}
 }
 
@@ -58,6 +59,8 @@ extern "device" {
     fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_i32  (i32, u32) -> i32;
     fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_u32  (u32, u32) -> u32;
     fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_f32  (f32, u32) -> f32;
+
+	fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
 }
 
 fn @opencl_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
