@@ -8,6 +8,7 @@ function(offline_graph _target)
 	anydsl_runtime_wrap(_${_target}_PROGRAM
 		CLANG_FLAGS -march=native
 		IMPALA_FLAGS --log-level info
+		NAME ${_target}
 		FILES ${_infiles})
 
 	add_executable(${_target} ${ARGN} ${_${_target}_PROGRAM})
@@ -18,7 +19,6 @@ endfunction()
 
 set(COMMON_IMPALA_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.impala
-	${CMAKE_CURRENT_SOURCE_DIR}/cuda_mapping.impala
 	# ${CMAKE_CURRENT_SOURCE_DIR}/nvvm_mapping.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/cuda_producer_consumer_queue.impala
@@ -31,16 +31,18 @@ if(BUILD_TESTING)
 	include(CTest)
 endif()
 
-function(add_schedule_test _testfile)
+function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
-	set(_target ${_testname})
-	offline_graph(${_target} ${COMMON_IMPALA_FILES} ${_testfile})
-	set_target_properties(${_target} PROPERTIES FOLDER "tests" )
+	set(_target "${_testname}-${_mapping}")
+	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/${_mapping}_mapping.impala" ${_testfile})
+	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	if(BUILD_TESTING)
 		add_test(NAME "${_testfile}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 	endif()
 endfunction()
 
 
-add_schedule_test(test-cuda-producer-consumer-queue.impala)
-add_schedule_test(test-cuda-utils.impala)
+# if(AnyDSL_runtime_HAS_CUDA_SUPPORT)
+	add_schedule_test(test-cuda-producer-consumer-queue.impala cuda)
+	add_schedule_test(test-basics.impala cuda)
+# endif()

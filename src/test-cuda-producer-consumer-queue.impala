@@ -105,10 +105,10 @@ fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: gpu_intrinsics) -> f32
 
 fn main() -> i32 {
 	let queue_size = 1024 * 1024;
-	let queue_test = createQueueTest(0, queue_size * sizeof[u32]());
+	let queue_test = createQueueTest(queue_size * sizeof[u32]());
 
 	with device, queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		with grid, intrinsics in cuda_launch_1d(device, 42, 512) {
+		with grid, intrinsics in device.launch_1d(42, 512) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
 					let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
