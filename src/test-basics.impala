@@ -3,7 +3,7 @@
 fn main() -> i32 {
 	let test = createBaseTest(0);
 
-	let group_size = 512;
+	let group_size = 256;
 	let num_groups = 42;
 
 	with device, device_memory, device_failed_flag in test.run_test() {

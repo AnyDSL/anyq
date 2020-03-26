@@ -46,3 +46,7 @@ endfunction()
 	add_schedule_test(test-cuda-producer-consumer-queue.impala cuda)
 	add_schedule_test(test-basics.impala cuda)
 # endif()
+
+# if(AnyDSL_runtime_HAS_OPENCL_SUPPORT)
+	add_schedule_test(test-basics.impala opencl)
+# endif()
