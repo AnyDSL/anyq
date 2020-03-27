@@ -28,7 +28,7 @@ set(COMMON_IMPALA_FILES
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
-	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/${_mapping}_mapping.impala" ${_testfile})
+	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	if (BUILD_TESTING)
 		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
