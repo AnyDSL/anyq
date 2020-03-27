@@ -1,4 +1,16 @@
 
+static cuda_device = 0;
+
+fn @createAccDevice() -> AccDevice {
+	AccDevice {
+		launch_1d: @|num_groups, group_size, body| {
+			cuda_launch_1d(cuda_device, num_groups, group_size, body)
+		},
+		alloc: @|size| alloc_cuda(cuda_device, size),
+		platform_device: runtime_device(1, cuda_device)
+	}
+}
+
 
 fn @cuda_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
