@@ -36,7 +36,7 @@ function(add_schedule_test _testfile _mapping)
 	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/${_mapping}_mapping.impala" ${_testfile})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	if (BUILD_TESTING)
-		add_test(NAME "${_testfile}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 	endif()
 endfunction()
 
