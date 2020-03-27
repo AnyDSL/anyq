@@ -25,11 +25,6 @@ set(COMMON_IMPALA_FILES
 )
 
 
-option(BUILD_TESTING OFF)
-if (BUILD_TESTING)
-	include(CTest)
-endif()
-
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")

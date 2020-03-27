@@ -25,6 +25,11 @@ include_directories(${AnyDSL_runtime_INCLUDE_DIRS})
     # message(FATAL_ERROR "AnyDSL runtime must be compiled with flag RUNTIME_JIT enabled")
 # endif()
 
+option(BUILD_TESTING OFF)
+if (BUILD_TESTING)
+	include(CTest)
+endif()
+
 add_subdirectory(src)
 
 # set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT minimal)
