@@ -1,36 +1,4 @@
 
-struct gpu_intrinsics {
-	expf: fn(f32) -> f32,
-	exp2f: fn(f32) -> f32,
-	logf: fn(f32) -> f32,
-	log2f: fn(f32) -> f32,
-	powf: fn(f32, f32) -> f32,
-	rsqrtf: fn(f32) -> f32,
-	sqrtf: fn(f32) -> f32,
-	fabsf: fn(f32) -> f32,
-	sinf: fn(f32) -> f32,
-	cosf: fn(f32) -> f32,
-	tanf: fn(f32) -> f32,
-	asinf: fn(f32) -> f32,
-	acosf: fn(f32) -> f32,
-	atanf: fn(f32) -> f32,
-	erff: fn(f32) -> f32,
-	atan2f: fn(f32, f32) -> f32,
-	fmaxf: fn(f32, f32) -> f32,
-	fminf: fn(f32, f32) -> f32,
-	fmodf: fn(f32, f32) -> f32,
-	floorf: fn(f32) -> f32,
-	fmaf: fn(f32, f32, f32) -> f32,
-	madf: fn(f32, f32, f32) -> f32,
-	isinff: fn(f32) -> i32,
-	isnanf: fn(f32) -> i32,
-	isfinitef: fn(f32) -> i32,
-	copysignf: fn(f32, f32) -> f32,
-
-	float_as_uint: fn(f32) -> u32,
-	uint_as_float: fn(u32) -> f32
-}
-
 struct gpu_grid_context {
 	device: i32,
 

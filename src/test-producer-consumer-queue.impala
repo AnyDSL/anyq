@@ -30,13 +30,13 @@ fn @float3_dot(a: float3, b: float3) -> f32 {
 	a(0) * b(0) + a(1) * b(1) + a(2) * b(2)
 }
 
-fn @randf(x: u32, intrinsics: gpu_intrinsics) -> f32 {
-	intrinsics.uint_as_float((127u32 << 23u32) | (xorshift32(x) >> 9u32)) * 2.0f32 - 3.0f32
+fn @randf(x: u32, intrinsics: Intrinsics) -> f32 {
+	bitcast[f32]((127u32 << 23u32) | (xorshift32(x) >> 9u32)) * 2.0f32 - 3.0f32
 }
 
-fn @noiseGradient(p: float3, intrinsics: gpu_intrinsics) -> float3 {
-	let seed1 = xorshift32(intrinsics.float_as_uint(p(0)) ^ (intrinsics.float_as_uint(p(2)) << 16u32));
-	let seed2 = xorshift32(intrinsics.float_as_uint(p(1)) ^ (intrinsics.float_as_uint(p(2)) << 16u32));
+fn @noiseGradient(p: float3, intrinsics: Intrinsics) -> float3 {
+	let seed1 = xorshift32(bitcast[u32](p(0)) ^ (bitcast[u32](p(2)) << 16u32));
+	let seed2 = xorshift32(bitcast[u32](p(1)) ^ (bitcast[u32](p(2)) << 16u32));
 	let u = randf(seed1, intrinsics);
 	let theta = randf(seed2, intrinsics) * 3.14159265358979f32;
 
@@ -57,7 +57,7 @@ fn @unskew(p: float3) -> float3 {
 
 type simplex_t = [float3 * 4];
 
-fn @simplex(p: float3, intrinsics: gpu_intrinsics) -> simplex_t {
+fn @simplex(p: float3, intrinsics: Intrinsics) -> simplex_t {
 	let skewed_base = skew(p);
 	let v_0 = unskew([intrinsics.floorf(skewed_base(0)), intrinsics.floorf(skewed_base(1)), intrinsics.floorf(skewed_base(2))]);
 
@@ -82,7 +82,7 @@ fn @simplexContribution(d: float3, gradient: float3) -> f32 {
 	if t > 0.0f { 8.0f * t4 * float3_dot(gradient, d) } else { 0.0f32 }
 }
 
-fn @simplexNoise(p: float3, intrinsics: gpu_intrinsics) -> f32 {
+fn @simplexNoise(p: float3, intrinsics: Intrinsics) -> f32 {
 	let s = simplex(p, intrinsics);
 
 	simplexContribution(float3_sub(p, s(0)), noiseGradient(s(0), intrinsics)) +
@@ -91,7 +91,7 @@ fn @simplexNoise(p: float3, intrinsics: gpu_intrinsics) -> f32 {
 	simplexContribution(float3_sub(p, s(3)), noiseGradient(s(3), intrinsics))
 }
 
-fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: gpu_intrinsics) -> f32
+fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
 {
 	let mut r = 0.0f32;
 

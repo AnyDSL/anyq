@@ -148,7 +148,7 @@ fn @nvvm_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group
 	});
 }
 
-fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, gpu_intrinsics) -> ()) -> () {
+fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 
 	let num_threads_per_block = @|| {
@@ -189,39 +189,5 @@ fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid
 		num_groups: num_blocks,
 		num_waves: num_warps,
 		num_threads: num_threads
-	}, nvvm_gpu_intrinsics()));
-}
-
-fn @nvvm_gpu_intrinsics() -> gpu_intrinsics {
-	gpu_intrinsics {
-		expf: nvvm_expf,
-		exp2f: nvvm_exp2f,
-		logf: nvvm_logf,
-		log2f: nvvm_log2f,
-		powf: nvvm_powf,
-		rsqrtf: nvvm_rsqrtf,
-		sqrtf: nvvm_sqrtf,
-		fabsf: nvvm_fabsf,
-		sinf: nvvm_sinf,
-		cosf: nvvm_cosf,
-		tanf: nvvm_tanf,
-		asinf: nvvm_asinf,
-		acosf: nvvm_acosf,
-		atanf: nvvm_atanf,
-		erff: nvvm_erff,
-		atan2f: nvvm_atan2f,
-		fmaxf: nvvm_fmaxf,
-		fminf: nvvm_fminf,
-		fmodf: nvvm_fmodf,
-		floorf: nvvm_floorf,
-		fmaf: nvvm_fmaf,
-		madf: nvvm_madf,
-		isinff: nvvm_isinff,
-		isnanf: nvvm_isnanf,
-		isfinitef: nvvm_isfinitef,
-		copysignf: nvvm_copysignf,
-
-		float_as_uint: @|x: f32| nvvm_bitcast_f2i(x) as u32,
-		uint_as_float : @|x: u32| nvvm_bitcast_i2f(x as i32)
-	}
+	}, nvvm_intrinsics));
 }

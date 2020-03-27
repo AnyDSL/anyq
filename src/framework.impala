@@ -15,7 +15,7 @@ fn @div_up(a: i32, b: i32) -> i32 {
 }
 
 struct AccDevice {
-	launch_1d: fn(i32, i32, fn (gpu_grid_context, gpu_intrinsics) -> ()) -> (),
+	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
 	alloc: fn(i32) -> Buffer,
 	platform_device: i32,
 	print_i32: fn(&[u8], i32) -> ()

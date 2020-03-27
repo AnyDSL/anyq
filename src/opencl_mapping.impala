@@ -207,7 +207,7 @@ fn @opencl_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_gro
 	});
 }
 
-fn opencl_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, gpu_intrinsics) -> ()) -> () {
+fn opencl_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 
 	let num_threads_per_block = @|| {
@@ -249,44 +249,5 @@ fn opencl_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_gr
 		num_groups: num_blocks,
 		num_waves: num_warps,
 		num_threads: num_threads
-	}, opencl_gpu_intrinsics()));
-}
-
-extern "device" {
-	fn "convert_uint"  opencl_float_as_uint(f32) -> u32;
-	fn "convert_float" opencl_uint_as_float(u32) -> f32;
-}
-
-fn @opencl_gpu_intrinsics() -> gpu_intrinsics {
-	gpu_intrinsics {
-		expf: opencl_expf,
-		exp2f: opencl_exp2f,
-		logf: opencl_logf,
-		log2f: opencl_log2f,
-		powf: opencl_powf,
-		rsqrtf: opencl_rsqrtf,
-		sqrtf: opencl_sqrtf,
-		fabsf: opencl_fabsf,
-		sinf: opencl_sinf,
-		cosf: opencl_cosf,
-		tanf: opencl_tanf,
-		asinf: opencl_asinf,
-		acosf: opencl_acosf,
-		atanf: opencl_atanf,
-		erff: opencl_erff,
-		atan2f: opencl_atan2f,
-		fmaxf: opencl_fmaxf,
-		fminf: opencl_fminf,
-		fmodf: opencl_fmodf,
-		floorf: opencl_floorf,
-		fmaf: opencl_fmaf,
-		madf: opencl_madf,
-		isinff: opencl_isinff,
-		isnanf: opencl_isnanf,
-		isfinitef: opencl_isfinitef,
-		copysignf: opencl_copysignf,
-
-		float_as_uint: opencl_float_as_uint,
-		uint_as_float : opencl_uint_as_float
-	}
+	}, opencl_intrinsics));
 }

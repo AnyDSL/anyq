@@ -148,7 +148,7 @@ fn @cuda_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group
 	});
 }
 
-fn cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, gpu_intrinsics) -> ()) -> () {
+fn cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 
 	let num_threads_per_block = @|| {
@@ -189,44 +189,5 @@ fn cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid
 		num_groups: num_blocks,
 		num_waves: num_warps,
 		num_threads: num_threads
-	}, cuda_gpu_intrinsics()));
-}
-
-extern "device" {
-	fn "__float_as_uint" cuda_float_as_uint(f32) -> u32;
-	fn "__uint_as_float" cuda_uint_as_float(u32) -> f32;
-}
-
-fn @cuda_gpu_intrinsics() -> gpu_intrinsics {
-	gpu_intrinsics {
-		expf: cuda_expf,
-		exp2f: cuda_exp2f,
-		logf: cuda_logf,
-		log2f: cuda_log2f,
-		powf: cuda_powf,
-		rsqrtf: cuda_rsqrtf,
-		sqrtf: cuda_sqrtf,
-		fabsf: cuda_fabsf,
-		sinf: cuda_sinf,
-		cosf: cuda_cosf,
-		tanf: cuda_tanf,
-		asinf: cuda_asinf,
-		acosf: cuda_acosf,
-		atanf: cuda_atanf,
-		erff: cuda_erff,
-		atan2f: cuda_atan2f,
-		fmaxf: cuda_fmaxf,
-		fminf: cuda_fminf,
-		fmodf: cuda_fmodf,
-		floorf: cuda_floorf,
-		fmaf: cuda_fmaf,
-		madf: cuda_madf,
-		isinff: cuda_isinff,
-		isnanf: cuda_isnanf,
-		isfinitef: cuda_isfinitef,
-		copysignf: cuda_copysignf,
-
-		float_as_uint: cuda_float_as_uint,
-		uint_as_float : cuda_uint_as_float
-	}
+	}, cuda_intrinsics));
 }
