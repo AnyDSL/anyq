@@ -8,7 +8,8 @@ fn @createAccDevice() -> AccDevice {
 			opencl_launch_1d(opencl_device, num_groups, group_size, body)
 		},
 		alloc: @|size| alloc_opencl(opencl_device, size),
-		platform_device: runtime_device(2, opencl_device)
+		platform_device: runtime_device(2, opencl_device),
+		print_i32: @|msg: &[u8], i: i32| { opencl_print_i32(msg, i); }
 	}
 }
 
@@ -39,9 +40,27 @@ extern "device" {
 
     fn "work_group_barrier"      opencl_work_group_barrier     (u32) -> ();
     fn "sub_group_barrier"       opencl_sub_group_barrier      (u32) -> ();
-    fn "get_sub_group_size"      opencl_get_sub_group_size     () -> (u32);
-    fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> (u32);
-    fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> (u32);
+    fn "get_sub_group_size"      opencl_get_sub_group_size     () -> u32;
+    fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> u32;
+    fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> u32;
+
+    fn "sub_group_all"           opencl_sub_group_all (i32) -> i32;
+    fn "sub_group_any"           opencl_sub_group_any (i32) -> i32;
+
+    fn "intel_sub_group_shuffle"      opencl_intel_sub_group_shuffle_i32 (i32, u32) -> i32;
+    fn "intel_sub_group_shuffle"      opencl_intel_sub_group_shuffle_u32 (u32, u32) -> u32;
+    fn "intel_sub_group_shuffle"      opencl_intel_sub_group_shuffle_f32 (f32, u32) -> f32;
+    fn "intel_sub_group_shuffle_down" opencl_intel_sub_group_shuffle_down_i32 (i32, i32, u32) -> i32;
+    fn "intel_sub_group_shuffle_down" opencl_intel_sub_group_shuffle_down_u32 (u32, u32, u32) -> u32;
+    fn "intel_sub_group_shuffle_down" opencl_intel_sub_group_shuffle_down_f32 (f32, f32, u32) -> f32;
+    fn "intel_sub_group_shuffle_up"   opencl_intel_sub_group_shuffle_up_i32   (i32, i32, u32) -> i32;
+    fn "intel_sub_group_shuffle_up"   opencl_intel_sub_group_shuffle_up_u32   (u32, u32, u32) -> u32;
+    fn "intel_sub_group_shuffle_up"   opencl_intel_sub_group_shuffle_up_f32   (f32, f32, u32) -> f32;
+    fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_i32  (i32, u32) -> i32;
+    fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_u32  (u32, u32) -> u32;
+    fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_f32  (f32, u32) -> f32;
+
+	fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
 }
 
 fn @opencl_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
@@ -97,10 +116,6 @@ fn @opencl_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () 
 	});
 }
 
-fn @ShuffleFn_i32(i32, i32, i32) -> i32 { undef[i32]() }
-fn @ShuffleFn_u32(u32, i32, i32) -> u32 { undef[u32]() }
-fn @ShuffleFn_f32(f32, i32, i32) -> f32 { undef[f32]() }
-
 fn @ShuffleDirFn_i32(i32, u32, i32) -> i32 { undef[i32]() }
 fn @ShuffleDirFn_u32(u32, u32, i32) -> u32 { undef[u32]() }
 fn @ShuffleDirFn_f32(f32, u32, i32) -> f32 { undef[f32]() }
@@ -116,19 +131,20 @@ fn @opencl_subwarp(membermask: u32, num_threads: fn () -> u32, idx: fn () -> u32
 
 		num_threads: num_threads,
 
-		barrier: @|| opencl_sub_group_barrier(1u32), //cuda_warp_sync(membermask),
-		barrier_all: @|predicate| { undef[i32]() }, //cuda_warp_sync_all(membermask, predicate),
-		barrier_any: @|predicate| { undef[i32]() }, //cuda_warp_sync_any(membermask, predicate),
+		barrier: @|| opencl_sub_group_barrier(1u32),
+		barrier_all: @|predicate| opencl_sub_group_all(predicate),
+		barrier_any: @|predicate| opencl_sub_group_any(predicate),
 		barrier_count: @|predicate| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
 		barrier_vote: @|predicate| { undef[u32]() }, //cuda_warp_sync_vote(membermask, predicate),
 
 		// activemask: cuda_warp_activemask,
 
-		shfl_i32: ShuffleFn_i32, // @|x:i32, src_lane:i32, width:i32| cuda_warp_shfl_i32(membermask, x, src_lane, width),
-		shfl_u32: ShuffleFn_u32, //@|x:u32, src_lane:i32, width:i32| cuda_warp_shfl_u32(membermask, x, src_lane, width),
+		/* TODO: assert width = num_threads */
+		shfl_i32: @|x:i32, src_lane:i32, width:i32| opencl_intel_sub_group_shuffle_i32(x, src_lane as u32),
+		shfl_u32: @|x:u32, src_lane:i32, width:i32| opencl_intel_sub_group_shuffle_u32(x, src_lane as u32),
 		// shfl_i64: @|x:i64, src_lane:i32, width:i32| cuda_warp_shfl_i64(membermask, x, src_lane, width),
 		// shfl_u64: @|x:u64, src_lane:i32, width:i32| cuda_warp_shfl_u64(membermask, x, src_lane, width),
-		shfl_f32: ShuffleFn_f32, //@|x:f32, src_lane:i32, width:i32| cuda_warp_shfl_f32(membermask, x, src_lane, width),
+		shfl_f32: @|x:f32, src_lane:i32, width:i32| opencl_intel_sub_group_shuffle_f32(x, src_lane as u32),
 		// shfl_f64: @|x:f64, src_lane:i32, width:i32| cuda_warp_shfl_f64(membermask, x, src_lane, width),
 
 		shfl_up_i32: ShuffleDirFn_i32, //@|x:i32, delta:u32, width:i32| cuda_warp_shfl_up_i32(membermask, x, delta, width),
@@ -145,11 +161,11 @@ fn @opencl_subwarp(membermask: u32, num_threads: fn () -> u32, idx: fn () -> u32
 		shfl_down_f32: ShuffleDirFn_f32, //@|x:f32, delta:u32, width:i32| cuda_warp_shfl_down_f32(membermask, x, delta, width),
 		// shfl_down_f64: @|x:f64, delta:u32, width:i32| cuda_warp_shfl_down_f64(membermask, x, delta, width),
 
-		shfl_xor_i32: ShuffleFn_i32, // @|x:i32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_i32(membermask, x, lane_mask, width),
-		shfl_xor_u32: ShuffleFn_u32, // @|x:u32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_u32(membermask, x, lane_mask, width),
+		shfl_xor_i32: @|x:i32, lane_mask:i32, width:i32| opencl_intel_sub_group_shuffle_xor_i32(x, lane_mask as u32),
+		shfl_xor_u32: @|x:u32, lane_mask:i32, width:i32| opencl_intel_sub_group_shuffle_xor_u32(x, lane_mask as u32),
 		// shfl_xor_i64: @|x:i64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_i64(membermask, x, lane_mask, width),
 		// shfl_xor_u64: @|x:u64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_u64(membermask, x, lane_mask, width),
-		shfl_xor_f32: ShuffleFn_f32, //@|x:f32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_f32(membermask, x, lane_mask, width),
+		shfl_xor_f32: @|x:f32, lane_mask:i32, width:i32| opencl_intel_sub_group_shuffle_xor_f32(x, lane_mask as u32),
 		// shfl_xor_f64: @|x:f64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_f64(membermask, x, lane_mask, width),
 
 		// match_any_i32: @|x:i32| cuda_warp_match_any_i32(membermask, x),

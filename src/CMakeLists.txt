@@ -20,7 +20,7 @@ endfunction()
 set(COMMON_IMPALA_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.impala
-	${CMAKE_CURRENT_SOURCE_DIR}/cuda_producer_consumer_queue.impala
+	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.impala
 )
 
@@ -44,9 +44,10 @@ endfunction()
 # if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-basics.impala cuda)
 	add_schedule_test(test-basics.impala nvvm)
-	add_schedule_test(test-cuda-producer-consumer-queue.impala cuda)
+	add_schedule_test(test-producer-consumer-queue.impala cuda)
 # endif()
 
 # if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
 	add_schedule_test(test-basics.impala opencl)
+	add_schedule_test(test-producer-consumer-queue.impala opencl)
 # endif()

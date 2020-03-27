@@ -17,7 +17,8 @@ fn @div_up(a: i32, b: i32) -> i32 {
 struct AccDevice {
 	launch_1d: fn(i32, i32, fn (gpu_grid_context, gpu_intrinsics) -> ()) -> (),
 	alloc: fn(i32) -> Buffer,
-	platform_device: i32
+	platform_device: i32,
+	print_i32: fn(&[u8], i32) -> ()
 }
 
 struct BaseTest {
@@ -71,26 +72,25 @@ fn createQueueTest(additional_mem: i32) -> QueueTest {
 			// let queue_buffer = alloc_cuda(device, queue_size * sizeof[i32]());
 			// let queue_storage = bitcast[&mut[1][u32]](queue_buffer.data);
 
-			let queue = createProducerConsumerQueue(cuda_device, /*queue_storage,*/ queue_size);
-
-			queue.reset();
-
 			with device, device_memory, device_failed_flag in test.run_test() {
+				let queue = createProducerConsumerQueue(device, /*queue_storage,*/ queue_size);
+
+				queue.reset();
+
 				let mut cpu_result: bool = true;
 
 				// TODO: properly refactor benchmark
-				with benchmark_cuda(cuda_device, 32) {
+				//with benchmark_cuda(cuda_device, 32) {
 					if !body(device, queue, device_memory, device_failed_flag) {
 						cpu_result = false;
 					}
-				}
+				//}
 
 				queue.validate(device_failed_flag);
+				queue.release();
 
 				cpu_result
 			}
-
-			queue.release();
 		},
 
 		finish: @|| {
