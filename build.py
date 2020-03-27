@@ -291,6 +291,8 @@ def main(args):
 			dlls = dependencies.build(buildsystem)
 			copyDlls(build_dir, dlls)
 
+		return
+
 
 	buildsystem = selectBuildsystem()
 
