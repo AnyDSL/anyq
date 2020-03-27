@@ -41,13 +41,13 @@ function(add_schedule_test _testfile _mapping)
 endfunction()
 
 
-# if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
+if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-basics.impala cuda)
 	add_schedule_test(test-basics.impala nvvm)
 	add_schedule_test(test-producer-consumer-queue.impala cuda)
-# endif()
+endif()
 
-# if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
+if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
 	add_schedule_test(test-basics.impala opencl)
 	add_schedule_test(test-producer-consumer-queue.impala opencl)
-# endif()
+endif()
