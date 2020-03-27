@@ -262,6 +262,7 @@ def copyDlls(build_dir, deps):
 	for bin_dir in [build_dir/"bin"/"Debug", build_dir/"bin"/"Release"]:
 		bin_dir.mkdir(parents=True, exist_ok=True)
 		for d in deps:
+			print(f"copying {d} to {bin_dir}")
 			shutil.copy(d, bin_dir)
 
 def selectBuildsystem():
