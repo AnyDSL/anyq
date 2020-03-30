@@ -40,6 +40,7 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-basics.impala cuda)
 	add_schedule_test(test-basics.impala nvvm)
 	add_schedule_test(test-producer-consumer-queue.impala cuda)
+	add_schedule_test(test-producer-consumer-queue.impala nvvm)
 endif()
 
 if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
