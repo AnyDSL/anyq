@@ -70,7 +70,7 @@ fn @cuda_subwarp(membermask: u32, num_threads: u32, idx: fn () -> u32, body: fn 
 	@@body(gpu_wave_context{
 		idx: idx,
 
-		membermask: @|| membermask,
+		membermask: @|| membermask as u64,
 
 		threads: @|body| cuda_thread(cuda_laneid, body),
 
@@ -126,11 +126,11 @@ fn @cuda_subwarp(membermask: u32, num_threads: u32, idx: fn () -> u32, body: fn 
 		// match_all_f32: @|x:f32, predicate:&mut i32| cuda_warp_match_all_f32(membermask, x, predicate),
 		// match_all_f64: @|x:f64, predicate:&mut i32| cuda_warp_match_all_f64(membermask, x, predicate),
 
-		lanemask: cuda_lanemask,
-		lanemask_le: cuda_lanemask_le,
-		lanemask_lt: cuda_lanemask_lt,
-		lanemask_ge: cuda_lanemask_ge,
-		lanemask_gt: cuda_lanemask_gt
+		lanemask: @|| cuda_lanemask() as u64,
+		lanemask_le: @|| cuda_lanemask_le() as u64,
+		lanemask_lt: @|| cuda_lanemask_lt() as u64,
+		lanemask_ge: @|| cuda_lanemask_ge() as u64,
+		lanemask_gt: @|| cuda_lanemask_gt() as u64
 	});
 }
 

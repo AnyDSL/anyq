@@ -29,7 +29,7 @@ struct gpu_group_context {
 struct gpu_wave_context {
 	idx: fn () -> u32,
 
-	membermask: fn () -> u32,
+	membermask: fn () -> u64,
 
 	threads: fn (fn (gpu_thread_context) -> ()) -> (),
 
@@ -85,11 +85,11 @@ struct gpu_wave_context {
 	// match_all_f32: fn (f32, &mut i32) -> u32,
 	// match_all_f64: fn (f64, &mut i32) -> u32,
 
-	lanemask: fn () -> u32,
-	lanemask_le: fn () -> u32,
-	lanemask_lt: fn () -> u32,
-	lanemask_ge: fn () -> u32,
-	lanemask_gt: fn () -> u32
+	lanemask: fn () -> u64,
+	lanemask_le: fn () -> u64,
+	lanemask_lt: fn () -> u64,
+	lanemask_ge: fn () -> u64,
+	lanemask_gt: fn () -> u64
 }
 
 struct gpu_thread_context {
