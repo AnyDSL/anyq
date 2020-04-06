@@ -87,7 +87,7 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 
 			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
 				with thread in grid.threads() {
-					let idx = thread.idx() as i32;
+					let idx = thread.idx(0) as i32;
 					if idx < buffer_size {
 						buffer(idx) = FREE;
 					}
@@ -101,7 +101,7 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 
 			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
 				with thread in grid.threads() {
-					let idx = thread.idx() as i32;
+					let idx = thread.idx(0) as i32;
 					if idx < buffer_size {
 						if buffer(idx) != FREE {
 							thread.atomic_or_global_u32(corrupted, 1u32);

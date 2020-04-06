@@ -41,8 +41,10 @@ extern "device" {
     fn "work_group_barrier"      opencl_work_group_barrier     (u32) -> ();
     fn "sub_group_barrier"       opencl_sub_group_barrier      (u32) -> ();
     fn "get_sub_group_size"      opencl_get_sub_group_size     () -> u32;
-    fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> u32;
-    fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> u32;
+	 fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> u32;
+	 fn "get_sub_group_id"        opencl_get_sub_group_id       () -> u32;
+	 fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> u32;
+	 fn "get_max_sub_group_size " opencl_get_max_sub_group_size () -> u32;
 
     fn "sub_group_all"           opencl_sub_group_all (i32) -> i32;
     fn "sub_group_any"           opencl_sub_group_any (i32) -> i32;
@@ -63,7 +65,7 @@ extern "device" {
 	fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
 }
 
-fn @opencl_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
+fn @opencl_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
 		idx: idx,
 
@@ -121,13 +123,13 @@ fn @ShuffleDirFn_u32(u32, u32, i32) -> u32 { undef[u32]() }
 fn @ShuffleDirFn_f32(f32, u32, i32) -> f32 { undef[f32]() }
 
 
-fn @opencl_subwarp(membermask: u32, num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_wave_context) -> ()) -> () {
+fn @opencl_sub_group(idx: fn () -> u32, membermask: u64, num_threads: fn () -> u32, body: fn (gpu_wave_context) -> ()) -> () {
 	@@body(gpu_wave_context{
 		idx: idx,
 
-		membermask: @|| membermask as u64,
+		membermask: @|| membermask,
 
-		threads: @|body| opencl_thread(@|| opencl_get_sub_group_local_id(), body),
+		threads: @|body| opencl_thread(@|i| match i { 1 => opencl_get_sub_group_local_id(), _ => 0u32 }, body),
 
 		num_threads: num_threads,
 
@@ -190,15 +192,12 @@ fn @opencl_subwarp(membermask: u32, num_threads: fn () -> u32, idx: fn () -> u32
 	});
 }
 
-fn @opencl_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group_context) -> ()) -> () {
-	// TODO: OpenCL's wave size?
-	let sub_group_size = @|| opencl_get_sub_group_size() as u32;
-
+fn @opencl_group(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads: fn (i32) -> u32, sub_group_size: fn () -> u32, num_sub_groups: fn () -> u32, body: fn (gpu_group_context) -> ()) -> () {
 	@@body(gpu_group_context {
 		idx: idx,
-		waves: @|body| opencl_subwarp(!0u32, sub_group_size, @|| opencl_get_local_id(0u) as u32 / sub_group_size(), body),
-		threads: @|body| opencl_thread(@|| opencl_get_local_id(0u) as u32, body),
-		num_waves: @|| opencl_get_num_sub_groups(),
+		waves: @|body| opencl_sub_group(opencl_get_sub_group_id, -1 as u64, sub_group_size, body),
+		threads: @|body| opencl_thread(thread_idx, body),
+		num_waves: num_sub_groups,
 		num_threads: num_threads,
 		barrier: @|| opencl_barrier(2u32),
 		barrier_all: @|n:i32| { undef[i32]() }, //cuda_block_sync_all,
@@ -207,47 +206,67 @@ fn @opencl_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_gro
 	});
 }
 
-fn opencl_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
-	// TODO: assert(warp_size == 32)
-
-	let num_threads_per_block = @|| {
-		if ?(block_dim as u32) {
-			block_dim as u32
-		}
-		else {
-			opencl_get_local_size(0u) as u32
-		}
-	};
-
+fn opencl_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	// TODO: assert(sub_group_size <= 64)
 	// TODO: OpenCL's wave size
-	let num_warps_per_block = @|| {
-		opencl_get_num_sub_groups() //(num_threads_per_block() + 31u32) / 32u32
-	};
+	// let sub_group_size = @|| opencl_get_sub_group_size();
+	let sub_group_size = @|| 32u32;
 
-	let num_blocks = @|| {
-		if ?(grid_dim as u32) {
-			grid_dim as u32
+	let num_threads_per_group = wrap_dim(@|i| {
+		if ?block_dim && ?i {
+			match i { 0 => block_dim(0) as u32, 1 => block_dim(1) as u32, 2 => block_dim(2) as u32, _ => 1u32 }
 		}
 		else {
-			opencl_get_num_groups(0u) as u32
+			opencl_get_local_size(i as u32) as u32
 		}
-	};
+	});
 
-	let num_warps = @|| {
-		num_blocks() * num_warps_per_block()
-	};
+	let num_subgroups_per_group = opencl_get_num_sub_groups;
 
-	let num_threads = @|| {
-		num_blocks() * num_threads_per_block()
-	};
+	let num_groups = wrap_dim(@|i| {
+		if ?grid_dim && ?i {
+			match i { 0 => grid_dim(0) as u32, 1 => grid_dim(1) as u32, 2 => grid_dim(2) as u32, _ => 1u32 }
+		}
+		else {
+			opencl_get_num_groups(i as u32) as u32
+		}
+	});
 
-	opencl(device, (grid_dim * block_dim, 1, 1), (block_dim, 1, 1), @|| @@body(gpu_grid_context {
+	let num_subgroups = @|| (num_groups(0) * num_groups(1) * num_groups(2)) * num_subgroups_per_group();
+
+	let num_threads = wrap_dim(@|i| opencl_get_global_size(i as u32) as u32);
+
+	let group_idx = wrap_index(@|i| opencl_get_group_id(i as u32) as u32);
+
+	let linear_group_idx = @|| (group_idx(2) * num_groups(1) + group_idx(1)) * num_groups(0) + group_idx(0);
+
+	let thread_idx = wrap_index(@|i| opencl_get_local_id(i as u32) as u32);
+
+	let global_thread_idx = wrap_index(@|i| opencl_get_global_id(i as u32) as u32);
+
+	//let linear_thread_idx = get_local_linear_id;
+
+	let global_sub_group_idx = @|| linear_group_idx() * num_subgroups_per_group() + opencl_get_sub_group_id();
+
+	opencl(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| @@body(gpu_grid_context {
 		device: device,
-		groups: @|body| opencl_block(num_threads_per_block, @|| opencl_get_group_id(0u) as u32, body),
-		waves: @|body| opencl_subwarp(!0u32, @|| opencl_get_num_sub_groups(), @|| opencl_get_group_id(0u) as u32 * num_warps_per_block() + opencl_get_local_id(0u) as u32 / 32u32, body),
-		threads: @|body| opencl_thread(@|| opencl_get_group_id(0u) as u32 * num_threads_per_block() + opencl_get_local_id(0u) as u32, body),
-		num_groups: num_blocks,
-		num_waves: num_warps,
+		groups: @|body| opencl_group(group_idx, thread_idx, num_threads_per_group, sub_group_size, num_subgroups_per_group, body),
+		waves: @|body| opencl_sub_group(global_sub_group_idx, -1 as u64, sub_group_size, body),
+		threads: @|body| opencl_thread(global_thread_idx, body),
+		num_groups: num_groups,
+		num_waves: num_subgroups,
 		num_threads: num_threads
 	}, opencl_intrinsics));
+}
+
+fn opencl_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@opencl_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
+}
+
+fn opencl_launch_2d(device: i32, grid_dim: (i32, i32), block_dim: (i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@opencl_launch(device, (grid_dim(0), grid_dim(1), 1), (block_dim(0), block_dim(1), 1), wrap_index_2d, wrap_dim_2d, body)
+}
+
+fn opencl_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@opencl_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
 }

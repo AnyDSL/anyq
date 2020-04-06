@@ -1,19 +1,19 @@
 
-static cuda_device = 0;
+static nvvm_device = 0;
 
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
 		launch_1d: @|num_groups, group_size, body| {
-			nvvm_launch_1d(cuda_device, num_groups, group_size, body)
+			nvvm_launch_1d(nvvm_device, num_groups, group_size, body)
 		},
-		alloc: @|size| alloc_cuda(cuda_device, size),
-		platform_device: runtime_device(1, cuda_device),
+		alloc: @|size| alloc_cuda(nvvm_device, size),
+		platform_device: runtime_device(1, nvvm_device),
 		print_i32: @|fmt: &[u8], i: i32| { let tmp = i; nvvm_vprintf(fmt, &tmp as &[u8]); }
 	}
 }
 
 
-fn @nvvm_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
+fn @nvvm_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
 		idx: idx,
 
@@ -62,17 +62,18 @@ fn @nvvm_thread(idx: fn () -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 		atomic_inc_global_u32: nvvm_atomic_inc_global_u32,
 		atomic_dec_global_u32: nvvm_atomic_dec_global_u32,
 
-		yield: @|| nvvm_nanosleep(0u32)
+		// yield: @|| nvvm_nanosleep(0u32)
+		yield: @|| nvvm_threadfence()
 	});
 }
 
-fn @nvvm_subwarp(membermask: u32, num_threads: u32, idx: fn () -> u32, body: fn (gpu_wave_context) -> ()) -> () {
+fn @nvvm_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn (gpu_wave_context) -> ()) -> () {
 	@@body(gpu_wave_context{
 		idx: idx,
 
 		membermask: @|| membermask as u64,
 
-		threads: @|body| nvvm_thread(nvvm_laneid, body),
+		threads: @|body| nvvm_thread(@|i| match i { 0 => nvvm_laneid(), _ => 0u32 }, body),
 
 		num_threads: @|| num_threads,
 
@@ -134,12 +135,22 @@ fn @nvvm_subwarp(membermask: u32, num_threads: u32, idx: fn () -> u32, body: fn 
 	});
 }
 
-fn @nvvm_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group_context) -> ()) -> () {
+fn @nvvm_block(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads: fn (i32) -> u32, warp_size: u32, body: fn (gpu_group_context) -> ()) -> () {
+	let linear_thread_idx = @|| {
+		(thread_idx(2) * num_threads(1) + thread_idx(1)) * num_threads(0) + thread_idx(0)
+	};
+
+	let warp_idx = @|| {
+		linear_thread_idx() / warp_size
+	};
+
+	let num_warps = @|| ((num_threads(0) * num_threads(1) * num_threads(2)) + warp_size - 1u32) / warp_size;
+
 	@@body(gpu_group_context {
 		idx: idx,
-		waves: @|body| nvvm_subwarp(!0u32, 32u32, @|| nvvm_read_ptx_sreg_tid_x() as u32 / 32u32, body),
-		threads: @|body| nvvm_thread(@|| nvvm_read_ptx_sreg_tid_x() as u32, body),
-		num_waves: @|| (num_threads() + 31u32) / 32u32,
+		waves: @|body| nvvm_subwarp(warp_idx, -1 as u32, warp_size, body),
+		threads: @|body| nvvm_thread(thread_idx, body),
+		num_waves: num_warps,
 		num_threads: num_threads,
 		barrier: nvvm_block_sync,
 		barrier_all: nvvm_block_sync_all,
@@ -148,46 +159,69 @@ fn @nvvm_block(num_threads: fn () -> u32, idx: fn () -> u32, body: fn (gpu_group
 	});
 }
 
-fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+fn nvvm_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
+	let warp_size = 32u32;
 
-	let num_threads_per_block = @|| {
-		if ?(block_dim as u32) {
-			block_dim as u32
+	let num_threads_per_block = wrap_dim(@|i| {
+		match i {
+			0 => if ?block_dim(0) { block_dim(0) as u32 } else { nvvm_read_ptx_sreg_ntid_x() as u32 },
+			1 => if ?block_dim(1) { block_dim(1) as u32 } else { nvvm_read_ptx_sreg_ntid_y() as u32 },
+			2 => if ?block_dim(2) { block_dim(2) as u32 } else { nvvm_read_ptx_sreg_ntid_z() as u32 },
+			_ => 1u32
 		}
-		else {
-			nvvm_read_ptx_sreg_ntid_x() as u32
+	});
+
+	let num_warps_per_block = @|| ((num_threads_per_block(0) * num_threads_per_block(1) * num_threads_per_block(2)) + warp_size - 1u32) / warp_size;
+
+	let num_blocks = wrap_dim(@|i| {
+		match i {
+			0 => if ?grid_dim(0) { grid_dim(0) as u32 } else { nvvm_read_ptx_sreg_nctaid_x() as u32 },
+			1 => if ?grid_dim(1) { grid_dim(1) as u32 } else { nvvm_read_ptx_sreg_nctaid_y() as u32 },
+			2 => if ?grid_dim(1) { grid_dim(2) as u32 } else { nvvm_read_ptx_sreg_nctaid_z() as u32 },
+			_ => 1u32
 		}
-	};
+	});
 
-	let num_warps_per_block = @|| {
-		(num_threads_per_block() + 31u32) / 32u32
-	};
+	let num_warps = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) * num_warps_per_block();
 
-	let num_blocks = @|| {
-		if ?(grid_dim as u32) {
-			grid_dim as u32
-		}
-		else {
-			nvvm_read_ptx_sreg_nctaid_x() as u32
-		}
-	};
+	let num_threads = @|i| num_blocks(i) * num_threads_per_block(i);
 
-	let num_warps = @|| {
-		num_blocks() * num_warps_per_block()
-	};
+	let block_idx = wrap_index(@|i| {
+		match i { 0 => nvvm_read_ptx_sreg_ctaid_x() as u32, 1 => nvvm_read_ptx_sreg_ctaid_y() as u32, 2 => nvvm_read_ptx_sreg_ctaid_z() as u32, _ => 0u32 }
+	});
 
-	let num_threads = @|| {
-		num_blocks() * num_threads_per_block()
-	};
+	let linear_block_idx = @|| (block_idx(2) * num_blocks(1) + block_idx(1)) * num_blocks(0) + block_idx(0);
 
-	nvvm(device, (grid_dim * block_dim, 1, 1), (block_dim, 1, 1), @|| @@body(gpu_grid_context {
+	let thread_idx = wrap_index(@|i| {
+		match i { 0 => nvvm_read_ptx_sreg_tid_x() as u32, 1 => nvvm_read_ptx_sreg_tid_y() as u32, 2 => nvvm_read_ptx_sreg_tid_z() as u32, _ => 0u32 }
+	});
+
+	let global_thread_idx = @|i| block_idx(i) * num_threads_per_block(i) + thread_idx(i);
+
+	let linear_thread_idx = @|| (thread_idx(2) * num_threads_per_block(1) + thread_idx(1)) * num_threads_per_block(0) + thread_idx(0);
+
+	let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / warp_size;
+
+	nvvm(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| @@body(gpu_grid_context {
 		device: device,
-		groups: @|body| nvvm_block(num_threads_per_block, @|| nvvm_read_ptx_sreg_ctaid_x() as u32, body),
-		waves: @|body| nvvm_subwarp(!0u32, 32u32, @|| nvvm_read_ptx_sreg_ctaid_x() as u32 * num_warps_per_block() + nvvm_read_ptx_sreg_tid_x() as u32 / 32u32, body),
-		threads: @|body| nvvm_thread(@|| nvvm_read_ptx_sreg_ctaid_x() as u32 * num_threads_per_block() + nvvm_read_ptx_sreg_tid_x() as u32, body),
+		groups: @|body| nvvm_block(block_idx, thread_idx, num_threads_per_block, warp_size, body),
+		waves: @|body| nvvm_subwarp(global_warp_idx, -1 as u32, warp_size, body),
+		threads: @|body| nvvm_thread(global_thread_idx, body),
 		num_groups: num_blocks,
 		num_waves: num_warps,
 		num_threads: num_threads
 	}, nvvm_intrinsics));
+}
+
+fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@nvvm_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
+}
+
+fn nvvm_launch_2d(device: i32, grid_dim: (i32, i32), block_dim: (i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@nvvm_launch(device, (grid_dim(0), grid_dim(1), 1), (block_dim(0), block_dim(1), 1), wrap_index_2d, wrap_dim_2d, body)
+}
+
+fn nvvm_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
+	@@nvvm_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
 }
