@@ -7,7 +7,8 @@ fn @createAccDevice() -> AccDevice {
 		launch_1d: @|num_groups, group_size, body| {
 			opencl_launch_1d(opencl_device, num_groups, group_size, body)
 		},
-		alloc: @|size| alloc_opencl(opencl_device, size),
+		synchronize: || synchronize_opencl(opencl_device),
+		alloc: |size| alloc_opencl(opencl_device, size),
 		platform_device: runtime_device(2, opencl_device),
 		print_i32: @|msg: &[u8], i: i32| { opencl_print_i32(msg, i); }
 	}

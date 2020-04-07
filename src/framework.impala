@@ -75,6 +75,7 @@ fn @wrap_dim_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 
 struct AccDevice {
 	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
+	synchronize: fn() -> (),
 	alloc: fn(i32) -> Buffer,
 	platform_device: i32,
 	print_i32: fn(&[u8], i32) -> ()

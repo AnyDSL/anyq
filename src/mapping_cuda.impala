@@ -15,7 +15,8 @@ fn @createAccDevice() -> AccDevice {
 		launch_1d: @|num_groups, group_size, body| {
 			cuda_launch_1d(cuda_device, num_groups, group_size, body)
 		},
-		alloc: @|size| alloc_cuda(cuda_device, size),
+		synchronize: || synchronize_cuda(cuda_device),
+		alloc: |size| alloc_cuda(cuda_device, size),
 		platform_device: runtime_device(1, cuda_device),
 		print_i32: @|fmt: &[u8], i: i32| { let tmp = i; cuda_vprintf(fmt, &tmp as &[u8]); }
 	}

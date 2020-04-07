@@ -6,7 +6,8 @@ fn @createAccDevice() -> AccDevice {
 		launch_1d: @|num_groups, group_size, body| {
 			nvvm_launch_1d(nvvm_device, num_groups, group_size, body)
 		},
-		alloc: @|size| alloc_cuda(nvvm_device, size),
+		synchronize: || synchronize_nvvm(nvvm_device),
+		alloc: |size| alloc_cuda(nvvm_device, size),
 		platform_device: runtime_device(1, nvvm_device),
 		print_i32: @|fmt: &[u8], i: i32| { let tmp = i; nvvm_vprintf(fmt, &tmp as &[u8]); }
 	}
