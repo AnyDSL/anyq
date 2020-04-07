@@ -69,6 +69,17 @@ fn @nvvm_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 }
 
 fn @nvvm_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn (gpu_wave_context) -> ()) -> () {
+	//  1 00000001 -> 00011111 00011111
+	//  2 00000010 -> 00011110 00011111
+	//  4 00000100 -> 00011100 00011111
+	//  8 00001000 -> 00011000 00011111
+	// 16 00010000 -> 00010000 00011111
+	// 32 00100000 -> 00000000 00011111
+	//
+	fn @shuffle_mask(width: u32) -> i32 {
+		((((!(width - 1u32)) & 0x1Fu32) << 8u32) | 0x1Fu32) as i32
+	}
+
 	@@body(gpu_wave_context{
 		idx: idx,
 
@@ -86,33 +97,33 @@ fn @nvvm_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn 
 
 		// activemask: nvvm_warp_activemask,
 
-		shfl_i32: @|x:i32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_i32(membermask, x, src_lane, width as i32),
-		shfl_u32: @|x:u32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_i32(membermask, x as i32, src_lane, width as i32) as u32,
-		// shfl_i64: @|x:i64, src_lane:i32, width:u32| nvvm_warp_shfl_i64(membermask, x, src_lane, width as i32),
-		// shfl_u64: @|x:u64, src_lane:i32, width:u32| nvvm_warp_shfl_u64(membermask, x, src_lane, width as i32),
-		shfl_f32: @|x:f32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_f32(membermask, x, src_lane, width as i32),
-		// shfl_f64: @|x:f64, src_lane:i32, width:u32| nvvm_warp_shfl_f64(membermask, x, src_lane, width as i32),
+		shfl_i32: @|x:i32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_i32(membermask, x, src_lane, shuffle_mask(width)),
+		shfl_u32: @|x:u32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_i32(membermask, x as i32, src_lane, shuffle_mask(width)) as u32,
+		// shfl_i64: @|x:i64, src_lane:i32, width:u32| nvvm_warp_shfl_i64(membermask, x, src_lane, shuffle_mask(width)),
+		// shfl_u64: @|x:u64, src_lane:i32, width:u32| nvvm_warp_shfl_u64(membermask, x, src_lane, shuffle_mask(width)),
+		shfl_f32: @|x:f32, src_lane:i32, width:u32| nvvm_warp_shfl_sync_idx_f32(membermask, x, src_lane, shuffle_mask(width)),
+		// shfl_f64: @|x:f64, src_lane:i32, width:u32| nvvm_warp_shfl_f64(membermask, x, src_lane, shuffle_mask(width)),
 
-		shfl_up_i32: @|x:i32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_i32(membermask, x, delta as i32, width as i32),
-		shfl_up_u32: @|x:u32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_i32(membermask, x as i32, delta as i32, width as i32) as u32,
-		// shfl_up_i64: @|x:i64, delta:u32, width:u32| nvvm_warp_shfl_up_i64(membermask, x, delta, width as i32),
-		// shfl_up_u64: @|x:u64, delta:u32, width:u32| nvvm_warp_shfl_up_u64(membermask, x, delta, width as i32),
-		shfl_up_f32: @|x:f32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_f32(membermask, x, delta as i32, width as i32),
-		// shfl_up_f64: @|x:f64, delta:u32, width:u32| nvvm_warp_shfl_up_f64(membermask, x, delta, width as i32),
+		shfl_up_i32: @|x:i32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_i32(membermask, x, delta as i32, shuffle_mask(width)),
+		shfl_up_u32: @|x:u32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_i32(membermask, x as i32, delta as i32, shuffle_mask(width)) as u32,
+		// shfl_up_i64: @|x:i64, delta:u32, width:u32| nvvm_warp_shfl_up_i64(membermask, x, delta, shuffle_mask(width)),
+		// shfl_up_u64: @|x:u64, delta:u32, width:u32| nvvm_warp_shfl_up_u64(membermask, x, delta, shuffle_mask(width)),
+		shfl_up_f32: @|x:f32, delta:u32, width:u32| nvvm_warp_shfl_sync_up_f32(membermask, x, delta as i32, shuffle_mask(width)),
+		// shfl_up_f64: @|x:f64, delta:u32, width:u32| nvvm_warp_shfl_up_f64(membermask, x, delta, shuffle_mask(width)),
 
-		shfl_down_i32: @|x:i32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_i32(membermask, x, delta as i32, width as i32),
-		shfl_down_u32: @|x:u32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_i32(membermask, x as i32, delta as i32, width as i32) as u32,
-		// shfl_down_i64: @|x:i64, delta:u32, width:u32| nvvm_warp_shfl_down_i64(membermask, x, delta, width as i32),
-		// shfl_down_u64: @|x:u64, delta:u32, width:u32| nvvm_warp_shfl_down_u64(membermask, x, delta, width as i32),
-		shfl_down_f32: @|x:f32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_f32(membermask, x, delta as i32, width as i32),
-		// shfl_down_f64: @|x:f64, delta:u32, width:u32| nvvm_warp_shfl_down_f64(membermask, x, delta, width as i32),
+		shfl_down_i32: @|x:i32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_i32(membermask, x, delta as i32, shuffle_mask(width)),
+		shfl_down_u32: @|x:u32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_i32(membermask, x as i32, delta as i32, shuffle_mask(width)) as u32,
+		// shfl_down_i64: @|x:i64, delta:u32, width:u32| nvvm_warp_shfl_down_i64(membermask, x, delta, shuffle_mask(width)),
+		// shfl_down_u64: @|x:u64, delta:u32, width:u32| nvvm_warp_shfl_down_u64(membermask, x, delta, shuffle_mask(width)),
+		shfl_down_f32: @|x:f32, delta:u32, width:u32| nvvm_warp_shfl_sync_down_f32(membermask, x, delta as i32, shuffle_mask(width)),
+		// shfl_down_f64: @|x:f64, delta:u32, width:u32| nvvm_warp_shfl_down_f64(membermask, x, delta, shuffle_mask(width)),
 
-		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_i32(membermask, x, lane_mask, width as i32),
-		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_i32(membermask, x as i32, lane_mask, width as i32) as u32,
-		// shfl_bfly_i64: @|x:i64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_i64(membermask, x, lane_mask, width as i32),
-		// shfl_bfly_u64: @|x:u64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_u64(membermask, x, lane_mask, width as i32),
-		shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_f32(membermask, x, lane_mask, width as i32),
-		// shfl_bfly_f64: @|x:f64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_f64(membermask, x, lane_mask, width as i32),
+		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_i32(membermask, x, lane_mask, shuffle_mask(width)),
+		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_i32(membermask, x as i32, lane_mask, shuffle_mask(width)) as u32,
+		// shfl_bfly_i64: @|x:i64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_i64(membermask, x, lane_mask, shuffle_mask(width)),
+		// shfl_bfly_u64: @|x:u64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_u64(membermask, x, lane_mask, shuffle_mask(width)),
+		shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| nvvm_warp_shfl_sync_bfly_f32(membermask, x, lane_mask, shuffle_mask(width)),
+		// shfl_bfly_f64: @|x:f64, lane_mask:i32, width:u32| nvvm_warp_shfl_bfly_f64(membermask, x, lane_mask, shuffle_mask(width)),
 
 		// match_any_i32: @|x:i32| nvvm_warp_match_any_i32(membermask, x),
 		// match_any_u32: @|x:u32| nvvm_warp_match_any_u32(membermask, x),
