@@ -96,9 +96,9 @@ fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(g
         shfl_down_u32: @|var:u32, delta:u32, width:i32| amdgcn_shfl_down_u32(var, delta, width),
         shfl_down_f32: @|var:f32, delta:u32, width:i32| amdgcn_shfl_down_f32(var, delta, width),
 
-        shfl_xor_i32: @|var:i32, lane_mask:i32, width:i32| amdgcn_shfl_xor_i32(var, lane_mask, width),
-        shfl_xor_u32: @|var:u32, lane_mask:i32, width:i32| amdgcn_shfl_xor_u32(var, lane_mask, width),
-        shfl_xor_f32: @|var:f32, lane_mask:i32, width:i32| amdgcn_shfl_xor_f32(var, lane_mask, width),
+        shfl_bfly_i32: @|var:i32, lane_mask:i32, width:i32| amdgcn_shfl_xor_i32(var, lane_mask, width),
+        shfl_bfly_u32: @|var:u32, lane_mask:i32, width:i32| amdgcn_shfl_xor_u32(var, lane_mask, width),
+        shfl_bfly_f32: @|var:f32, lane_mask:i32, width:i32| amdgcn_shfl_xor_f32(var, lane_mask, width),
 
         lanemask: @|| cuda_lanemask() as u64,
         lanemask_le: @|| cuda_lanemask_le() as u64,

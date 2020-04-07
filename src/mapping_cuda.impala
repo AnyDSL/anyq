@@ -117,12 +117,12 @@ fn @cuda_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn 
 		shfl_down_f32: @|x:f32, delta:u32, width:i32| cuda_warp_shfl_down_f32(membermask, x, delta, width),
 		// shfl_down_f64: @|x:f64, delta:u32, width:i32| cuda_warp_shfl_down_f64(membermask, x, delta, width),
 
-		shfl_xor_i32: @|x:i32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_i32(membermask, x, lane_mask, width),
-		shfl_xor_u32: @|x:u32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_u32(membermask, x, lane_mask, width),
-		// shfl_xor_i64: @|x:i64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_i64(membermask, x, lane_mask, width),
-		// shfl_xor_u64: @|x:u64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_u64(membermask, x, lane_mask, width),
-		shfl_xor_f32: @|x:f32, lane_mask:i32, width:i32| cuda_warp_shfl_xor_f32(membermask, x, lane_mask, width),
-		// shfl_xor_f64: @|x:f64, lane_mask:i32, width:i32| cuda_warp_shfl_xor_f64(membermask, x, lane_mask, width),
+		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_i32(membermask, x, lane_mask, width),
+		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_u32(membermask, x, lane_mask, width),
+		// shfl_bfly_i64: @|x:i64, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_i64(membermask, x, lane_mask, width),
+		// shfl_bfly_u64: @|x:u64, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_u64(membermask, x, lane_mask, width),
+		shfl_bfly_f32: @|x:f32, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_f32(membermask, x, lane_mask, width),
+		// shfl_bfly_f64: @|x:f64, lane_mask:i32, width:i32| cuda_warp_shfl_bfly_f64(membermask, x, lane_mask, width),
 
 		// match_any_i32: @|x:i32| cuda_warp_match_any_i32(membermask, x),
 		// match_any_u32: @|x:u32| cuda_warp_match_any_u32(membermask, x),
