@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
-
 source_group("Impala Files" REGULAR_EXPRESSION "[.]impala$")
 
 function(offline_graph _target)
@@ -46,4 +44,9 @@ endif()
 if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
 	add_schedule_test(test-basics.impala opencl)
 	add_schedule_test(test-producer-consumer-queue.impala opencl)
+endif()
+
+if (AnyDSL_runtime_HAS_HSA_SUPPORT)
+	add_schedule_test(test-basics.impala amdgpu)
+	add_schedule_test(test-producer-consumer-queue.impala amdgpu)
 endif()
