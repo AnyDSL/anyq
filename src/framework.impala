@@ -93,8 +93,10 @@ fn createBaseTest(additional_mem: i32) -> BaseTest {
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory(memory_size - sizeof[u32]()));
 
-	let zero: u32 = 0u32;
-	runtime_copy(0, bitcast[&[i8]](&zero), 0i64, device.platform_device, bitcast[&mut[i8]](device_failed_flag), 0i64, sizeof[u32]() as i64);
+	let zero = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
+	*zero = 0u32;
+	runtime_copy(0, zero as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]() as i64);
+	runtime_release(0, zero as &[i8]);
 
 	let mut cpu_result: bool = true;
 
@@ -104,12 +106,15 @@ fn createBaseTest(additional_mem: i32) -> BaseTest {
 		},
 
 		finish: @|| {
-			let mut gpu_result: u32;
-			runtime_copy(device.platform_device, bitcast[&mut[i8]](device_failed_flag), 0i64, 0, bitcast[&mut[i8]](&mut gpu_result), 0i64, sizeof[u32]() as i64);
+			let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
+			runtime_copy(device.platform_device, device_memory as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
 
+			let result = (if cpu_result { 0 } else { 1 }) + *gpu_result as i32;
+
+			runtime_release(0, gpu_result as &[i8]);
 			release(device_test_state_alloc);
 
-			(if cpu_result { 0 } else { 1 }) + gpu_result as i32
+			result
 		}
 	}
 }
