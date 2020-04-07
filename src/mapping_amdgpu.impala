@@ -84,21 +84,21 @@ fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(g
         barrier_count: |_| undef[i32](), // AMDGCN doesn't need to sync threads in a warp
         barrier_vote:  |_| undef[u32](), // AMDGCN doesn't need to sync threads in a warp
 
-        shfl_i32: @|var:i32, src_lane:i32, width:i32| amdgcn_shfl_i32(var, src_lane, width),
-        shfl_u32: @|var:u32, src_lane:i32, width:i32| amdgcn_shfl_u32(var, src_lane, width),
-        shfl_f32: @|var:f32, src_lane:i32, width:i32| amdgcn_shfl_f32(var, src_lane, width),
+        shfl_i32: @|var:i32, src_lane:i32, width:u32| amdgcn_shfl_i32(var, src_lane, width as i32),
+        shfl_u32: @|var:u32, src_lane:i32, width:u32| amdgcn_shfl_u32(var, src_lane, width as i32),
+        shfl_f32: @|var:f32, src_lane:i32, width:u32| amdgcn_shfl_f32(var, src_lane, width as i32),
 
-        shfl_up_i32: @|var:i32, delta:u32, width:i32| amdgcn_shfl_up_i32(var, delta, width),
-        shfl_up_u32: @|var:u32, delta:u32, width:i32| amdgcn_shfl_up_u32(var, delta, width),
-        shfl_up_f32: @|var:f32, delta:u32, width:i32| amdgcn_shfl_up_f32(var, delta, width),
+        shfl_up_i32: @|var:i32, delta:u32, width:u32| amdgcn_shfl_up_i32(var, delta, width as i32),
+        shfl_up_u32: @|var:u32, delta:u32, width:u32| amdgcn_shfl_up_u32(var, delta, width as i32),
+        shfl_up_f32: @|var:f32, delta:u32, width:u32| amdgcn_shfl_up_f32(var, delta, width as i32),
 
-        shfl_down_i32: @|var:i32, delta:u32, width:i32| amdgcn_shfl_down_i32(var, delta, width),
-        shfl_down_u32: @|var:u32, delta:u32, width:i32| amdgcn_shfl_down_u32(var, delta, width),
-        shfl_down_f32: @|var:f32, delta:u32, width:i32| amdgcn_shfl_down_f32(var, delta, width),
+        shfl_down_i32: @|var:i32, delta:u32, width:u32| amdgcn_shfl_down_i32(var, delta, width as i32),
+        shfl_down_u32: @|var:u32, delta:u32, width:u32| amdgcn_shfl_down_u32(var, delta, width as i32),
+        shfl_down_f32: @|var:f32, delta:u32, width:u32| amdgcn_shfl_down_f32(var, delta, width as i32),
 
-        shfl_bfly_i32: @|var:i32, lane_mask:i32, width:i32| amdgcn_shfl_xor_i32(var, lane_mask, width),
-        shfl_bfly_u32: @|var:u32, lane_mask:i32, width:i32| amdgcn_shfl_xor_u32(var, lane_mask, width),
-        shfl_bfly_f32: @|var:f32, lane_mask:i32, width:i32| amdgcn_shfl_xor_f32(var, lane_mask, width),
+        shfl_bfly_i32: @|var:i32, lane_mask:i32, width:u32| amdgcn_shfl_xor_i32(var, lane_mask, width as i32),
+        shfl_bfly_u32: @|var:u32, lane_mask:i32, width:u32| amdgcn_shfl_xor_u32(var, lane_mask, width as i32),
+        shfl_bfly_f32: @|var:f32, lane_mask:i32, width:u32| amdgcn_shfl_xor_f32(var, lane_mask, width as i32),
 
         lanemask: @|| cuda_lanemask() as u64,
         lanemask_le: @|| cuda_lanemask_le() as u64,
