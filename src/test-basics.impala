@@ -1,10 +1,10 @@
 
 
 fn main() -> i32 {
-	let test = createBaseTest(0);
-
 	let group_size = 256;
 	let num_groups = 42;
+
+	let test = createBaseTest(0);
 
 	with device, device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {

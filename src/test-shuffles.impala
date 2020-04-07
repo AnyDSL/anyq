@@ -1,0 +1,27 @@
+
+
+fn main() -> i32 {
+	let group_size = 256;
+	let num_groups = 42;
+
+	let test = createBaseTest(0);
+
+	with device, device_memory, device_failed_flag in test.run_test() {
+		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
+			with wave in grid.waves() {
+				with thread in wave.threads() {
+					for i in range(0, wave.num_threads() as i32) {
+						let iami = if thread.idx(0) as i32 == i {1} else {0};
+						if wave.shfl_i32(iami, i, wave.num_threads()) != 1 {
+							thread.atomic_exch_global_u32(device_failed_flag, 1u32);
+						}
+					}
+				}
+			}
+		}
+
+		true
+	}
+
+	test.finish()
+}
