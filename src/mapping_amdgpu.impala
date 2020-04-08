@@ -133,7 +133,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
 }
 
 fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics)->()) -> () {
-    let wavefront_size = amdgcn_wavefront_size as u32;
+    let wavefront_size = 32u32;
     fn @div_round_up(num: i32, multiple: i32) -> i32 { (num + multiple - 1) / multiple }
 
     let num_threads_per_block = wrap_dim(@|i| {
