@@ -119,9 +119,9 @@ fn @opencl_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> 
 	});
 }
 
-fn @ShuffleDirFn_i32(i32, u32, i32) -> i32 { undef[i32]() }
-fn @ShuffleDirFn_u32(u32, u32, i32) -> u32 { undef[u32]() }
-fn @ShuffleDirFn_f32(f32, u32, i32) -> f32 { undef[f32]() }
+fn @ShuffleDirFn_i32(i32, u32, u32) -> i32 { undef[i32]() }
+fn @ShuffleDirFn_u32(u32, u32, u32) -> u32 { undef[u32]() }
+fn @ShuffleDirFn_f32(f32, u32, u32) -> f32 { undef[f32]() }
 
 
 fn @opencl_sub_group(idx: fn () -> u32, membermask: u64, num_threads: fn () -> u32, body: fn (gpu_wave_context) -> ()) -> () {
