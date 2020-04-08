@@ -121,7 +121,7 @@ fn main() -> i32 {
 						// let should_push = simplexNoiseFractal([randf(rand_state), randf(rand_state), randf(rand_state)], 8) < 0.0f32;
 						// let should_push = simplexNoiseFractal([0.0f32, 0.0f32, 0.0f32], 8) < 0.0f32;
 
-						if wave.shfl_i32(if rand_state as i32 < 0 { 1 } else { 0 }, 0, 32) != 0 {
+						if wave.shfl_i32(if rand_state as i32 < 0 { 1 } else { 0 }, 0, 32u32) != 0 {
 							// if lane.idx() == 0u32 {
 							// 	// cuda_device_print_i32("pushing %d\n", warp_id);
 							// 	// queue.push((i + 1) as u32);
