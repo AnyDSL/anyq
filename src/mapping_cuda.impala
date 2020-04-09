@@ -30,14 +30,10 @@ fn @cuda_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 		atomic_add_global_i32: cuda_atomic_add_global_i32,
 		atomic_add_global_u32: cuda_atomic_add_global_u32,
 		atomic_add_global_u64: cuda_atomic_add_global_u64,
-		atomic_add_global_f32: cuda_atomic_add_global_f32,
-		// atomic_add_global_f64: cuda_atomic_add_global_f64,
 
 		atomic_sub_global_i32: cuda_atomic_sub_global_i32,
 		atomic_sub_global_u32: cuda_atomic_sub_global_u32,
 		atomic_sub_global_u64: cuda_atomic_sub_global_u64,
-		atomic_sub_global_f32: cuda_atomic_sub_global_f32,
-		// atomic_sub_global_f64: cuda_atomic_sub_global_f64,
 
 		atomic_and_global_i32: cuda_atomic_and_global_i32,
 		atomic_and_global_u32: cuda_atomic_and_global_u32,
@@ -54,7 +50,6 @@ fn @cuda_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 		atomic_exch_global_i32: cuda_atomic_exch_global_i32,
 		atomic_exch_global_u32: cuda_atomic_exch_global_u32,
 		atomic_exch_global_u64: cuda_atomic_exch_global_u64,
-		atomic_exch_global_f32: cuda_atomic_exch_global_f32,
 
 		atomic_min_global_i32: cuda_atomic_min_global_i32,
 		atomic_min_global_u32: cuda_atomic_min_global_u32,
@@ -64,7 +59,6 @@ fn @cuda_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 		atomic_max_global_u32: cuda_atomic_max_global_u32,
 		atomic_max_global_u64: cuda_atomic_max_global_u64,
 
-		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
 		atomic_cas_global_i32: cuda_atomic_cas_global_i32,
 		atomic_cas_global_u32: cuda_atomic_cas_global_u32,
 		atomic_cas_global_i64: cuda_atomic_cas_global_u64,
