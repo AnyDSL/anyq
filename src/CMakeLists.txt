@@ -59,5 +59,7 @@ if (Thorin_HAS_RV_SUPPORT)
 	add_schedule_test(test-basics.impala cpu)
 	add_schedule_test(test-shuffles.impala cpu)
 	# add_schedule_test(test-producer-consumer-queue.impala cpu)
+
+	add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()
 

@@ -1,0 +1,41 @@
+
+
+fn main() -> i32 {
+
+	let warp_size = 32;
+	// works for values atleast up to 128
+	let vec_width = warp_size;
+
+	let buffer = alloc_cpu(warp_size*sizeof[i32]());
+	let data = bitcast[&mut[i32]](buffer.data);
+
+	for i in range(0, warp_size) {
+		data(i) = i;
+	}
+
+	//let delta = 12;
+	//for j in vectorize(vec_width) {
+	//	data(j) = rv_shuffle(data(j) as f32, $delta) as i32;
+	//}
+
+	// rv error : rv_shuffle: shift amount needs to be a constant!
+	//for j in vectorize(vec_width) {
+	//	let src_lane = j / 4;
+	//	let delta = src_lane - j;
+	//	data(j) = rv_shuffle(data(j) as f32, delta) as i32;
+	//}
+
+	//for j in vectorize(vec_width) {
+	//	data(j) = rv_all(data(j) <= 0) as i32;
+	//	data(j) = rv_any(data(j) <= 0) as i32;
+	//}
+
+
+	for i in range(0, warp_size) {
+		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+	}
+
+	release(buffer);
+
+	0
+}
