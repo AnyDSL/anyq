@@ -54,3 +54,12 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 	add_schedule_test(test-shuffles.impala amdgpu)
 	add_schedule_test(test-producer-consumer-queue.impala amdgpu)
 endif()
+
+if (Thorin_HAS_RV_SUPPORT)
+	add_schedule_test(test-basics.impala cpu)
+	add_schedule_test(test-shuffles.impala cpu)
+	# add_schedule_test(test-producer-consumer-queue.impala cpu)
+
+	add_schedule_test(test-rv-intrinsics.impala cpu)
+endif()
+
