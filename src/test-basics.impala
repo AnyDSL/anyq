@@ -9,7 +9,7 @@ fn main() -> i32 {
 	with device, device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with thread in grid.threads() {
-				thread.atomic_add_global_u32(device_failed_flag, thread.idx(0) as u32);
+				thread.atomic_add_global_u32(device_failed_flag, thread.idx(0));
 			}
 		}
 
@@ -21,7 +21,7 @@ fn main() -> i32 {
 			with group in grid.groups() {
 				with wave in group.waves() {
 					with thread in wave.threads() {
-						thread.atomic_sub_global_u32(device_failed_flag, ((group.idx(0) * group.num_waves() + wave.idx()) * wave.num_threads() + thread.idx(0)) as u32);
+						thread.atomic_sub_global_u32(device_failed_flag, (group.idx(0) * group.num_waves() + wave.idx()) * wave.num_threads() + thread.idx(0));
 					}
 				}
 			}
@@ -34,7 +34,7 @@ fn main() -> i32 {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with group in grid.groups() {
 				with thread in group.threads() {
-					thread.atomic_add_global_u32(device_failed_flag, (group.idx(0) * group.num_threads(0) + thread.idx(0)) as u32);
+					thread.atomic_add_global_u32(device_failed_flag, group.idx(0) * group.num_threads(0) + thread.idx(0));
 				}
 			}
 		}
@@ -46,7 +46,7 @@ fn main() -> i32 {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
-					thread.atomic_sub_global_u32(device_failed_flag, (wave.idx() * wave.num_threads() + thread.idx(0)) as u32);
+					thread.atomic_sub_global_u32(device_failed_flag, wave.idx() * wave.num_threads() + thread.idx(0));
 				}
 			}
 		}
