@@ -17,6 +17,11 @@ fn @createAccDevice() -> AccDevice {
 
 fn AtomicFn_u32(&mut[1] u32, u32) -> u32 { undef[u32]() }
 
+extern "C" {
+	fn "rv_shuffle" rv_shuffle_f32(f32, i32) -> f32;
+	fn "rv_shuffle" rv_shuffle_i32(i32, i32) -> i32;
+	fn "rv_shuffle" rv_shuffle_u32(u32, i32) -> u32;
+}
 
 fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
@@ -96,13 +101,13 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		shfl_u32: @|x:u32, src_lane:i32, width:u32| { undef[u32]() },
 		//shfl_f32: @|x:f32, src_lane:i32, width:u32| { undef[f32]() },
 
-		shfl_up_i32: @|x:i32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), -(delta as i32)); bitcast[i32](y) },
-		shfl_up_u32: @|x:u32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), -(delta as i32)); bitcast[u32](y) },
-		//shfl_up_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, -(delta as i32)) },
+		shfl_up_i32: @|x:i32, delta:u32, width:u32| { rv_shuffle_i32(x, -(delta as i32)) },
+		shfl_up_u32: @|x:u32, delta:u32, width:u32| { rv_shuffle_u32(x, -(delta as i32)) },
+		//shfl_up_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle_f32(x, -(delta as i32)) },
 
-		shfl_down_i32: @|x:i32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), delta as i32); bitcast[i32](y) },
-		shfl_down_u32: @|x:u32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), delta as i32); bitcast[u32](y) },
-		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, delta as i32) },
+		shfl_down_i32: @|x:i32, delta:u32, width:u32| { rv_shuffle_i32(x, delta as i32) },
+		shfl_down_u32: @|x:u32, delta:u32, width:u32| { rv_shuffle_u32(x, delta as i32) },
+		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle_f32(x, delta as i32) },
 
 		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { undef[i32]() }, // opencl_intel_sub_group_shuffle_xor_i32(x, lane_mask as u32),
 		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { undef[u32]() }, // opencl_intel_sub_group_shuffle_xor_u32(x, lane_mask as u32),
