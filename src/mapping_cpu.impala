@@ -93,8 +93,8 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		barrier: @|| { },
 		barrier_all: @|predicate| { rv_all(predicate != 0) as i32 },
 		barrier_any: @|predicate| { rv_any(predicate != 0) as i32 },
-		barrier_count: @|predicate| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
-		barrier_vote: @|predicate| { undef[u64]() }, //cuda_warp_sync_vote(membermask, predicate),
+		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate != 0)) },
+		barrier_vote: @|predicate| { rv_ballot(predicate != 0) as u64 },
 
 		/* TODO: assert width == num_threads == warp_size */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { undef[i32]() },
