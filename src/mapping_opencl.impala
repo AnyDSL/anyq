@@ -140,7 +140,7 @@ fn @opencl_sub_group(idx: fn () -> u32, membermask: u64, num_threads: fn () -> u
 		barrier_all: @|predicate| opencl_sub_group_all(predicate),
 		barrier_any: @|predicate| opencl_sub_group_any(predicate),
 		barrier_count: @|predicate| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
-		barrier_vote: @|predicate| { undef[u32]() }, //cuda_warp_sync_vote(membermask, predicate),
+		barrier_vote: @|predicate| { undef[u64]() }, //cuda_warp_sync_vote(membermask, predicate),
 
 		// activemask: cuda_warp_activemask,
 

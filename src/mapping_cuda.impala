@@ -94,7 +94,7 @@ fn @cuda_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn 
 		barrier_all: @|predicate| cuda_warp_sync_all(membermask, predicate),
 		barrier_any: @|predicate| cuda_warp_sync_any(membermask, predicate),
 		barrier_count: @|predicate| cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
-		barrier_vote: @|predicate| cuda_warp_sync_vote(membermask, predicate),
+		barrier_vote: @|predicate| cuda_warp_sync_vote(membermask, predicate) as u64,
 
 		// activemask: cuda_warp_activemask,
 

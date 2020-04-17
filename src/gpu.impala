@@ -39,7 +39,7 @@ struct gpu_wave_context {
 	barrier_all: fn (i32) -> i32,
 	barrier_any: fn (i32) -> i32,
 	barrier_count: fn (i32) -> i32,
-	barrier_vote: fn (i32) -> u32,
+	barrier_vote: fn (i32) -> u64,
 
 	// activemask: fn () -> u32,
 

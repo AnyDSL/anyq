@@ -102,8 +102,8 @@ fn @nvvm_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn 
 		barrier: @|| nvvm_warp_sync(membermask),
 		barrier_all: @|predicate| if nvvm_warp_sync_all(membermask, predicate != 0) {1} else {0},
 		barrier_any: @|predicate| if nvvm_warp_sync_any(membermask, predicate != 0) {1} else {0},
-		barrier_count: @|predicate| nvvm_popc_i(nvvm_warp_sync_vote(membermask, predicate != 0) as i32),
-		barrier_vote: @|predicate| nvvm_warp_sync_vote(membermask, predicate != 0),
+		barrier_count: @|predicate| nvvm_popc_i(nvvm_warp_sync_ballot(membermask, predicate != 0) as i32),
+		barrier_vote: @|predicate| nvvm_warp_sync_ballot(membermask, predicate != 0) as u64,
 
 		// activemask: nvvm_warp_activemask,
 
