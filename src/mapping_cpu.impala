@@ -86,19 +86,19 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		/* TODO: assert width == num_threads == warp_size */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { undef[i32]() },
 		shfl_u32: @|x:u32, src_lane:i32, width:u32| { undef[u32]() },
-		shfl_f32: @|x:f32, src_lane:i32, width:u32| { undef[f32]() },
+		//shfl_f32: @|x:f32, src_lane:i32, width:u32| { undef[f32]() },
 
 		shfl_up_i32: @|x:i32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), -(delta as i32)); bitcast[i32](y) },
 		shfl_up_u32: @|x:u32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), -(delta as i32)); bitcast[u32](y) },
-		shfl_up_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, -(delta as i32)) },
+		//shfl_up_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, -(delta as i32)) },
 
 		shfl_down_i32: @|x:i32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), delta as i32); bitcast[i32](y) },
 		shfl_down_u32: @|x:u32, delta:u32, width:u32| { let y = rv_shuffle(bitcast[f32](x), delta as i32); bitcast[u32](y) },
-		shfl_down_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, delta as i32) },
+		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { rv_shuffle(x, delta as i32) },
 
 		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { undef[i32]() }, // opencl_intel_sub_group_shuffle_xor_i32(x, lane_mask as u32),
 		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { undef[u32]() }, // opencl_intel_sub_group_shuffle_xor_u32(x, lane_mask as u32),
-		shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() }, // opencl_intel_sub_group_shuffle_xor_f32(x, lane_mask as u32),
+		//shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() }, // opencl_intel_sub_group_shuffle_xor_f32(x, lane_mask as u32),
 
 		lanemask: @|| 1u64 << idx.local_id() as u64,
 		lanemask_le: @|| undef[u64](),
