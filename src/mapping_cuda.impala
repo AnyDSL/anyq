@@ -27,6 +27,14 @@ fn @cuda_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 	@@body(gpu_thread_context {
 		idx: idx,
 
+		atomic_load_global_i32: @|location:&mut[1]i32| cuda_atomic_add_global_i32(location, 0i32),
+		atomic_load_global_u32: @|location:&mut[1]u32| cuda_atomic_add_global_u32(location, 0u32),
+		atomic_load_global_u64: @|location:&mut[1]u64| cuda_atomic_add_global_u64(location, 0u64),
+	
+		atomic_store_global_i32: @|location:&mut[1]i32, value:i32| -> () { cuda_atomic_exch_global_i32(location, value); },
+		atomic_store_global_u32: @|location:&mut[1]u32, value:u32| -> () { cuda_atomic_exch_global_u32(location, value); },
+		atomic_store_global_u64: @|location:&mut[1]u64, value:u64| -> () { cuda_atomic_exch_global_u64(location, value); },
+
 		atomic_add_global_i32: cuda_atomic_add_global_i32,
 		atomic_add_global_u32: cuda_atomic_add_global_u32,
 		atomic_add_global_u64: cuda_atomic_add_global_u64,

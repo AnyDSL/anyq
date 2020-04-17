@@ -95,6 +95,14 @@ struct gpu_wave_context {
 struct gpu_thread_context {
 	idx: fn (i32) -> u32,
 
+	atomic_load_global_i32: fn (&mut[1]i32) -> i32,
+	atomic_load_global_u32: fn (&mut[1]u32) -> u32,
+	atomic_load_global_u64: fn (&mut[1]u64) -> u64,
+
+	atomic_store_global_i32: fn (&mut[1]i32, i32) -> (),
+	atomic_store_global_u32: fn (&mut[1]u32, u32) -> (),
+	atomic_store_global_u64: fn (&mut[1]u64, u64) -> (),
+
 	atomic_add_global_i32: fn (&mut[1]i32, i32) -> i32,
 	atomic_add_global_u32: fn (&mut[1]u32, u32) -> u32,
 	atomic_add_global_u64: fn (&mut[1]u64, u64) -> u64,
