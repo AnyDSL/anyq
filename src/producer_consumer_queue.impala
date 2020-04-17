@@ -3,6 +3,7 @@ struct ProducerConsumerQueue
 {
 	push: fn (gpu_thread_context, fn (u32) -> u32) -> i32,
 	pop: fn (gpu_thread_context, fn (u32, u32) -> ()) -> i32,
+	// pop_wave: fn (gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
 	// size: fn() -> i32,
 	reset: fn () -> (),
 	validate: fn (&mut[1]u32) -> (),
@@ -48,9 +49,9 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 		},
 
 		pop: @|thread, sink| -> i32 {
-			let old_size = thread.atomic_sub_global_i32(size, 1);
+			let available = thread.atomic_sub_global_i32(size, 1);
 
-			if old_size <= 0 {
+			if available <= 0 {
 				thread.atomic_add_global_i32(size, 1);
 				0
 			}
@@ -76,6 +77,38 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 				1
 			}
 		},
+
+		// pop_wave: @|wave, N, sink| -> i32 {
+		// 	with thread in wave.threads() {
+		// 		let available = thread.atomic_sub_global_i32(size, N);
+
+		// 		if available <= N {
+		// 			thread.atomic_add_global_i32(size, N);
+		// 			0
+		// 		}
+		// 		else
+		// 		{
+		// 			let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
+
+		// 			let tryDequeue = @|sink, i| {
+		// 				let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
+		// 				if el != FREE {
+		// 					sink(i, el);
+		// 					true
+		// 				}
+		// 				else {
+		// 					false
+		// 				}
+		// 			};
+
+		// 			while !tryDequeue(sink, i) {
+		// 				thread.yield();
+		// 			}
+
+		// 			1
+		// 		}
+		// 	}
+		// },
 
 		// size: @|| {
 		// 	cuda_atomic_add_global_i32(size, 0)

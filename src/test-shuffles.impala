@@ -4,7 +4,7 @@ fn main() -> i32 {
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(0);
+	let test = createBaseTest(0u32);
 
 	// verify that each lane can read from each other lane
 	with device, device_memory, device_failed_flag in test.run_test() {

@@ -86,10 +86,10 @@ struct BaseTest {
 	finish: fn () -> i32
 }
 
-fn createBaseTest(additional_mem: i32) -> BaseTest {
+fn createBaseTest(additional_mem: u32) -> BaseTest {
 	let device = createAccDevice();
 
-	let memory_size = round_up(0 + sizeof[u32](), sizeof[u32]());
+	let memory_size = round_up(additional_mem as i32 + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory(memory_size - sizeof[u32]()));
@@ -126,7 +126,7 @@ struct QueueTest {
 	finish: fn () -> i32
 }
 
-fn createQueueTest(additional_mem: i32) -> QueueTest {
+fn createQueueTest(additional_mem: u32) -> QueueTest {
 	let test = createBaseTest(additional_mem);
 
 	// cuda_device is a static in cuda_mapping
