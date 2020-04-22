@@ -4,7 +4,7 @@ struct ProducerConsumerQueue
 	push: fn (gpu_thread_context, fn (u32) -> u32) -> i32,
 	pop: fn (gpu_thread_context, fn (u32, u32) -> ()) -> i32,
 	// pop_wave: fn (gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
-	// size: fn() -> i32,
+	size: fn(gpu_thread_context) -> i32,
 	reset: fn () -> (),
 	validate: fn (&mut[1]u32) -> (),
 	release: fn () -> ()
@@ -110,9 +110,9 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 		// 	}
 		// },
 
-		// size: @|| {
-		// 	cuda_atomic_add_global_i32(size, 0)
-		// },
+		size: @|thread| {
+			thread.atomic_load_global_i32(size)
+		},
 
 		reset: @|| {
 			let block_dim = 256;

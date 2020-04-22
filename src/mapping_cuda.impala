@@ -1,15 +1,6 @@
 
 static cuda_device = 0;
 
-extern "device" {
-	fn "printf" cuda_device_print_i32(&[u8], i32) -> i32;
-	fn "printf" cuda_device_print_i32_i32(&[u8], i32, i32) -> i32;
-	fn "printf" cuda_device_print_i32_i32_i32(&[u8], i32, i32, i32) -> i32;
-	fn "printf" cuda_device_print_i32_i32_i32_i32(&[u8], i32, i32, i32, i32) -> i32;
-	fn "printf" cuda_device_print_i32_i32_i32_i32_i32(&[u8], i32, i32, i32, i32, i32) -> i32;
-	fn "printf" cuda_device_print_i32_i32_i32_i32_i32_i32(&[u8], i32, i32, i32, i32, i32, i32) -> i32;
-}
-
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
 		launch_1d: @|num_groups, group_size, body| {
@@ -237,4 +228,9 @@ fn cuda_launch_2d(device: i32, grid_dim: (i32, i32), block_dim: (i32, i32), body
 
 fn cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	@@cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
+}
+
+
+fn @cuda_device_print_i32a(format: &[u8], a: &[i32]) -> i32 {
+	cuda_vprintf(format, bitcast[&[u8]](&a(0)))
 }
