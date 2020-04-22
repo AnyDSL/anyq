@@ -22,42 +22,50 @@ fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () 
 	@@body(gpu_thread_context {
 		idx: idx,
 
-		atomic_add_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](1u, bitcast[&mut i32](addr), val) },
-		atomic_add_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](1u, bitcast[&mut u32](addr), val) },
-		atomic_add_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](1u, bitcast[&mut u64](addr), val) },
+		atomic_load_global_i32: @|addr: &mut[1]i32| atomic_load(bitcast[&mut i32](addr), 7u32, ""),
+		atomic_load_global_u32: @|addr: &mut[1]u32| atomic_load(bitcast[&mut u32](addr), 7u32, ""),
+		atomic_load_global_u64: @|addr: &mut[1]u64| atomic_load(bitcast[&mut u64](addr), 7u32, ""),
 
-		atomic_sub_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](2u, bitcast[&mut i32](addr), val) },
-		atomic_sub_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](2u, bitcast[&mut u32](addr), val) },
-		atomic_sub_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](2u, bitcast[&mut u64](addr), val) },
+		atomic_store_global_i32: @|addr: &mut[1]i32, val: i32| atomic_store(bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_store_global_u32: @|addr: &mut[1]u32, val: u32| atomic_store(bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_store_global_u64: @|addr: &mut[1]u64, val: u64| atomic_store(bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_and_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](3u, bitcast[&mut i32](addr), val) },
-		atomic_and_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](3u, bitcast[&mut u32](addr), val) },
-		atomic_and_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](3u, bitcast[&mut u64](addr), val) },
+		atomic_add_global_i32: @|addr: &mut[1] i32, val: i32| atomic(1u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_add_global_u32: @|addr: &mut[1] u32, val: u32| atomic(1u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_add_global_u64: @|addr: &mut[1] u64, val: u64| atomic(1u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_or_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](5u, bitcast[&mut i32](addr), val) },
-		atomic_or_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](5u, bitcast[&mut u32](addr), val) },
-		atomic_or_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](5u, bitcast[&mut u64](addr), val) },
+		atomic_sub_global_i32: @|addr: &mut[1] i32, val: i32| atomic(2u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_sub_global_u32: @|addr: &mut[1] u32, val: u32| atomic(2u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_sub_global_u64: @|addr: &mut[1] u64, val: u64| atomic(2u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_xor_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](6u, bitcast[&mut i32](addr), val) },
-		atomic_xor_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](6u, bitcast[&mut u32](addr), val) },
-		atomic_xor_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](6u, bitcast[&mut u64](addr), val) },
+		atomic_and_global_i32: @|addr: &mut[1] i32, val: i32| atomic(3u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_and_global_u32: @|addr: &mut[1] u32, val: u32| atomic(3u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_and_global_u64: @|addr: &mut[1] u64, val: u64| atomic(3u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_exch_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](0u, bitcast[&mut i32](addr), val) },
-		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](0u, bitcast[&mut u32](addr), val) },
-		atomic_exch_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](0u, bitcast[&mut u64](addr), val) },
+		atomic_or_global_i32: @|addr: &mut[1] i32, val: i32| atomic(5u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_or_global_u32: @|addr: &mut[1] u32, val: u32| atomic(5u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_or_global_u64: @|addr: &mut[1] u64, val: u64| atomic(5u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](8u, bitcast[&mut i32](addr), val) },
-		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](8u, bitcast[&mut u32](addr), val) },
-		atomic_min_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](8u, bitcast[&mut u64](addr), val) },
+		atomic_xor_global_i32: @|addr: &mut[1] i32, val: i32| atomic(6u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_xor_global_u32: @|addr: &mut[1] u32, val: u32| atomic(6u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_xor_global_u64: @|addr: &mut[1] u64, val: u64| atomic(6u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
-		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 { atomic[i32](7u, bitcast[&mut i32](addr), val) },
-		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 { atomic[u32](7u, bitcast[&mut u32](addr), val) },
-		atomic_max_global_u64: @|addr: &mut[1] u64, val: u64| -> u64 { atomic[u64](7u, bitcast[&mut u64](addr), val) },
+		atomic_exch_global_i32: @|addr: &mut[1] i32, val: i32| atomic(0u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| atomic(0u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_exch_global_u64: @|addr: &mut[1] u64, val: u64| atomic(0u32, bitcast[&mut u64](addr), val, 7u32, ""),
+
+		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| atomic( 8u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| atomic(10u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_min_global_u64: @|addr: &mut[1] u64, val: u64| atomic(10u32, bitcast[&mut u64](addr), val, 7u32, ""),
+
+		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| atomic(7u32, bitcast[&mut i32](addr), val, 7u32, ""),
+		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| atomic(9u32, bitcast[&mut u32](addr), val, 7u32, ""),
+		atomic_max_global_u64: @|addr: &mut[1] u64, val: u64| atomic(9u32, bitcast[&mut u64](addr), val, 7u32, ""),
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
-		atomic_cas_global_i32: @|addr: &mut[1] i32, cmp: i32, val: i32| -> i32 { let r = cmpxchg[i32](bitcast[&mut i32](addr), cmp, val); r(0) },
-		atomic_cas_global_u32: @|addr: &mut[1] u32, cmp: u32, val: u32| -> u32 { let r = cmpxchg[u32](bitcast[&mut u32](addr), cmp, val); r(0) },
-		atomic_cas_global_i64: @|addr: &mut[1] u64, cmp: u64, val: u64| -> u64 { let r = cmpxchg[u64](bitcast[&mut u64](addr), cmp, val); r(0) },
+		atomic_cas_global_i32: @|addr: &mut[1] i32, cmp: i32, new: i32| cmpxchg(bitcast[&mut i32](addr), cmp, new, 7u32, "")(0),
+		atomic_cas_global_u32: @|addr: &mut[1] u32, cmp: u32, new: u32| cmpxchg(bitcast[&mut u32](addr), cmp, new, 7u32, "")(0),
+		atomic_cas_global_i64: @|addr: &mut[1] u64, cmp: u64, new: u64| cmpxchg(bitcast[&mut u64](addr), cmp, new, 7u32, "")(0),
 
 		atomic_inc_global_u32: AtomicFn_u32,
 		atomic_dec_global_u32: AtomicFn_u32,
@@ -81,7 +89,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		barrier_all: @|predicate| { rv_all(predicate != 0) as i32 },
 		barrier_any: @|predicate| { rv_any(predicate != 0) as i32 },
 		barrier_count: @|predicate| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
-		barrier_vote: @|predicate| { undef[u32]() }, //cuda_warp_sync_vote(membermask, predicate),
+		barrier_vote: @|predicate| { undef[u64]() }, //cuda_warp_sync_vote(membermask, predicate),
 
 		/* TODO: assert width == num_threads == warp_size */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { undef[i32]() },
