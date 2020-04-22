@@ -81,11 +81,11 @@ fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(g
 
         num_threads: @|| num_threads,
 
-        barrier:       amdgcn_s_barrier,
-        barrier_all:   |_| undef[i32](), // AMDGCN doesn't need to sync threads in a warp
-        barrier_any:   |_| undef[i32](), // AMDGCN doesn't need to sync threads in a warp
-        barrier_count: |_| undef[i32](), // AMDGCN doesn't need to sync threads in a warp
-        barrier_vote:  |_| undef[u64](), // AMDGCN doesn't need to sync threads in a warp
+        barrier:       amdgcn_wave_barrier,
+        barrier_all:   amdgcn_sync_all,
+        barrier_any:   amdgcn_sync_any,
+        barrier_count: amdgcn_sync_count,
+        barrier_vote:  amdgcn_sync_vote,
 
         shfl_i32: @|var:i32, src_lane:i32, width:u32| amdgcn_shfl_i32(var, src_lane, width as i32),
         shfl_u32: @|var:u32, src_lane:i32, width:u32| amdgcn_shfl_u32(var, src_lane, width as i32),
