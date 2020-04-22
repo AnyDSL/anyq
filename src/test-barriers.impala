@@ -63,7 +63,8 @@ fn main() -> i32 {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
-					for i in range(0, wave.num_threads() as i32) {
+					// FIXME: nvcc / nvrtc generates incorrect code on Linux when range is used
+					for i in unroll(0, wave.num_threads() as i32) {
 
 						let iami = if thread.idx(0) == i as u32 {1} else {0};
 						let x = wave.barrier_vote(iami);
