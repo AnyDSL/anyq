@@ -122,6 +122,51 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
 
     let num_warps = @|| ((num_threads(0) * num_threads(1) * num_threads(2)) + warp_size - 1u32) / warp_size;
 
+    fn @amdgcn_barrier_all(p: i32) -> i32 {
+        let lds = reserve_shared[i32](num_warps() as i32);
+        let warp_res = amdgcn_sync_all(p);
+        amdgcn_s_barrier();
+        if ockl_activelane() == 0u32 {
+            lds(warp_idx()) = warp_res;
+        }
+        amdgcn_s_barrier();
+        let mut res = lds(0);
+        for i in range(1, num_warps() as i32) {
+            res &= lds(i);
+        }
+        res
+    }
+
+    fn @amdgcn_barrier_any(p: i32) -> i32 {
+        let lds = reserve_shared[i32](num_warps() as i32);
+        let warp_res = amdgcn_sync_any(p);
+        amdgcn_s_barrier();
+        if ockl_activelane() == 0u32 {
+            lds(warp_idx()) = warp_res;
+        }
+        amdgcn_s_barrier();
+        let mut res = lds(0);
+        for i in range(1, num_warps() as i32) {
+            res |= lds(i);
+        }
+        res
+    }
+
+    fn @amdgcn_barrier_count(p: i32) -> i32 {
+        let lds = reserve_shared[i32](num_warps() as i32);
+        let warp_res = amdgcn_sync_count(p);
+        amdgcn_s_barrier();
+        if ockl_activelane() == 0u32 {
+            lds(warp_idx()) = warp_res;
+        }
+        amdgcn_s_barrier();
+        let mut res = lds(0);
+        for i in range(1, num_warps() as i32) {
+            res += lds(i);
+        }
+        res
+    }
+
     body(gpu_group_context {
         idx: idx,
         waves: @|body| amdgpu_subwarp(warp_idx, -1 as u64, warp_size, body),
@@ -129,9 +174,9 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         num_waves: num_warps,
         num_threads: num_threads,
         barrier: amdgcn_s_barrier,
-        barrier_all: |_| 42,
-        barrier_any: |_| 42,
-        barrier_count: |_| 42
+        barrier_all: amdgcn_barrier_all,
+        barrier_any: amdgcn_barrier_any,
+        barrier_count: amdgcn_barrier_count
     })
 }
 
