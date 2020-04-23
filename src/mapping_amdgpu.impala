@@ -126,7 +126,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         let lds = reserve_shared[i32](num_warps() as i32);
         let warp_res = amdgcn_sync_all(p);
         amdgcn_s_barrier();
-        if ockl_activelane() == 0u32 {
+        if amdgcn_activelane() == 0 {
             lds(warp_idx()) = warp_res;
         }
         amdgcn_s_barrier();
@@ -141,7 +141,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         let lds = reserve_shared[i32](num_warps() as i32);
         let warp_res = amdgcn_sync_any(p);
         amdgcn_s_barrier();
-        if ockl_activelane() == 0u32 {
+        if amdgcn_activelane() == 0 {
             lds(warp_idx()) = warp_res;
         }
         amdgcn_s_barrier();
@@ -156,7 +156,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         let lds = reserve_shared[i32](num_warps() as i32);
         let warp_res = amdgcn_sync_count(p);
         amdgcn_s_barrier();
-        if ockl_activelane() == 0u32 {
+        if amdgcn_activelane() == 0 {
             lds(warp_idx()) = warp_res;
         }
         amdgcn_s_barrier();
