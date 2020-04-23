@@ -138,7 +138,7 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 					if idx < buffer_size {
 						if buffer(idx) != FREE {
 							thread.atomic_or_global_u32(corrupted, 1u32);
-							device.print_i32("inconsistent queue state at %d\n", idx);
+							device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
 						}
 					}
 				}

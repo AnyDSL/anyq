@@ -78,7 +78,8 @@ struct AccDevice {
 	synchronize: fn() -> (),
 	alloc: fn(i32) -> Buffer,
 	platform_device: i32,
-	print_i32: fn(&[u8], i32) -> ()
+	print_i32: fn(&[u8], i32) -> (),
+	print_i32a: fn(&[u8], &[i32]) -> ()
 }
 
 struct BaseTest {
@@ -107,8 +108,15 @@ fn createBaseTest(additional_mem: u32) -> BaseTest {
 		},
 
 		finish: @|| {
+			device.synchronize();
+
 			let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
 			runtime_copy(device.platform_device, device_memory as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
+
+			print_string("gpu_result ");
+			print_i32(*gpu_result as i32);
+			print_string("\ncpu_result ");
+			print_i32((if cpu_result { 0 } else { 1 }));
 
 			let result = (if cpu_result { 0 } else { 1 }) + *gpu_result as i32;
 

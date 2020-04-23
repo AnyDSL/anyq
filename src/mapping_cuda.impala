@@ -9,7 +9,8 @@ fn @createAccDevice() -> AccDevice {
 		synchronize: || synchronize_cuda(cuda_device),
 		alloc: |size| alloc_cuda(cuda_device, size),
 		platform_device: runtime_device(1, cuda_device),
-		print_i32: @|fmt: &[u8], i: i32| { let tmp = i; cuda_vprintf(fmt, &tmp as &[u8]); }
+		print_i32: @|format: &[u8], arg: i32| { cuda_vprintf(format, bitcast[&[u8]](&arg)); },
+		print_i32a: @|format: &[u8], args: &[i32]| { cuda_vprintf(format, bitcast[&[u8]](&args(0))); }
 	}
 }
 
@@ -65,7 +66,7 @@ fn @cuda_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> ()
 		atomic_inc_global_u32: cuda_atomic_inc_global_u32,
 		atomic_dec_global_u32: cuda_atomic_dec_global_u32,
 
-		yield: @|| cuda_nanosleep(0u32)
+		yield: @|| cuda_threadfence() //cuda_nanosleep(0u32)
 	});
 }
 
@@ -228,9 +229,4 @@ fn cuda_launch_2d(device: i32, grid_dim: (i32, i32), block_dim: (i32, i32), body
 
 fn cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn (gpu_grid_context, Intrinsics) -> ()) -> () {
 	@@cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
-}
-
-
-fn @cuda_device_print_i32a(format: &[u8], a: &[i32]) -> i32 {
-	cuda_vprintf(format, bitcast[&[u8]](&a(0)))
 }

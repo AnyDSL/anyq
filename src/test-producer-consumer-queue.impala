@@ -247,12 +247,12 @@ fn main() -> i32 {
 		with grid, intrinsics in device.launch_1d(1, 1) {
 			with thread in grid.threads() {
 				if *next_input != num_elements {
-					//cuda_device_print_i32a("inconsistent next_input %d\n", [*next_input as i32]);
+					device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
 					thread.atomic_exch_global_u32(device_failed_flag, -1u32);
 				}
 
 				if *num_retired != num_elements {
-					//cuda_device_print_i32a("inconsistent num_retired %d\n", [*num_retired as i32]);
+					device.print_i32a("inconsistent num_retired %d != %d\n", [*num_retired as i32, num_elements as i32]);
 					thread.atomic_exch_global_u32(device_failed_flag, -2u32);
 				}
 			}

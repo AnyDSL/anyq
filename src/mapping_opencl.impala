@@ -10,7 +10,8 @@ fn @createAccDevice() -> AccDevice {
 		synchronize: || synchronize_opencl(opencl_device),
 		alloc: |size| alloc_opencl(opencl_device, size),
 		platform_device: runtime_device(2, opencl_device),
-		print_i32: @|msg: &[u8], i: i32| { opencl_print_i32(msg, i); }
+		print_i32: @|format: &[u8], arg: i32| { opencl_print_i32(format, arg); },
+		print_i32a: @|format: &[u8], args: &[i32]| { opencl_print_i32("print_i32a not supported in opencl", args(0)); }
 	}
 }
 
