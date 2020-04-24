@@ -1,4 +1,3 @@
-
 // require device with OpenCL 2.1 support (and cl_intel_subgroups extension)
 static opencl_device = 1;
 
@@ -43,10 +42,10 @@ extern "device" {
     fn "work_group_barrier"      opencl_work_group_barrier     (u32) -> ();
     fn "sub_group_barrier"       opencl_sub_group_barrier      (u32) -> ();
     fn "get_sub_group_size"      opencl_get_sub_group_size     () -> u32;
-	 fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> u32;
-	 fn "get_sub_group_id"        opencl_get_sub_group_id       () -> u32;
-	 fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> u32;
-	 fn "get_max_sub_group_size " opencl_get_max_sub_group_size () -> u32;
+    fn "get_num_sub_groups"      opencl_get_num_sub_groups     () -> u32;
+    fn "get_sub_group_id"        opencl_get_sub_group_id       () -> u32;
+    fn "get_sub_group_local_id"  opencl_get_sub_group_local_id () -> u32;
+    fn "get_max_sub_group_size " opencl_get_max_sub_group_size () -> u32;
 
     fn "sub_group_all"           opencl_sub_group_all (i32) -> i32;
     fn "sub_group_any"           opencl_sub_group_any (i32) -> i32;
@@ -64,7 +63,7 @@ extern "device" {
     fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_u32  (u32, u32) -> u32;
     fn "intel_sub_group_shuffle_xor"  opencl_intel_sub_group_shuffle_xor_f32  (f32, u32) -> f32;
 
-	fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
+    fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
 }
 
 fn @opencl_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
