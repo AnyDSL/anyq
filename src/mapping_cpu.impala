@@ -11,7 +11,8 @@ fn @createAccDevice() -> AccDevice {
 		synchronize: @|| { },
 		alloc: @|size| alloc_cpu(size),
 		platform_device: runtime_device(0, 0),
-		print_i32: @|msg: &[u8], i: i32| { print_string(msg); print_i32(i); print_char('\n'); }
+		print_i32: @|msg: &[u8], i: i32| { print_string(msg); print_i32(i); print_char('\n'); },
+		print_i32a: @|format: &[u8], args: &[i32]| { print_string(format); print_i32(args(0)); print_char('\n'); /* printf(format, bitcast[&[u8]](&args(0))); */ }
 	}
 }
 
