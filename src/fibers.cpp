@@ -138,8 +138,12 @@ void anydsl_fibers_spawn(
 
 	void (*fun_ptr) (void*, int32_t, int32_t) = reinterpret_cast<void (*) (void*, int32_t, int32_t)>(fun);
 
-
-	boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx.num_threads);
+	// main thread must not join scheduling multiple times
+	static bool main_thread_join_scheduling = true;
+	if (main_thread_join_scheduling) {
+		boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx.num_threads);
+		main_thread_join_scheduling = false;
+	}
 
 	// TODO: incorporate num_blocks_in_flight to reuse fibers for multiple blocks
 	block_barriers.clear();
@@ -181,5 +185,6 @@ void anydsl_fibers_spawn(
 	for (std::thread & t : threads) {
 		t.join();
 	}
+	threads.clear();
 }
 

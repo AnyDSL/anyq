@@ -22,12 +22,40 @@ set(COMMON_IMPALA_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.impala
 )
 
+find_package(Boost 1.65 COMPONENTS fiber)
+
+if (Boost_FOUND)
+	add_library(fiber-support STATIC fibers.h fibers.cpp)
+	set_target_properties(fiber-support PROPERTIES INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
+	target_link_libraries(fiber-support PRIVATE Boost::fiber)
+
+	add_executable(fiber-test test-fibers.cpp)
+	set_target_properties(fiber-test PROPERTIES
+		FOLDER "tests/cpu"
+		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+	target_link_libraries(fiber-test PRIVATE fiber-support)
+
+	offline_graph(fiber-integration fibers.impala)
+	set_target_properties(fiber-integration PROPERTIES FOLDER "tests/cpu")
+	target_link_libraries(fiber-integration PRIVATE fiber-support)
+
+	set(AnyQ_FIBER_SUPPORT TRUE)
+	set(ADDITIONAL_LINK_DEPENDENCY_cpu fiber-support)
+else()
+	message(STATUS "Boost is required for fiber-support used in the CPU mapping.")
+endif()
+
 
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
 	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
+	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
+	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")
+	if(ADDITIONAL_LINK_DEPENDENCY)
+		target_link_libraries(${_target} PRIVATE ${ADDITIONAL_LINK_DEPENDENCY})
+	endif()
 	if (BUILD_TESTING)
 		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 	endif()
@@ -59,29 +87,11 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 	add_schedule_test(test-producer-consumer-queue.impala amdgpu)
 endif()
 
-if (Thorin_HAS_RV_SUPPORT)
+if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	add_schedule_test(test-basics.impala cpu)
-	add_schedule_test(test-shuffles.impala cpu)
+	# add_schedule_test(test-shuffles.impala cpu)
 	add_schedule_test(test-barriers.impala cpu)
 	# add_schedule_test(test-producer-consumer-queue.impala cpu)
 
-	add_schedule_test(test-rv-intrinsics.impala cpu)
-endif()
-
-
-find_package(Boost 1.65 COMPONENTS fiber)
-
-if (Boost_FOUND)
-	add_executable(fiber-test fibers.h fibers.cpp test-fibers.cpp)
-	set_target_properties(fiber-test PROPERTIES
-		INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
-		FOLDER "tests/cpu"
-		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-	target_link_libraries(fiber-test PRIVATE Boost::fiber)
-
-	offline_graph(fiber-integration fibers.h fibers.cpp fibers.impala)
-	set_target_properties(fiber-integration PROPERTIES
-		INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
-		FOLDER "tests/cpu")
-	target_link_libraries(fiber-integration PRIVATE Boost::fiber)
+	# add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()

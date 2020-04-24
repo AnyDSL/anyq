@@ -1,5 +1,5 @@
 
-static cpu_threads = 0;
+static cpu_threads = 1;
 static vec_width = 32u32;
 static warp_size = 32u32;
 
@@ -17,6 +17,17 @@ fn @createAccDevice() -> AccDevice {
 }
 
 fn AtomicFn_u32(&mut[1] u32, u32) -> u32 { undef[u32]() }
+
+
+extern "thorin" {
+	fn fibers(num_threads: i32, num_blocks: i32, num_warps: i32, body: fn(i32, i32) -> ()) -> ();
+}
+
+extern "C" {
+	fn "anydsl_fibers_sync_block" fibers_sync_block(i32) -> ();
+	fn "anydsl_fibers_yield"      fibers_yield() -> ();
+}
+
 
 extern "C" {
 	fn "rv_shuffle" rv_shuffle_f32(f32, i32) -> f32;
@@ -76,7 +87,7 @@ fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () 
 		atomic_inc_global_u32: AtomicFn_u32,
 		atomic_dec_global_u32: AtomicFn_u32,
 
-		yield: @|| { }//cuda_nanosleep(0u32)
+		yield: @|| { fibers_yield(); }
 	});
 }
 
@@ -133,7 +144,7 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, bo
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
 		// TODO: this will only work with fibers, coroutines or alike
-		barrier: @|| { }, // opencl_barrier(2u32),
+		barrier: @|| { fibers_sync_block(idx.block_id() as i32); },
 		barrier_all: @|n:i32| { undef[i32]() }, //cuda_block_sync_all,
 		barrier_any: @|n:i32| { undef[i32]() }, //cuda_block_sync_any,
 		barrier_count: @|n:i32| { undef[i32]() } //cuda_block_sync_count
@@ -156,20 +167,15 @@ fn cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intr
 	let num_threads = num_blocks * num_threads_per_block;
 
 	// TODO: assert(warp_size/l == vec_width)
-	//let block_loop = @|l:u32, body: fn(u32)->()| parallel(cpu_threads, 0, num_warps as i32, @|i:i32| body(i as u32));
 	let warp_loop = @|l:u32, body: fn(u32)->()| vectorize(vec_width as i32, @|i:i32| body(i as u32));
-
-	let block_loop = @|l:u32, body: fn(u32)->()| range(0, num_warps as i32, @|i:i32| body(i as u32));
 	//let warp_loop = @|l:u32, body: fn(u32)->()| range(0, l as i32, @|i:i32| body(i as u32));
 
-	for gid in block_loop(num_warps) {
-		let block_id = gid / num_warps_per_block;
-		let warp_id = gid % num_warps_per_block;
+	for block_id, warp_id in fibers(cpu_threads, num_blocks as i32, num_warps_per_block as i32) {
 
 		for local_id in warp_loop(warp_size) {
 			let idx = Index {
-				block_id: @|| block_id,
-				 warp_id: @||  warp_id,
+				block_id: @|| block_id as u32,
+				 warp_id: @||  warp_id as u32,
 				local_id: @|| local_id,
 			};
 
