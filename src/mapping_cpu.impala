@@ -138,7 +138,7 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, bo
 	@@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
 		idx: @|i:i32| idx.block_id(),
-		waves: @|body| cpu_subwarp(!0u64, @|| warp_size, idx, body),
+		waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
 		threads: @|body| cpu_thread(@|i:i32| idx.warp_id() * warp_size + idx.local_id(), body),
 		num_waves: num_warps,
 		// TODO: dispatch ndim-thread_id
@@ -182,7 +182,7 @@ fn cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intr
 			let context = gpu_grid_context {
 				device: 0,
 				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, body),
-				waves: @|body| cpu_subwarp(!0u64, @|| warp_size, Index { block_id: idx.block_id, warp_id: @|| idx.block_id() * num_warps_per_block + idx.warp_id(), local_id: idx.local_id }, body),
+				waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: idx.block_id, warp_id: @|| idx.block_id() * num_warps_per_block + idx.warp_id(), local_id: idx.local_id }, body),
 				threads: @|body| cpu_thread(@|i:i32| idx.block_id() * num_threads_per_block + idx.warp_id() * warp_size + idx.local_id(), body),
 				num_groups: @|i:i32| num_blocks,
 				num_waves: @|| num_warps,

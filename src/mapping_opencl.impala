@@ -199,7 +199,7 @@ fn @opencl_sub_group(idx: fn () -> u32, membermask: u64, num_threads: fn () -> u
 fn @opencl_group(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads: fn (i32) -> u32, sub_group_size: fn () -> u32, num_sub_groups: fn () -> u32, body: fn (gpu_group_context) -> ()) -> () {
 	@@body(gpu_group_context {
 		idx: idx,
-		waves: @|body| opencl_sub_group(opencl_get_sub_group_id, -1 as u64, sub_group_size, body),
+		waves: @|body| opencl_sub_group(opencl_get_sub_group_id, get_member_mask_u64(sub_group_size()), sub_group_size, body),
 		threads: @|body| opencl_thread(thread_idx, body),
 		num_waves: num_sub_groups,
 		num_threads: num_threads,
@@ -255,7 +255,7 @@ fn opencl_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i
 	opencl(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| @@body(gpu_grid_context {
 		device: device,
 		groups: @|body| opencl_group(group_idx, thread_idx, num_threads_per_group, sub_group_size, num_subgroups_per_group, body),
-		waves: @|body| opencl_sub_group(global_sub_group_idx, -1 as u64, sub_group_size, body),
+		waves: @|body| opencl_sub_group(global_sub_group_idx, get_member_mask_u64(sub_group_size()), sub_group_size, body),
 		threads: @|body| opencl_thread(global_thread_idx, body),
 		num_groups: num_groups,
 		num_waves: num_subgroups,

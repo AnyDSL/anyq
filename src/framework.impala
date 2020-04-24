@@ -1,4 +1,8 @@
-fn get_member_mask(size: u32) -> u64 {
+fn @get_member_mask_u32(size: u32) -> u32 {
+	if size == 32u32 { -1u32 } else { (1u32 << size as u32) - 1u32 }
+}
+
+fn @get_member_mask_u64(size: u32) -> u64 {
 	if size == 64u32 { -1u64 } else { (1u64 << size as u64) - 1u64 }
 }
 

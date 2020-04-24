@@ -153,7 +153,7 @@ fn @cuda_block(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads: f
 
 	@@body(gpu_group_context {
 		idx: idx,
-		waves: @|body| cuda_subwarp(warp_idx, -1 as u32, warp_size, body),
+		waves: @|body| cuda_subwarp(warp_idx, get_member_mask_u32(warp_size), warp_size, body),
 		threads: @|body| cuda_thread(thread_idx, body),
 		num_waves: num_warps,
 		num_threads: num_threads,
@@ -211,7 +211,7 @@ fn cuda_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32
 	cuda(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| @@body(gpu_grid_context {
 		device: device,
 		groups: @|body| cuda_block(block_idx, thread_idx, num_threads_per_block, warp_size, body),
-		waves: @|body| cuda_subwarp(global_warp_idx, -1 as u32, warp_size, body),
+		waves: @|body| cuda_subwarp(global_warp_idx, get_member_mask_u32(warp_size), warp_size, body),
 		threads: @|body| cuda_thread(global_thread_idx, body),
 		num_groups: num_blocks,
 		num_waves: num_warps,
