@@ -1,7 +1,7 @@
 
 static cpu_threads = 1;
-static vec_width = 32u32;
-static warp_size = 32u32;
+static vec_width = 8u;
+static warp_size = 8u;
 
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
