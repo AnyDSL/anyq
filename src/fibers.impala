@@ -1,0 +1,38 @@
+
+extern "thorin" {
+	fn fibers(num_threads: i32, num_blocks: i32, num_warps: i32, body: fn(i32, i32) -> ()) -> ();
+}
+
+extern "C" {
+	fn "anydsl_fibers_sync_block" fibers_sync_block(i32) -> ();
+	fn "anydsl_fibers_yield"      fibers_yield() -> ();
+}
+
+
+fn main() -> int {
+	print_string("start ...\n");
+
+	let num_threads = 1; // number of (hardware) worker threads
+	let num_blocks = 8;  // number of logical blocks that can be synced
+	let num_warps = 4;   // number of fibers per block
+
+	for block, warp in fibers(num_threads, num_blocks, num_warps) {
+		print_string("I am "); print_i32(block); print_string("/"); print_i32(warp); print_string(" at A\n");
+
+		// yield
+		if warp % 2 == 0 {
+			fibers_yield();
+		}
+
+		print_string("I am "); print_i32(block); print_string("/"); print_i32(warp); print_string(" at B\n");
+
+		// sync
+		fibers_sync_block(block);
+
+		print_string("I am "); print_i32(block); print_string("/"); print_i32(warp); print_string(" at C\n");
+	}
+
+	print_string("... done!\n");
+
+	0
+}

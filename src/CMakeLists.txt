@@ -68,3 +68,20 @@ if (Thorin_HAS_RV_SUPPORT)
 	add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()
 
+
+find_package(Boost 1.65 COMPONENTS fiber)
+
+if (Boost_FOUND)
+	add_executable(fiber-test fibers.h fibers.cpp test-fibers.cpp)
+	set_target_properties(fiber-test PROPERTIES
+		INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
+		FOLDER "tests/cpu"
+		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+	target_link_libraries(fiber-test PRIVATE Boost::fiber)
+
+	offline_graph(fiber-integration fibers.h fibers.cpp fibers.impala)
+	set_target_properties(fiber-integration PROPERTIES
+		INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
+		FOLDER "tests/cpu")
+	target_link_libraries(fiber-integration PRIVATE Boost::fiber)
+endif()
