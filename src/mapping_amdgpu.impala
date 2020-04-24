@@ -183,7 +183,6 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
 
 fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics)->()) -> () {
     let wavefront_size = 32u32;
-    fn @div_round_up(num: i32, multiple: i32) -> i32 { (num + multiple - 1) / multiple }
 
     let num_threads_per_block = wrap_dim(@|i| {
         match i {
@@ -198,9 +197,9 @@ fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, 
 
     let num_blocks = wrap_dim(@|i| {
         match i {
-            0 => if ?grid_dim(0) { grid_dim(0) as u32 } else { div_round_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(3) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(2) as i32) as u32 },
-            1 => if ?grid_dim(1) { grid_dim(1) as u32 } else { div_round_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(4) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(3) as i32) as u32 },
-            2 => if ?grid_dim(1) { grid_dim(2) as u32 } else { div_round_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(5) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(4) as i32) as u32 },
+            0 => if ?grid_dim(0) { grid_dim(0) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(3) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(2) as i32) as u32 },
+            1 => if ?grid_dim(1) { grid_dim(1) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(4) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(3) as i32) as u32 },
+            2 => if ?grid_dim(1) { grid_dim(2) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(5) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(4) as i32) as u32 },
             _ => 1u32
         }
     });
