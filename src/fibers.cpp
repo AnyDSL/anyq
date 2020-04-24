@@ -82,9 +82,9 @@ static std::vector<fiber_barrier> block_barriers;
 
 
 void anydsl_fibers_sync_block(int32_t block) {
-	std::ostringstream buffer;
-	buffer << "wait for block barrier " << block << std::endl;
-	std::cout << buffer.str() << std::flush;
+	//std::ostringstream buffer;
+	//buffer << "wait for block barrier " << block << std::endl;
+	//std::cout << buffer.str() << std::flush;
 	block_barriers[block].wait();
 }
 
@@ -94,9 +94,9 @@ void anydsl_fibers_yield() {
 
 
 void thread_fun(Context* ctx, thread_barrier* b) {
-	std::ostringstream buffer;
-	buffer << "thread started " << std::this_thread::get_id() << std::endl;
-	std::cout << buffer.str() << std::flush;
+	//std::ostringstream buffer;
+	//buffer << "thread started " << std::this_thread::get_id() << std::endl;
+	//std::cout << buffer.str() << std::flush;
 	boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx->num_threads);
 
 	b->wait();
@@ -110,10 +110,10 @@ void thread_fun(Context* ctx, thread_barrier* b) {
 
 void fiber_fun(Context& ctx, int block, int warp, void* args, func_type func) {
 	try {
-		std::thread::id my_thread = std::this_thread::get_id(); /*< get ID of initial thread >*/
-		std::ostringstream buffer;
-		buffer << "fiber " << block << "/" << warp << " started on thread " << my_thread << '\n';
-		std::cout << buffer.str() << std::flush;
+		//std::thread::id my_thread = std::this_thread::get_id(); /*< get ID of initial thread >*/
+		//std::ostringstream buffer;
+		//buffer << "fiber " << block << "/" << warp << " started on thread " << my_thread << '\n';
+		//std::cout << buffer.str() << std::flush;
 
 		// invoke the actual work function
 		func(args, block, warp);
@@ -148,7 +148,7 @@ void anydsl_fibers_spawn(
 	// TODO: incorporate num_blocks_in_flight to reuse fibers for multiple blocks
 	block_barriers.clear();
 	block_barriers.reserve(num_blocks);
-	std::cout << "size of barrier " << sizeof(fiber_barrier) << " / size of block barriers " << ((block_barriers.capacity()*sizeof(fiber_barrier)) >> 10) << "KB" << std::endl;
+	//std::cout << "size of barrier " << sizeof(fiber_barrier) << " / size of block barriers " << ((block_barriers.capacity()*sizeof(fiber_barrier)) >> 10) << "KB" << std::endl;
 
 	for (int block = 0; block < num_blocks; ++block) {
 		block_barriers.emplace_back(num_warps);
