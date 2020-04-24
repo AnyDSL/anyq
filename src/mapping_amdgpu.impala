@@ -72,11 +72,11 @@ fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
     });
 }
 
-fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(gpu_wave_context)->()) -> () {
+fn @amdgpu_subwarp(idx: fn()->u32, num_threads: u32, body: fn(gpu_wave_context)->()) -> () {
     body(gpu_wave_context{
         idx: idx,
 
-        membermask: @|| membermask,
+        membermask: @|| get_member_mask(num_threads),
 
         threads: @|body| amdgpu_thread(@|i| match i { 0 => amdgcn_lane_id() as u32, _ => 0u32 }, body),
 
@@ -170,7 +170,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
 
     body(gpu_group_context {
         idx: idx,
-        waves: @|body| amdgpu_subwarp(warp_idx, -1 as u32 as u64, warp_size, body),
+        waves: @|body| amdgpu_subwarp(warp_idx, warp_size, body),
         threads: @|body| amdgpu_thread(thread_idx, body),
         num_waves: num_warps,
         num_threads: num_threads,
@@ -227,7 +227,7 @@ fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, 
     amdgpu(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| body(gpu_grid_context {
         device:  device,
         groups:  @|body| amdgpu_block(block_idx, thread_idx, num_threads_per_block, wavefront_size, body),
-        waves:   @|body| amdgpu_subwarp(global_warp_idx, -1 as u32 as u64, wavefront_size, body),
+        waves:   @|body| amdgpu_subwarp(global_warp_idx, wavefront_size, body),
         threads: @|body| amdgpu_thread(global_thread_idx, body),
         num_groups:  num_blocks,
         num_waves:   num_warps,
