@@ -104,11 +104,11 @@ fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(g
         shfl_bfly_u32: @|var:u32, lane_mask:i32, width:u32| amdgcn_shfl_xor_u32(var, lane_mask, width as i32),
         // shfl_bfly_f32: @|var:f32, lane_mask:i32, width:u32| amdgcn_shfl_xor_f32(var, lane_mask, width as i32),
 
-        lanemask: @|| cuda_lanemask() as u64,
-        lanemask_le: @|| cuda_lanemask_le() as u64,
-        lanemask_lt: @|| cuda_lanemask_lt() as u64,
-        lanemask_ge: @|| cuda_lanemask_ge() as u64,
-        lanemask_gt: @|| cuda_lanemask_gt() as u64
+        lanemask: amdgcn_lanemask_eq,
+        lanemask_le: amdgcn_lanemask_le,
+        lanemask_lt: amdgcn_lanemask_lt,
+        lanemask_ge: amdgcn_lanemask_ge,
+        lanemask_gt: amdgcn_lanemask_gt
     });
 }
 
