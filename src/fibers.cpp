@@ -70,6 +70,7 @@ struct Context {
 	std::size_t fiber_count{0};
 	std::mutex mtx_count{};
 	boost::fibers::condition_variable_any cnd_count{};
+	bool terminate{false};
 
 	explicit Context(int num_threads_) : num_threads(num_threads_) { }
 
@@ -94,26 +95,63 @@ void anydsl_fibers_yield() {
 
 
 void thread_fun(Context* ctx, thread_barrier* b) {
-	//std::ostringstream buffer;
-	//buffer << "thread started " << std::this_thread::get_id() << std::endl;
-	//std::cout << buffer.str() << std::flush;
-	boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx->num_threads);
+	if (false) {
+		std::ostringstream buffer;
+		buffer << "thread started " << std::this_thread::get_id() << std::endl;
+		std::cerr << buffer.str() << std::flush;
+	}
 
+	static thread_local std::once_flag flag;
+	std::call_once(flag, [&ctx] {
+		if (false) {
+			std::ostringstream buffer;
+			buffer << "thread " << std::this_thread::get_id() << " joins work_stealing scheduler" << std::endl;
+			std::cout << buffer.str() << std::flush;
+		}
+		boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx->num_threads);
+	});
 	b->wait();
 
-	lock_type lk(ctx->mtx_count);
-	ctx->cnd_count.wait(lk, [&ctx](){ return 0 == ctx->fiber_count; });
+	while (true) {
+		b->wait();
+		if (ctx->terminate) break;
 
-	BOOST_ASSERT( 0 == ctx->fiber_count);
+		if (false) {
+			std::ostringstream buffer;
+			buffer << "thread start work " << std::this_thread::get_id() << std::endl;
+			std::cerr << buffer.str() << std::flush;
+		}
+
+		{
+			lock_type lk(ctx->mtx_count);
+			ctx->cnd_count.wait(lk, [&ctx](){ return 0 == ctx->fiber_count; });
+		}
+
+		if (false) {
+			std::ostringstream buffer;
+			buffer << "thread finished work " << std::this_thread::get_id() << std::endl;
+			std::cerr << buffer.str() << std::flush;
+		}
+
+		// this assertion can't be hold if new fibers are scheduled before reaching this point
+		b->wait();
+		//BOOST_ASSERT( 0 == ctx->fiber_count);
+	}
+
+	if (false) {
+		std::ostringstream buffer;
+		buffer << "thread terminated " << std::this_thread::get_id() << std::endl;
+		std::cerr << buffer.str() << std::flush;
+	}
 }
 
 
 void fiber_fun(Context& ctx, int block, int warp, void* args, func_type func) {
 	try {
-		//std::thread::id my_thread = std::this_thread::get_id(); /*< get ID of initial thread >*/
-		//std::ostringstream buffer;
-		//buffer << "fiber " << block << "/" << warp << " started on thread " << my_thread << '\n';
-		//std::cout << buffer.str() << std::flush;
+		// std::thread::id my_thread = std::this_thread::get_id(); /*< get ID of initial thread >*/
+		// std::ostringstream buffer;
+		// buffer << "fiber " << block << "/" << warp << " started on thread " << my_thread << '\n';
+		// std::cout << buffer.str() << std::flush;
 
 		// invoke the actual work function
 		func(args, block, warp);
@@ -127,6 +165,27 @@ void fiber_fun(Context& ctx, int block, int warp, void* args, func_type func) {
 }
 
 
+class thread_pool : public std::vector<std::thread> {
+public:
+	thread_pool(int num_threads, thread_barrier& barrier, bool& terminate) : _barrier(barrier), _terminate(terminate) {
+		reserve(num_threads);
+	}
+
+	~thread_pool() {
+		_terminate = true;
+		_barrier.wait();
+
+		for (std::thread & t : *this) {
+			if (!t.joinable())
+				std::cerr << "thread not joinable " << t.get_id() << std::endl;
+			t.join();
+		}
+	}
+
+private:
+	thread_barrier& _barrier;
+	bool& _terminate;
+};
 
 void anydsl_fibers_spawn(
 	int32_t num_threads,
@@ -134,16 +193,40 @@ void anydsl_fibers_spawn(
 	int32_t num_warps,
 	void* args, void* fun
 ) {
-	Context ctx(num_threads);
+	// unfortunately, boost uses some static variables that do not allow clean shutdown
+	// thus, we must use a static thread pool and context for proper work stealing scheduling
+	static int fixed_num_threads = num_threads == 0 ? std::thread::hardware_concurrency() : num_threads;
+
+	static Context ctx(fixed_num_threads);
 
 	void (*fun_ptr) (void*, int32_t, int32_t) = reinterpret_cast<void (*) (void*, int32_t, int32_t)>(fun);
 
-	// main thread must not join scheduling multiple times
-	static bool main_thread_join_scheduling = true;
-	if (main_thread_join_scheduling) {
+	static thread_barrier b(ctx.num_threads);
+	// Launch a couple of additional threads that join the work sharing.
+	static thread_pool threads(ctx.num_threads, b, ctx.terminate);
+	static std::once_flag init_workers;
+	std::call_once(init_workers, [&ctx, &b] {
+		if (true) {
+			std::ostringstream buffer;
+			buffer << "using " << ctx.num_threads << " worker threads " << std::endl;
+			std::cerr << buffer.str() << std::flush;
+		}
+
+		for (int t = 1; t < ctx.num_threads; ++t) {
+			threads.emplace_back(thread_fun, &ctx, &b);
+		}
+
+		// wait for all threads to join work scheduling
+		b.wait();
+
+		// main thread must not join scheduling multiple times
+		if (false) {
+			std::ostringstream buffer;
+			buffer << "main thread " << std::this_thread::get_id() << " joins work_stealing scheduler" << std::endl;
+			std::cerr << buffer.str() << std::flush;
+		}
 		boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx.num_threads);
-		main_thread_join_scheduling = false;
-	}
+	});
 
 	// TODO: incorporate num_blocks_in_flight to reuse fibers for multiple blocks
 	block_barriers.clear();
@@ -161,15 +244,14 @@ void anydsl_fibers_spawn(
 	}
 	BOOST_ASSERT(num_blocks*num_warps == ctx.fiber_count);
 
-	thread_barrier b(ctx.num_threads);
-	// Launch a couple of additional threads that join the work sharing.
-	std::vector<std::thread> threads;
-	for (int t = 1; t < ctx.num_threads; ++t) {
-		threads.emplace_back(thread_fun, &ctx, &b);
-	}
-
-	// sync main thread with other threads
+	// sync main thread with other threads before starting current work load
 	b.wait();
+
+	if (false) {
+		std::ostringstream buffer;
+		buffer << "main thread start work " << std::this_thread::get_id() << std::endl;
+		std::cerr << buffer.str() << std::flush;
+	}
 
 	{
 		lock_type lk(ctx.mtx_count);
@@ -180,11 +262,15 @@ void anydsl_fibers_spawn(
 			if all worker fibers are complete.
 		*/
 	}
-	BOOST_ASSERT(0 == ctx.fiber_count);
 
-	for (std::thread & t : threads) {
-		t.join();
+	if (false) {
+		std::ostringstream buffer;
+		buffer << "main thread finished work " << std::this_thread::get_id() << std::endl;
+		std::cerr << buffer.str() << std::flush;
 	}
-	threads.clear();
+
+	// sync main thread with other threads
+	b.wait();
+	BOOST_ASSERT(0 == ctx.fiber_count);
 }
 

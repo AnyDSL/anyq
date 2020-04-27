@@ -1,5 +1,5 @@
 
-static cpu_threads = 1;
+static cpu_threads = 0;
 static vec_width = 8u;
 static warp_size = 8u;
 
