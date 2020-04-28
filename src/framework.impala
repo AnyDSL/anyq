@@ -121,8 +121,10 @@ fn createBaseTest(additional_mem: u32) -> BaseTest {
 
 			print_string("gpu_result ");
 			print_i32(*gpu_result as i32);
-			print_string("\ncpu_result ");
+			print_char('\n');
+			print_string("cpu_result ");
 			print_i32((if cpu_result { 0 } else { 1 }));
+			print_char('\n');
 
 			let result = (if cpu_result { 0 } else { 1 }) + *gpu_result as i32;
 
