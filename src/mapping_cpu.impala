@@ -134,8 +134,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 	});
 }
 
-fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, body: fn (gpu_group_context) -> ()) -> () {
-
+fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn (gpu_group_context) -> ()) -> () {
 	@@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
 		idx: @|i:i32| idx.block_id(),
@@ -146,9 +145,30 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, bo
 		num_threads: @|i:i32| num_threads(),
 		// TODO: this will only work with fibers, coroutines or alike
 		barrier: @|| { fibers_sync_block(idx.block_id() as i32); },
-		barrier_all: @|n:i32| { undef[i32]() }, //cuda_block_sync_all,
-		barrier_any: @|n:i32| { undef[i32]() }, //cuda_block_sync_any,
-		barrier_count: @|n:i32| { undef[i32]() } //cuda_block_sync_count
+		barrier_all: @|predicate:i32| {
+			let warp_pred = rv_all(predicate != 0) as i32;
+			// atomic_and_global_i32
+			atomic(3u32, addr(1), warp_pred, 7u32, "");
+			fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id() as i32);
+			let result = *(addr(0));
+			result
+		},
+		barrier_any: @|predicate:i32| {
+			let warp_pred = rv_any(predicate != 0) as i32;
+			// atomic_or_global_i32
+			atomic(5u32, addr(2), warp_pred, 7u32, "");
+			fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id() as i32);
+			let result = *(addr(0));
+			result
+		},
+		barrier_count: @|predicate:i32| {
+			let warp_count = cpu_popcount32(rv_ballot(predicate != 0));
+			// atomic_add_global_i32
+			atomic(1u32, addr(3), warp_count, 7u32, "");
+			fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id() as i32);
+			let result = *(addr(0));
+			result
+		},
 	});
 }
 
@@ -171,6 +191,18 @@ fn cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intr
 	let warp_loop = @|l:u32, body: fn(u32)->()| vectorize(vec_width as i32, @|i:i32| body(i as u32));
 	//let warp_loop = @|l:u32, body: fn(u32)->()| range(0, l as i32, @|i:i32| body(i as u32));
 
+	// we need a buffer to accumulate block level results of barriers
+	let num_block_variables = 4; // output, all, any, count
+	let block_pred_buffer = alloc(0, num_block_variables * num_blocks as i32 * sizeof[i32]());
+	let addr = bitcast[&mut[i32]](block_pred_buffer.data);
+
+	// reset all variables
+	for i in range(0, num_blocks as i32) {
+		addr(num_block_variables*i + 1) = 1;
+		addr(num_block_variables*i + 2) = 0;
+		addr(num_block_variables*i + 3) = 0;
+	}
+
 	for block_id, warp_id in fibers(cpu_threads, num_blocks as i32, num_warps_per_block as i32) {
 
 		for local_id in warp_loop(warp_size) {
@@ -182,7 +214,7 @@ fn cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intr
 
 			let context = gpu_grid_context {
 				device: 0,
-				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, body),
+				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
 				waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: idx.block_id, warp_id: @|| idx.block_id() * num_warps_per_block + idx.warp_id(), local_id: idx.local_id }, body),
 				threads: @|body| cpu_thread(@|i:i32| idx.block_id() * num_threads_per_block + idx.warp_id() * warp_size + idx.local_id(), body),
 				num_groups: @|i:i32| num_blocks,
@@ -193,4 +225,6 @@ fn cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Intr
 		}
 
 	}
+
+	release(block_pred_buffer);
 }
