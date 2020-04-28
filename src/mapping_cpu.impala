@@ -24,8 +24,9 @@ extern "thorin" {
 }
 
 extern "C" {
-	fn "anydsl_fibers_sync_block" fibers_sync_block(i32) -> ();
-	fn "anydsl_fibers_yield"      fibers_yield() -> ();
+	fn "anydsl_fibers_sync_block"               fibers_sync_block(i32) -> ();
+	fn "anydsl_fibers_sync_block_with_result"   fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
+	fn "anydsl_fibers_yield"                    fibers_yield() -> ();
 }
 
 

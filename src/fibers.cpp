@@ -57,6 +57,29 @@ public:
 		}
 		return false;
 	}
+
+	template<typename T>
+	bool wait_for_result(T* output, T* result, T reset) {
+		lock_type lk(mtx_);
+		const bool cycle = cycle_;
+
+		if (0 == --current_) {
+			cycle_ = ! cycle_;
+			current_ = initial_;
+
+			// copy result for all waiting fibers
+			*output = *result;
+			// reset predicate for next use
+			*result = reset;
+
+			lk.unlock(); // no pessimization
+			cond_.notify_all();
+			return true;
+		} else {
+			cond_.wait(lk, [&](){ return cycle != cycle_; });
+		}
+		return false;
+	}
 };
 
 typedef barrier<std::condition_variable> thread_barrier;
@@ -87,6 +110,13 @@ void anydsl_fibers_sync_block(int32_t block) {
 	//buffer << "wait for block barrier " << block << std::endl;
 	//std::cout << buffer.str() << std::flush;
 	block_barriers[block].wait();
+}
+
+void anydsl_fibers_sync_block_with_result(int32_t* output, int32_t* result, int32_t reset, int32_t block) {
+	//std::ostringstream buffer;
+	//buffer << "wait for block barrier " << block << " with current result " << *result << std::endl;
+	//std::cout << buffer.str() << std::flush;
+	block_barriers[block].wait_for_result<int32_t>(output, result, reset);
 }
 
 void anydsl_fibers_yield() {
