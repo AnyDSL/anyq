@@ -217,9 +217,9 @@ fn main() -> i32 {
 						else {
 							let more_input = push();
 							drain = wave.barrier_any(pred(!more_input)) != 0;
-							if drain {
-								device.print_i32a("%d %d\n", [wave.idx() as i32, thread.idx(0) as i32]);
-							}
+							// if drain {
+							// 	device.print_i32a("%d %d\n", [wave.idx() as i32, thread.idx(0) as i32]);
+							// }
 						}
 					}
 
