@@ -1,13 +1,30 @@
 
+extern "C" {
+	fn "rv_load" rv_load_i32(&[i32], i32) -> i32;
+	fn "rv_load" rv_load_u32(&[u32], i32) -> u32;
+	//fn "rv_load" rv_load_f32(&[f32], i32) -> f32;
+
+	fn "rv_store" rv_store_i32(&[i32], i32, i32) -> ();
+	fn "rv_store" rv_store_u32(&[u32], i32, u32) -> ();
+	//fn "rv_store" rv_store_f32(&[f32], i32, f32) -> ();
+
+    fn "rv_align" rv_align_i8(&[i8], i32)-> &[i8];
+
+
+    fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
+    fn "rv_insert" rv_insert_u32(u32, i32, u32) -> u32;
+    //fn "rv_insert" rv_insert_f32(f32, i32, f32) -> f32;
+}
+
 
 fn main() -> i32 {
 
-	let warp_size = 32;
+	let warp_size = 8;
 	// works for values atleast up to 128
 	let vec_width = warp_size;
 
-	let buffer = alloc_cpu(warp_size*sizeof[i32]());
-	let data = bitcast[&mut[i32]](buffer.data);
+	let buffer = alloc_cpu(2*warp_size*sizeof[i32]());
+	let data = bitcast[&mut[i32]](rv_align_i8(buffer.data, vec_width));
 
 	for i in range(0, warp_size) {
 		data(i) = i;
@@ -15,14 +32,65 @@ fn main() -> i32 {
 
 	//let delta = 12;
 	//for j in vectorize(vec_width) {
-	//	data(j) = rv_shuffle(data(j) as f32, $delta) as i32;
+	//	data(j) = rv_shuffle_i32(data(j), $delta);
+	//}
+
+	fn shuffle_i32(self: i32, value: i32, src_lane: i32) -> i32 {
+		// use rv_extract / FAIL
+		//let result = rv_extract_i32(value, src_lane);
+		// result
+
+		// use rv_store with temp / FAIL
+		//let mut result:[i32*8];
+		//rv_store_i32(result, 0, value);
+		//result(src_lane)
+
+		// unroll over vec_width / WORKS but re-assembles the whole vector
+		// with a lot of shufflevector and @llvm.x86.avx.blendv.ps.256
+		let mut result:i32;
+		for i in unroll(0, vec_width) {
+			if i == src_lane {
+				result = rv_extract_i32(value, i);
+				//return(result)
+			}
+		}
+		result
+	}
+
+	fn shuffle_up_i32(self: i32, value: i32, delta: i32) -> i32 {
+		shuffle_i32(self, value, ((self as u32 - delta as u32) & (vec_width as u32 - 1u)) as i32)
+	}
+
+	fn shuffle_bfly_i32(self: i32, value: i32, xor: i32) -> i32 {
+		shuffle_i32(self, value, self ^ xor)
+	}
+
+	for j in vectorize(vec_width) {
+		//let mydata = rv_load_i32(data, 0);
+		let mydata = data(j);
+
+		//mydata = -mydata;
+		let laneid = 7 - j;
+
+		//let new_data = shuffle_i32(j, mydata, laneid);
+		//let new_data = shuffle_up_i32(j, mydata, 3);
+		let new_data = shuffle_bfly_i32(j, mydata, 0x3);
+
+		//rv_store_i32(data, j, mydata);
+		data(j) = new_data;
+	}
+
+	//let delta = 12;
+	//for j in vectorize(vec_width) {
+	//	data(j) = rv_shuffle_f32(data(j) as f32, $delta) as i32;
 	//}
 
 	// rv error : rv_shuffle: shift amount needs to be a constant!
 	//for j in vectorize(vec_width) {
-	//	let src_lane = j / 4;
-	//	let delta = src_lane - j;
-	//	data(j) = rv_shuffle(data(j) as f32, delta) as i32;
+		//let src_lane = (2*j) % vec_width;
+		//let delta = src_lane - j;
+		//data(j) = rv_shuffle_i32(data(j), delta);
+		//data(j) = rv_extract(data(j) as f32, src_lane) as i32;
 	//}
 
 	//for j in vectorize(vec_width) {
@@ -30,6 +98,10 @@ fn main() -> i32 {
 	//	data(j) = rv_any(data(j) <= 0) as i32;
 	//}
 
+	//for j in vectorize(vec_width) {
+		//data(j) = cpu_popcount32(rv_ballot(data(j) % 2 == 0))
+		//data(j) = rv_ballot(data(j) % 2 == 0);
+	//}
 
 	for i in range(0, warp_size) {
 		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");

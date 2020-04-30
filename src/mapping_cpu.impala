@@ -31,9 +31,12 @@ extern "C" {
 
 
 extern "C" {
-	fn "rv_shuffle" rv_shuffle_f32(f32, i32) -> f32;
+	//fn "rv_shuffle" rv_shuffle_f32(f32, i32) -> f32;
 	fn "rv_shuffle" rv_shuffle_i32(i32, i32) -> i32;
 	fn "rv_shuffle" rv_shuffle_u32(u32, i32) -> u32;
+	//fn "rv_extract" rv_extract_f32(f32, i32) -> f32;
+	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
+	fn "rv_extract" rv_extract_u32(u32, i32) -> u32;
 }
 
 fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
