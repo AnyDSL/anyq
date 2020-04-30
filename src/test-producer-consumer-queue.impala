@@ -102,10 +102,13 @@ fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
 	1.0f32 / (2.0f32 - 1.0f32 / (1 << (N - 1)) as f32) * r
 }
 
+fn @pred(b: bool) -> i32 {
+	if b {1} else {0}
+}
 
 fn main() -> i32 {
-	let num_elements = (100 * 1024 * 1024) as u32;
-	let queue_size = 1024 * 1024;
+	let num_elements = (1024) as u32;
+	let queue_size = 32;
 	let queue_test = createQueueTest((num_elements + 2u32) * sizeof[u32]() as u32);
 	let block_dim = 256;
 
@@ -113,60 +116,110 @@ fn main() -> i32 {
 		let state_counters = bitcast[&mut[1][u32]](device_memory);
 		let next_input = &mut state_counters(0);
 		let num_retired = &mut state_counters(1);
+		// let global_seq = &mut state_counters(2);
 
 		with grid, intrinsics in device.launch_1d(1, 1) {
 			with thread in grid.threads() {
 				*next_input = 0u32;
 				*num_retired = 0u32;
+				// *global_seq = 0u32;
 			}
 		}
 
 		with grid, intrinsics in device.launch_1d(42, block_dim) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
-
 					fn push() -> bool {
-						if thread.atomic_add_global_u32(next_input, 1u32) < num_elements {
-							let enqueued = with i in queue.push(thread) {
-								0u32
-							};
-							
-							if enqueued <= 0 {
-								thread.atomic_sub_global_u32(next_input, 1u32);
-							}
+						let element = thread.atomic_add_global_u32(next_input, 1u32);
 
-							true
+						let mut not_done = element < num_elements;
+
+						while wave.barrier_any(pred(not_done)) != 0 {
+							if not_done {
+								let num_enqueued =
+									with i in queue.push(thread) {
+										element
+									};
+
+								not_done = num_enqueued <= 0;
+							}
 						}
-						else {
+
+						if element > num_elements {
 							thread.atomic_exch_global_u32(next_input, num_elements);
-							false
 						}
+
+						element < num_elements
+
+						// cuda_threadfence();
+						// device.print_i32a("%d %d %d try_enqueue - %d\n", [thread.atomic_add_global_u32(global_seq, 1u32) as i32, wave.idx() as i32, thread.idx(0) as i32, element as i32]);
+						// if element < num_elements {
+						// 	let enqueued = with i in queue.push(thread) {
+						// 		// device.print_i32a("%d %d %d enqueued %d %d\n", [thread.atomic_add_global_u32(global_seq, 1u32) as i32, wave.idx() as i32, thread.idx(0) as i32, i as i32, element as i32]);
+						// 		element
+						// 	};
+
+						// 	if enqueued <= 0 {
+						// 		// device.print_i32a("%d %d %d not_enqueued - %d\n", [thread.atomic_add_global_u32(global_seq, 1u32) as i32, wave.idx() as i32, thread.idx(0) as i32, element as i32]);
+						// 		cuda_threadfence();
+						// 		thread.atomic_sub_global_u32(next_input, 1u32);
+						// 		cuda_threadfence();
+						// 	}
+
+						// 	true
+						// }
+						// else {
+						// 	cuda_threadfence();
+						// 	thread.atomic_sub_global_u32(next_input, 1u32);
+						// 	cuda_threadfence();
+						// 	false
+						// }
 					}
 
 					fn pop() -> bool {
-						let dequeued = with i, el in queue.pop(thread) {
-							;
-						};
-						
-						let retired = if dequeued > 0 {
-							thread.atomic_add_global_u32(num_retired, 1u32) + 1u32
-						}
-						else {
-							thread.atomic_load_global_u32(num_retired)
+						let num_dequeued = with i, el in queue.pop(thread) {
+							thread.atomic_add_global_u32(num_retired, 1u32);
+							// device.print_i32a("%d %d %d dequeued %d %d\n", [thread.atomic_add_global_u32(global_seq, 1u32) as i32, wave.idx() as i32, thread.idx(0) as i32, i as i32, el as i32]);
 						};
 
-						retired < num_elements
+						// device.print_i32a("num_dequeued %d", [num_dequeued]);
+
+						// let num_retired =
+							// if num_dequeued > 0 {
+							// 	thread.atomic_add_global_u32(num_retired, 1u32) + 1u32
+							// }
+							// else {
+							// 	thread.atomic_load_global_u32(num_retired)
+							// }
+
+						// device.print_i32a("num_retired %d", [num_retired]);
+
+						// cuda_threadfence();
+						// let bla = thread.atomic_load_global_u32(next_input) < num_elements;
+						// cuda_threadfence();
+						// bla
+
+						thread.atomic_load_global_u32(num_retired) < num_elements
 					}
 
 
 					let mut drain = false;
 
 					while true {
-						if drain || queue.size(thread) >= wave.num_threads() as i32 {
-							if !pop() { break() }
+						let queue_size = wave.shfl_i32(if thread.idx(0) == 0u32 { queue.size(thread) } else { 0 }, 0, wave.num_threads());
+
+						if drain || queue_size >= wave.num_threads() as i32 {
+							let done = !pop();
+							// device.print_i32a("%d %d\n", [wave.idx() as i32, thread.idx(0) as i32]);
+							if wave.barrier_any(pred(done)) != 0 { break() }
+							// device.print_i32a("%d %d\n", [wave.idx() as i32, thread.idx(0) as i32]);
 						}
 						else {
-							drain = !push();
+							let more_input = push();
+							drain = wave.barrier_any(pred(!more_input)) != 0;
+							if drain {
+								device.print_i32a("%d %d\n", [wave.idx() as i32, thread.idx(0) as i32]);
+							}
 						}
 					}
 

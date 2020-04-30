@@ -10,7 +10,7 @@ fn @createAccDevice() -> AccDevice {
 		alloc: |size| alloc_cuda(nvvm_device, size),
 		platform_device: runtime_device(1, nvvm_device),
 		print_i32: @|format: &[u8], arg: i32| { cuda_vprintf(format, bitcast[&[u8]](&arg)); },
-		print_i32a: @|format: &[u8], args: &[i32]| { cuda_vprintf(format, bitcast[&[u8]](&args(0))); }
+		print_i32a: @|format: &[u8], args: &[i32]| { let buffer = ; cuda_vprintf(format, bitcast[&[u8]](&buffer(0))); }
 	}
 }
 

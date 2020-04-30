@@ -28,53 +28,61 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 
 	ProducerConsumerQueue {
 		push: @|thread, source| -> i32 {
-			let new_size = thread.atomic_add_global_i32(size, 1) + 1;
-
-			if new_size > buffer_size {
-				thread.atomic_sub_global_i32(size, 1);
+			if thread.atomic_load_global_i32(size) >= buffer_size {
 				0
 			}
-			else
-			{
-				let i = thread.atomic_inc_global_u32(tail, (buffer_size - 1) as u32);
+			else {
+				let new_size = thread.atomic_add_global_i32(size, 1) + 1;
 
-				let value = source(i);
-
-				while thread.atomic_cas_global_u32(&mut buffer(i), FREE, value) != FREE {
-					thread.yield();
+				if new_size > buffer_size {
+					thread.atomic_sub_global_i32(size, 1);
+					0
 				}
+				else {
+					let i = thread.atomic_inc_global_u32(tail, (buffer_size - 1) as u32);
 
-				new_size
+					let value = source(i);
+
+					while thread.atomic_cas_global_u32(&mut buffer(i), FREE, value) != FREE {
+						thread.yield();
+					}
+
+					1
+				}
 			}
 		},
 
 		pop: @|thread, sink| -> i32 {
-			let available = thread.atomic_sub_global_i32(size, 1);
-
-			if available <= 0 {
-				thread.atomic_add_global_i32(size, 1);
+			if thread.atomic_load_global_i32(size) <= 0 {
 				0
 			}
-			else
-			{
-				let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
+			else {
+				let available = thread.atomic_sub_global_i32(size, 1);
 
-				let tryDequeue = @|sink, i| {
-					let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
-					if el != FREE {
-						sink(i, el);
-						true
-					}
-					else {
-						false
-					}
-				};
-
-				while !tryDequeue(sink, i) {
-					thread.yield();
+				if available <= 0 {
+					thread.atomic_add_global_i32(size, 1);
+					0
 				}
+				else {
+					let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
 
-				1
+					let tryDequeue = @|sink, i| {
+						let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
+						if el != FREE {
+							sink(i, el);
+							true
+						}
+						else {
+							false
+						}
+					};
+
+					while !tryDequeue(sink, i) {
+						thread.yield();
+					}
+
+					1
+				}
 			}
 		},
 
@@ -121,6 +129,13 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
 				with thread in grid.threads() {
 					let idx = thread.idx(0) as i32;
+
+					if idx == 0 {
+						*size = 0;
+						*head = 0u32;
+						*tail = 0u32;
+					}
+
 					if idx < buffer_size {
 						buffer(idx) = FREE;
 					}

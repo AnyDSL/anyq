@@ -117,7 +117,7 @@ fn createBaseTest(additional_mem: u32) -> BaseTest {
 			device.synchronize();
 
 			let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
-			runtime_copy(device.platform_device, device_memory as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
+			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
 
 			print_string("gpu_result ");
 			print_i32(*gpu_result as i32);
@@ -126,7 +126,7 @@ fn createBaseTest(additional_mem: u32) -> BaseTest {
 			print_i32((if cpu_result { 0 } else { 1 }));
 			print_char('\n');
 
-			let result = (if cpu_result { 0 } else { 1 }) + *gpu_result as i32;
+			let result = if cpu_result && *gpu_result == 0u32 { 0 } else { -1 };
 
 			runtime_release(0, gpu_result as &[i8]);
 			release(device_test_state_alloc);
