@@ -86,38 +86,6 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 			}
 		},
 
-		// pop_wave: @|wave, N, sink| -> i32 {
-		// 	with thread in wave.threads() {
-		// 		let available = thread.atomic_sub_global_i32(size, N);
-
-		// 		if available <= N {
-		// 			thread.atomic_add_global_i32(size, N);
-		// 			0
-		// 		}
-		// 		else
-		// 		{
-		// 			let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
-
-		// 			let tryDequeue = @|sink, i| {
-		// 				let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
-		// 				if el != FREE {
-		// 					sink(i, el);
-		// 					true
-		// 				}
-		// 				else {
-		// 					false
-		// 				}
-		// 			};
-
-		// 			while !tryDequeue(sink, i) {
-		// 				thread.yield();
-		// 			}
-
-		// 			1
-		// 		}
-		// 	}
-		// },
-
 		size: @|thread| {
 			thread.atomic_load_global_i32(size)
 		},
