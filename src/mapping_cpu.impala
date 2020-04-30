@@ -88,8 +88,58 @@ fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () 
 		atomic_cas_global_u32: @|addr: &mut[1] u32, cmp: u32, new: u32| cmpxchg(bitcast[&mut u32](addr), cmp, new, 7u32, "")(0),
 		atomic_cas_global_i64: @|addr: &mut[1] u64, cmp: u64, new: u64| cmpxchg(bitcast[&mut u64](addr), cmp, new, 7u32, "")(0),
 
-		atomic_inc_global_u32: AtomicFn_u32,
-		atomic_dec_global_u32: AtomicFn_u32,
+		atomic_inc_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
+			let ptr = bitcast[&mut u32](addr);
+
+			// this is the generic version
+			let mut old:u32 = atomic_load(ptr, 7u32, "");
+			let mut cmp:bool = false;
+			while(!cmp) {
+				let new = if old >= val { 0u } else { old + 1u };
+				let res = cmpxchg(ptr, old, new, 7u32, "");
+				old = res(0);
+				cmp = res(1);
+			}
+
+			// this is optimized for val being 2**n-1
+			/*
+			// atomic add
+			let old:u32 = atomic(1u32, ptr, 1u, 7u32, "");
+			if old >= val {
+				// atomic and to mask overflow bits
+				// however, we must ensure that addr will not be read outside of this function
+				atomic(3u32, ptr, val, 7u32, "");
+			}
+			*/
+
+			old
+		},
+		atomic_dec_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
+			let ptr = bitcast[&mut u32](addr);
+
+			// this is the generic version
+			let mut old:u32 = atomic_load(ptr, 7u32, "");
+			let mut cmp:bool = false;
+			while(!cmp) {
+				let new = if (old == 0u) || (old > val) { val } else { old - 1u };
+				let res = cmpxchg(ptr, old, new, 7u32, "");
+				old = res(0);
+				cmp = res(1);
+			}
+
+			// this is optimized for val being 2**n-1
+			/*
+			// atomic sub
+			let old:u32 = atomic(2u32, ptr, 1u, 7u32, "");
+			if old == 0u {
+				// atomic and to mask overflow bits
+				// however, we must ensure that addr will not be read outside of this function
+				atomic(3u32, ptr, val, 7u32, "");
+			}
+			*/
+
+			old
+		},
 
 		yield: @|| { fibers_yield(); }
 	});
