@@ -1,13 +1,13 @@
 
 struct ProducerConsumerQueue
 {
-	push: fn (gpu_thread_context, fn (u32) -> u32) -> i32,
-	pop: fn (gpu_thread_context, fn (u32, u32) -> ()) -> i32,
-	// pop_wave: fn (gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
+	push: fn(gpu_thread_context, fn (u32) -> u32) -> i32,
+	pop: fn(gpu_thread_context, fn (u32, u32) -> ()) -> i32,
+	// pop_wave: fn(gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
 	size: fn(gpu_thread_context) -> i32,
-	reset: fn () -> (),
-	validate: fn (&mut[1]u32) -> (),
-	release: fn () -> ()
+	reset: fn() -> (),
+	validate: fn(&mut[1]u32) -> (),
+	release: fn() -> ()
 };
 
 // note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently

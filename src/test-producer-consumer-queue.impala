@@ -106,21 +106,57 @@ fn @pred(b: bool) -> i32 {
 	if b {1} else {0}
 }
 
+fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, fn(u32) -> ()) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
+	with thread in wave.threads() {
+		fn push() -> bool {
+			// TODO: reserve for entire wave
+			producer(thread, @|el| {
+				while (with i in queue.push(thread) { el }) <= 0 {}
+			})
+		}
+
+		fn pop() -> bool {
+			// TODO: pop for entire wave
+			let num_dequeued = with i, el in queue.pop(thread) {
+				consumer(thread, el)
+			};
+
+			num_dequeued > 0
+		}
+
+
+		let mut drain = false;
+
+		while true {
+			let flush = wave.shfl_i32(if thread.idx(0) == 0u32 { pred(should_flush(thread)) } else { 0 }, 0, wave.num_threads()) != 0;
+
+			if drain || flush {
+				let done = !pop();
+				if drain && wave.barrier_any(pred(done)) != 0 { break() }
+			}
+			else {
+				let more_input = push();
+				drain = wave.barrier_any(pred(!more_input)) != 0;
+			}
+		}
+	}
+}
+
 fn main() -> i32 {
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;
-	let queue_test = createQueueTest((num_elements + 2u32) * sizeof[u32]() as u32);
+	// let num_elements = 1024u32;
+	// let queue_size = 32;
+	let queue_test = createQueueTest((num_elements + 1u32) * sizeof[u32]() as u32);
 	let block_dim = 256;
 
 	with device, queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		let state_counters = bitcast[&mut[1][u32]](device_memory);
-		let next_input = &mut state_counters(0);
-		let num_retired = &mut state_counters(1);
+		let output = bitcast[&mut[1][u32]](device_memory);
+		let next_input = &mut output(num_elements);
 
 		with grid, intrinsics in device.launch_1d(1, 1) {
 			with thread in grid.threads() {
 				*next_input = 0u32;
-				*num_retired = 0u32;
 			}
 		}
 
@@ -129,65 +165,34 @@ fn main() -> i32 {
 				with thread in wave.threads() {
 					let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
 
-					fn push() -> bool {
-						// TODO: reserve for entire wave
-						let element = thread.atomic_add_global_u32(next_input, 1u32);
+					fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
+						let el = thread.atomic_add_global_u32(next_input, 1u32);
 
-						let mut not_done = element < num_elements;
-
-						while wave.barrier_any(pred(not_done)) != 0 {
-							if not_done {
-								let num_enqueued =
-									with i in queue.push(thread) {
-										rand_state = xorshift32(rand_state);
-										let octaves = (rand_state % 8u32) as i32;
-										(simplexNoiseFractal([thread.idx(0) as f32, 0.0f32, 0.0f32], octaves, intrinsics) * 8.0f32) as u32
-									};
-
-								not_done = num_enqueued <= 0;
-							}
+						if el < num_elements {
+							// rand_state = xorshift32(rand_state);
+							// let octaves = (rand_state % 8u32) as i32;
+							// (simplexNoiseFractal([thread.idx(0) as f32, 0.0f32, 0.0f32], octaves, intrinsics) * 8.0f32) as u32
+							sink(el);
+							true
 						}
-
-						if element > num_elements {
+						else {
 							thread.atomic_exch_global_u32(next_input, num_elements);
+							false
 						}
-
-						element < num_elements
 					}
 
-					fn pop() -> bool {
-						// TODO: pop for entire wave
-						let num_dequeued = with i, el in queue.pop(thread) {
-							;
-						};
-
-						(if num_dequeued > 0 {
-							thread.atomic_add_global_u32(num_retired, 1u32) + 1u32
-						}
-						else {
-							thread.atomic_load_global_u32(num_retired)
-						} < num_elements)
+					fn consumer(thread: gpu_thread_context, el: u32) -> () {
+						output(el) = el;
 					}
 
 
-					let mut drain = false;
-
-					while true {
-						rand_state = xorshift32(rand_state);
+					fn should_flush(thread: gpu_thread_context) -> bool {
 						// let should_push = if rand_state as i32 < 0 { 1 } else { 0 };
-
-						let queue_size = wave.shfl_i32(if thread.idx(0) == 0u32 { queue.size(thread) } else { 0 }, 0, wave.num_threads());
-
 						// if drain || wave.shfl_i32(should_push, 0, wave.num_threads()) == 0 {  // note: cannot use barrier_any(), would mess up the probabilities
-						if drain || queue_size >= wave.num_threads() as i32 {
-							let done = !pop();
-							if wave.barrier_any(pred(done)) != 0 { break() }
-						}
-						else {
-							let more_input = push();
-							drain = wave.barrier_any(pred(!more_input)) != 0;
-						}
+						queue.size(thread) >= wave.num_threads() as i32
 					}
+
+					producer_consumer_loop_wave(wave, producer, consumer, queue, should_flush);
 				}
 			}
 		}
@@ -197,11 +202,6 @@ fn main() -> i32 {
 				if *next_input != num_elements {
 					device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
 					thread.atomic_exch_global_u32(device_failed_flag, -1u32);
-				}
-
-				if *num_retired != num_elements {
-					device.print_i32a("inconsistent num_retired %d != %d\n", [*num_retired as i32, num_elements as i32]);
-					thread.atomic_exch_global_u32(device_failed_flag, -2u32);
 				}
 			}
 		}
