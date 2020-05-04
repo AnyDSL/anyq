@@ -132,11 +132,11 @@ fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_c
 
 			if drain || flush {
 				let done = !pop();
-				if drain && wave.barrier_any(pred(done)) != 0 { break() }
+				if drain && wave.barrier_any(done) { break() }
 			}
 			else {
 				let more_input = push();
-				drain = wave.barrier_any(pred(!more_input)) != 0;
+				drain = wave.barrier_any(!more_input);
 			}
 		}
 	}

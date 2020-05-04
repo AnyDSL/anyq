@@ -18,9 +18,9 @@ struct gpu_group_context {
 	threads: fn (fn (gpu_thread_context) -> ()) -> (),
 
 	barrier: fn () -> (),
-	barrier_all: fn (i32) -> i32,
-	barrier_any: fn (i32) -> i32,
-	barrier_count: fn (i32) -> i32,
+	barrier_all: fn (bool) -> bool,
+	barrier_any: fn (bool) -> bool,
+	barrier_count: fn (bool) -> i32,
 
 	num_waves: fn () -> u32,
 	num_threads: fn (i32) -> u32,
@@ -36,10 +36,10 @@ struct gpu_wave_context {
 	num_threads: fn () -> u32,
 
 	barrier: fn () -> (),
-	barrier_all: fn (i32) -> i32,
-	barrier_any: fn (i32) -> i32,
-	barrier_count: fn (i32) -> i32,
-	barrier_vote: fn (i32) -> u64,
+	barrier_all: fn (bool) -> bool,
+	barrier_any: fn (bool) -> bool,
+	barrier_count: fn (bool) -> i32,
+	barrier_vote: fn (bool) -> u64,
 
 	// activemask: fn () -> u32,
 

@@ -66,6 +66,10 @@ extern "device" {
     fn "printf"  opencl_print_i32 (&[u8], i32) -> i32;
 }
 
+fn @opencl_pred(b: bool) -> i32 {
+	if b {1} else {0}
+}
+
 fn @opencl_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
 		idx: idx,
@@ -137,10 +141,10 @@ fn @opencl_sub_group(idx: fn () -> u32, membermask: u64, num_threads: fn () -> u
 		num_threads: num_threads,
 
 		barrier: @|| opencl_sub_group_barrier(1u32),
-		barrier_all: @|predicate| opencl_sub_group_all(predicate),
-		barrier_any: @|predicate| opencl_sub_group_any(predicate),
-		barrier_count: @|predicate| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
-		barrier_vote: @|predicate| { undef[u64]() }, //cuda_warp_sync_vote(membermask, predicate),
+		barrier_all: @|predicate| opencl_sub_group_all(opencl_pred(predicate)) != 0,
+		barrier_any: @|predicate| opencl_sub_group_any(opencl_pred(predicate)) != 0,
+		barrier_count: @|predicate:bool| { undef[i32]() }, //cuda_popc_u32(cuda_warp_sync_vote(membermask, predicate)),
+		barrier_vote: @|predicate:bool| { undef[u64]() }, //cuda_warp_sync_vote(membermask, predicate),
 
 		// activemask: cuda_warp_activemask,
 
@@ -203,9 +207,9 @@ fn @opencl_group(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads:
 		num_waves: num_sub_groups,
 		num_threads: num_threads,
 		barrier: @|| opencl_barrier(2u32),
-		barrier_all: @|n:i32| { undef[i32]() }, //cuda_block_sync_all,
-		barrier_any: @|n:i32| { undef[i32]() }, //cuda_block_sync_any,
-		barrier_count: @|n:i32| { undef[i32]() } //cuda_block_sync_count
+		barrier_all: @|_:bool| { undef[bool]() }, //cuda_block_sync_all,
+		barrier_any: @|_:bool| { undef[bool]() }, //cuda_block_sync_any,
+		barrier_count: @|_:bool| { undef[i32]() } //cuda_block_sync_count
 	});
 }
 

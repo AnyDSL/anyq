@@ -16,6 +16,10 @@ fn @createAccDevice() -> AccDevice {
 }
 
 
+fn @amdgpu_pred(b: bool) -> i32 {
+	if b {1} else {0}
+}
+
 fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {
         idx: idx,
@@ -83,10 +87,10 @@ fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(g
         num_threads: @|| num_threads,
 
         barrier:       amdgcn_wave_barrier,
-        barrier_all:   amdgcn_sync_all,
-        barrier_any:   amdgcn_sync_any,
-        barrier_count: amdgcn_sync_count,
-        barrier_vote:  amdgcn_sync_vote,
+        barrier_all:   @|predicate| amdgcn_sync_all(amdgpu_pred(predicate)) != 0,
+        barrier_any:   @|predicate| amdgcn_sync_any(amdgpu_pred(predicate)) != 0,
+        barrier_count: @|predicate| amdgcn_sync_count(amdgpu_pred(predicate)),
+        barrier_vote:  @|predicate| amdgcn_sync_vote(amdgpu_pred(predicate)),
 
         shfl_i32: @|var:i32, src_lane:i32, width:u32| amdgcn_shfl_i32(var, src_lane, width as i32),
         shfl_u32: @|var:u32, src_lane:i32, width:u32| amdgcn_shfl_u32(var, src_lane, width as i32),
@@ -175,9 +179,9 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         num_waves: num_warps,
         num_threads: num_threads,
         barrier: amdgcn_s_barrier,
-        barrier_all: amdgcn_barrier_all,
-        barrier_any: amdgcn_barrier_any,
-        barrier_count: amdgcn_barrier_count
+        barrier_all: @|predicate| amdgcn_barrier_all(amdgpu_pred(predicate)) != 0,
+        barrier_any: @|predicate| amdgcn_barrier_any(amdgpu_pred(predicate)) != 0,
+        barrier_count: @|predicate| amdgcn_barrier_count(amdgpu_pred(predicate))
     })
 }
 

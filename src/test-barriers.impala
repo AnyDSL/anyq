@@ -13,16 +13,12 @@ fn main() -> i32 {
 				with thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = wave.barrier_all(iami);
-						let passed = (x == 0);
-
-						if !passed {
+						if wave.barrier_all(thread.idx(0) == i as u32) != false {
 							thread.atomic_exch_global_u32(device_failed_flag, 1u32);
 						}
 					}
 
-					if wave.barrier_all(1) != 1 {
+					if wave.barrier_all(true) != true {
 						thread.atomic_exch_global_u32(device_failed_flag, 2u32);
 					}
 				}
@@ -39,16 +35,12 @@ fn main() -> i32 {
 				with thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = wave.barrier_any(iami);
-						let passed = (x == 1);
-
-						if !passed {
+						if wave.barrier_any(thread.idx(0) == i as u32) != true {
 							thread.atomic_exch_global_u32(device_failed_flag, 3u32);
 						}
 					}
 
-					if wave.barrier_any(0) != 0 {
+					if wave.barrier_any(false) != false {
 						thread.atomic_exch_global_u32(device_failed_flag, 4u32);
 					}
 				}
@@ -66,16 +58,14 @@ fn main() -> i32 {
 					// FIXME: nvcc / nvrtc generates incorrect code on Linux when range is used
 					for i in unroll(0, wave.num_threads() as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = wave.barrier_vote(iami);
-						let passed = (x == (1u64 << i as u64));
+						let expected = (1u64 << i as u64);
 
-						if !passed {
+						if wave.barrier_vote(thread.idx(0) == i as u32) != expected {
 							thread.atomic_exch_global_u32(device_failed_flag, 5u32);
 						}
 					}
 
-					if wave.barrier_vote(1) != wave.membermask() {
+					if wave.barrier_vote(true) != wave.membermask() {
 						thread.atomic_exch_global_u32(device_failed_flag, 6u32);
 					}
 				}
@@ -92,16 +82,12 @@ fn main() -> i32 {
 				with thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = wave.barrier_count(iami);
-						let passed = (x == 1);
-
-						if !passed {
+						if wave.barrier_count(thread.idx(0) == i as u32) != 1 {
 							thread.atomic_exch_global_u32(device_failed_flag, 7u32);
 						}
 					}
 
-					if wave.barrier_count(1) as u32 != wave.num_threads() {
+					if wave.barrier_count(true) as u32 != wave.num_threads() {
 						thread.atomic_exch_global_u32(device_failed_flag, 8u32);
 					}
 				}
@@ -119,16 +105,12 @@ fn main() -> i32 {
 				with thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = group.barrier_all(iami);
-						let passed = (x == 0);
-
-						if !passed {
+						if group.barrier_all(thread.idx(0) == i as u32) != false {
 							thread.atomic_exch_global_u32(device_failed_flag, 10u32);
 						}
 					}
 
-					if group.barrier_all(1) != 1 {
+					if group.barrier_all(true) != true {
 						thread.atomic_exch_global_u32(device_failed_flag, 11u32);
 					}
 				}
@@ -145,16 +127,12 @@ fn main() -> i32 {
 				with thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = group.barrier_any(iami);
-						let passed = (x == 1);
-
-						if !passed {
+						if group.barrier_any(thread.idx(0) == i as u32) != true {
 							thread.atomic_exch_global_u32(device_failed_flag, 12u32);
 						}
 					}
 
-					if group.barrier_any(0) != 0 {
+					if group.barrier_any(false) != false {
 						thread.atomic_exch_global_u32(device_failed_flag, 13u32);
 					}
 				}
@@ -171,16 +149,12 @@ fn main() -> i32 {
 				with thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
-						let iami = if thread.idx(0) == i as u32 {1} else {0};
-						let x = group.barrier_count(iami);
-						let passed = (x == 1);
-
-						if !passed {
+						if group.barrier_count(thread.idx(0) == i as u32) != 1 {
 							thread.atomic_exch_global_u32(device_failed_flag, 14u32);
 						}
 					}
 
-					if group.barrier_count(1) as u32 != group.num_threads(0) {
+					if group.barrier_count(true) as u32 != group.num_threads(0) {
 						thread.atomic_exch_global_u32(device_failed_flag, 15u32);
 					}
 				}

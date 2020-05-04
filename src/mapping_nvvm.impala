@@ -14,6 +14,9 @@ fn @createAccDevice() -> AccDevice {
 	}
 }
 
+fn @nvvm_pred(b: bool) -> i32 {
+	if b {1} else {0}
+}
 
 fn @nvvm_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
@@ -101,10 +104,10 @@ fn @nvvm_subwarp(idx: fn () -> u32, membermask: u32, num_threads: u32, body: fn 
 		num_threads: @|| num_threads,
 
 		barrier: @|| nvvm_warp_sync(membermask),
-		barrier_all: @|predicate| if nvvm_warp_sync_all(membermask, predicate != 0) {1} else {0},
-		barrier_any: @|predicate| if nvvm_warp_sync_any(membermask, predicate != 0) {1} else {0},
-		barrier_count: @|predicate| nvvm_popc_i(nvvm_warp_sync_ballot(membermask, predicate != 0) as i32),
-		barrier_vote: @|predicate| nvvm_warp_sync_ballot(membermask, predicate != 0) as u64,
+		barrier_all: @|predicate| nvvm_warp_sync_all(membermask, predicate),
+		barrier_any: @|predicate| nvvm_warp_sync_any(membermask, predicate),
+		barrier_count: @|predicate| nvvm_popc_i(nvvm_warp_sync_ballot(membermask, predicate) as i32),
+		barrier_vote: @|predicate| nvvm_warp_sync_ballot(membermask, predicate) as u64,
 
 		// activemask: nvvm_warp_activemask,
 
@@ -176,9 +179,9 @@ fn @nvvm_block(idx: fn (i32) -> u32, thread_idx: fn (i32) -> u32, num_threads: f
 		num_waves: num_warps,
 		num_threads: num_threads,
 		barrier: nvvm_block_sync,
-		barrier_all: nvvm_block_sync_all,
-		barrier_any: nvvm_block_sync_any,
-		barrier_count: nvvm_block_sync_count
+		barrier_all: @|predicate| nvvm_block_sync_all(nvvm_pred(predicate)) != 0,
+		barrier_any: @|predicate| nvvm_block_sync_any(nvvm_pred(predicate)) != 0,
+		barrier_count: @|predicate| nvvm_block_sync_count(nvvm_pred(predicate))
 	});
 }
 
