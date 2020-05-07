@@ -89,34 +89,31 @@ struct AccDevice {
 }
 
 struct BaseTest {
-	run_test: fn (fn (AccDevice, &mut[1][i8], &mut[1]u32) -> bool) -> (),
+	run_test: fn (fn (&mut[1][i8], &mut[1]u32) -> bool) -> (),
 	finish: fn () -> i32
 }
 
-fn createBaseTest(additional_mem: u32) -> BaseTest {
-	let device = createAccDevice();
-
+fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 	let memory_size = round_up(additional_mem as i32 + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory(memory_size - sizeof[u32]()));
 
-	let zero = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
-	*zero = 0u32;
-	runtime_copy(0, zero as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]() as i64);
-	runtime_release(0, zero as &[i8]);
+	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
+	*gpu_result = 0u32;
+	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]() as i64);
+
 
 	let mut cpu_result: bool = true;
 
 	BaseTest {
 		run_test: @|body| {
-			cpu_result = cpu_result & body(device, device_memory, device_failed_flag);
+			cpu_result = cpu_result & body(device_memory, device_failed_flag);
 		},
 
 		finish: @|| {
 			device.synchronize();
 
-			let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
 			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
 
 			print_string("gpu_result ");
@@ -138,12 +135,12 @@ fn createBaseTest(additional_mem: u32) -> BaseTest {
 
 
 struct QueueTest {
-	run_test: fn (i32, fn (AccDevice, ProducerConsumerQueue, &mut[1][i8], &mut[1]u32) -> bool) -> (),
+	run_test: fn (i32, fn (ProducerConsumerQueue, &mut[1][i8], &mut[1]u32) -> bool) -> (),
 	finish: fn () -> i32
 }
 
-fn createQueueTest(additional_mem: u32) -> QueueTest {
-	let test = createBaseTest(additional_mem);
+fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
+	let test = createBaseTest(device, additional_mem);
 
 	// cuda_device is a static in cuda_mapping
 	// device is a struct from createAccDevice()
@@ -153,7 +150,7 @@ fn createQueueTest(additional_mem: u32) -> QueueTest {
 			// let queue_buffer = alloc_cuda(device, queue_size * sizeof[i32]());
 			// let queue_storage = bitcast[&mut[1][u32]](queue_buffer.data);
 
-			with device, device_memory, device_failed_flag in test.run_test() {
+			with device_memory, device_failed_flag in test.run_test() {
 				let queue = createProducerConsumerQueue(device, /*queue_storage,*/ queue_size);
 
 				queue.reset();
@@ -162,7 +159,7 @@ fn createQueueTest(additional_mem: u32) -> QueueTest {
 
 				// TODO: properly refactor benchmark
 				//with benchmark_cuda(cuda_device, 32) {
-					if !body(device, queue, device_memory, device_failed_flag) {
+					if !body(queue, device_memory, device_failed_flag) {
 						cpu_result = false;
 					}
 				//}

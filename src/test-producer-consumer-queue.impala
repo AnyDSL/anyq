@@ -1,207 +1,91 @@
 
-
-fn @xorshift32(state: u32) -> u32 {
-	let mut x = state;
-	x ^= x << 13u32;
-	x ^= x >> 17u32;
-	x ^= x << 5u32;
-	x
-}
-
-
-// based on Ken Perlin, Noise hardware. In Real-Time Shading SIGGRAPH Course Notes (2001), Olano M., (Ed.).
-// https://www.csee.umbc.edu/~olano/s2002c36/ch02.pdf
-
-type float3 = [f32 * 3];
-
-fn @float3_add(a: float3, b: float3) -> float3 {
-	[a(0) + b(0), a(1) + b(1), a(2) + b(2)]
-}
-
-fn @float3_sub(a: float3, b: float3) -> float3 {
-	[a(0) - b(0), a(1) - b(1), a(2) - b(2)]
-}
-
-fn @float3_scale(a: float3, f: f32) -> float3 {
-	[a(0) * f, a(1) * f, a(2) * f]
-}
-
-fn @float3_dot(a: float3, b: float3) -> f32 {
-	a(0) * b(0) + a(1) * b(1) + a(2) * b(2)
-}
-
-fn @randf(x: u32, intrinsics: Intrinsics) -> f32 {
-	bitcast[f32]((127u32 << 23u32) | (xorshift32(x) >> 9u32)) * 2.0f32 - 3.0f32
-}
-
-fn @noiseGradient(p: float3, intrinsics: Intrinsics) -> float3 {
-	let seed1 = xorshift32(bitcast[u32](p(0)) ^ (bitcast[u32](p(2)) << 16u32));
-	let seed2 = xorshift32(bitcast[u32](p(1)) ^ (bitcast[u32](p(2)) << 16u32));
-	let u = randf(seed1, intrinsics);
-	let theta = randf(seed2, intrinsics) * 3.14159265358979f32;
-
-	let s = intrinsics.sqrtf(1.0f32 - u * u);
-
-	[s * intrinsics.cosf(theta), s * intrinsics.sinf(theta), u]
-}
-
-fn @skew(p: float3) -> float3 {
-	let s = (p(0) + p(1) + p(2)) / 3.0f32;
-	[p(0) + s, p(1) + s, p(2) + s]
-}
-
-fn @unskew(p: float3) -> float3 {
-	let s = (p(0) + p(1) + p(2)) / 6.0f32;
-	[p(0) - s, p(1) - s, p(2) - s]
-}
-
-type simplex_t = [float3 * 4];
-
-fn @simplex(p: float3, intrinsics: Intrinsics) -> simplex_t {
-	let skewed_base = skew(p);
-	let v_0 = unskew([intrinsics.floorf(skewed_base(0)), intrinsics.floorf(skewed_base(1)), intrinsics.floorf(skewed_base(2))]);
-
-	let v = float3_sub(p, v_0);
-
-	let b1 = v(0) < v(1);
-	let b2 = v(1) < v(2);
-	let b3 = v(2) < v(0);
-
-	let e_1 = [ if !b1 &  b3 { 1.0f32 } else { 0.0f32 }, if !b2 &  b1 { 1.0f32 } else { 0.0f32 }, if !b3 &  b2 { 1.0f32 } else { 0.0f32 } ];
-	let e_2 = [ if  b1 ^  b3 { 0.0f32 } else { 1.0f32 }, if  b2 ^  b1 { 0.0f32 } else { 1.0f32 }, if  b3 ^  b2 { 0.0f32 } else { 1.0f32 } ];
-	let e_3 = [ if  b1 & !b3 { 1.0f32 } else { 0.0f32 }, if  b2 & !b1 { 1.0f32 } else { 0.0f32 }, if  b3 & !b2 { 1.0f32 } else { 0.0f32 } ];
-
-	[ v_0, float3_add(v_0, unskew(e_1)), float3_add(v_0, unskew(float3_add(e_1, e_2))), float3_add(v_0, unskew(float3_add(e_1, float3_add(e_2, e_3)))) ]
-}
-
-fn @simplexContribution(d: float3, gradient: float3) -> f32 {
-	let t = 0.5f32 - float3_dot(d, d);
-	let t2 = t * t;
-	let t4 = t2 * t2;
-
-	if t > 0.0f { 8.0f * t4 * float3_dot(gradient, d) } else { 0.0f32 }
-}
-
-fn @simplexNoise(p: float3, intrinsics: Intrinsics) -> f32 {
-	let s = simplex(p, intrinsics);
-
-	simplexContribution(float3_sub(p, s(0)), noiseGradient(s(0), intrinsics)) +
-	simplexContribution(float3_sub(p, s(1)), noiseGradient(s(1), intrinsics)) +
-	simplexContribution(float3_sub(p, s(2)), noiseGradient(s(2), intrinsics)) +
-	simplexContribution(float3_sub(p, s(3)), noiseGradient(s(3), intrinsics))
-}
-
-fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
-{
-	let mut r = 0.0f32;
-
-	for i in range(0, N) {
-		r += (1.0f32 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32), intrinsics);
-	}
-
-	1.0f32 / (2.0f32 - 1.0f32 / (1 << (N - 1)) as f32) * r
-}
-
-fn @pred(b: bool) -> i32 {
-	if b {1} else {0}
-}
-
-fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, fn(u32) -> ()) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
-	with thread in wave.threads() {
-		fn push() -> bool {
-			// TODO: reserve for entire wave
-			producer(thread, @|el| {
-				while (with i in queue.push(thread) { el }) <= 0 {}
-			})
-		}
-
-		fn pop() -> bool {
-			// TODO: pop for entire wave
-			let num_dequeued = with i, el in queue.pop(thread) {
-				consumer(thread, el)
-			};
-
-			num_dequeued > 0
-		}
-
-
-		let mut drain = false;
-
-		while true {
-			let flush = wave.shfl_i32(if thread.idx(0) == 0u32 { pred(should_flush(thread)) } else { 0 }, 0, wave.num_threads()) != 0;
-
-			if drain || flush {
-				let done = !pop();
-				if drain && wave.barrier_any(done) { break() }
-			}
-			else {
-				let more_input = push();
-				drain = wave.barrier_any(!more_input);
-			}
-		}
-	}
-}
-
 fn main() -> i32 {
+	let device = createAccDevice();
+
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;
-	// let num_elements = 1024u32;
-	// let queue_size = 32;
-	let queue_test = createQueueTest((num_elements + 1u32) * sizeof[u32]() as u32);
+	let queue_test = createQueueTest(device, (num_elements + 1u32) * sizeof[u32]() as u32);
 	let block_dim = 256;
 
-	with device, queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		let output = bitcast[&mut[1][u32]](device_memory);
-		let next_input = &mut output(num_elements);
+	let ref_test = createBaseTest(device, (num_elements + 0u32) * sizeof[u32]() as u32);
 
-		with grid, intrinsics in device.launch_1d(1, 1) {
-			with thread in grid.threads() {
-				*next_input = 0u32;
+	fn element(intrinsics: Intrinsics, i: u32) -> u32 {
+		let rand_state = xorshift32(i);
+		let octaves = (rand_state % 8u32) as i32;
+		(simplexNoiseFractal([randf(i, intrinsics), randf(i * 2u32, intrinsics), randf(i * 3u32, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+	}
+
+	with device_memory, device_failed_flag in ref_test.run_test() {
+		let ref_output = bitcast[&mut[1][u32]](device_memory);
+
+		with queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
+			let output = bitcast[&mut[1][u32]](device_memory);
+			let next_input = &mut output(num_elements);
+
+			with grid, intrinsics in device.launch_1d(1, 1) {
+				with thread in grid.threads() {
+					*next_input = 0u32;
+				}
 			}
+
+			with grid, intrinsics in device.launch_1d(42, block_dim) {
+				with wave in grid.waves() {
+					with thread in wave.threads() {
+						// let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
+
+						fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
+							let el = thread.atomic_add_global_u32(next_input, 1u32);
+
+							if el < num_elements {
+								sink(element(intrinsics, el));
+								true
+							}
+							else {
+								thread.atomic_exch_global_u32(next_input, num_elements);
+								false
+							}
+						}
+
+						fn consumer(thread: gpu_thread_context, el: u32) -> () {
+							output(el) = el;
+						}
+
+
+						fn should_flush(thread: gpu_thread_context) -> bool {
+							// let should_push = if rand_state as i32 < 0 { 1 } else { 0 };
+							// if drain || wave.shfl_i32(should_push, 0, wave.num_threads()) == 0 {  // note: cannot use barrier_any(), would mess up the probabilities
+							queue.size(thread) >= wave.num_threads() as i32
+						}
+
+						producer_consumer_loop_wave(wave, producer, consumer, queue, should_flush);
+					}
+				}
+			}
+
+			with grid, intrinsics in device.launch_1d(1, 1) {
+				with thread in grid.threads() {
+					if *next_input != num_elements {
+						device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1u32);
+					}
+				}
+			}
+
+			queue_test.finish() == 0
 		}
 
-		with grid, intrinsics in device.launch_1d(42, block_dim) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
-					let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
-
-					fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
-						let el = thread.atomic_add_global_u32(next_input, 1u32);
-
-						if el < num_elements {
-							// rand_state = xorshift32(rand_state);
-							// let octaves = (rand_state % 8u32) as i32;
-							// (simplexNoiseFractal([thread.idx(0) as f32, 0.0f32, 0.0f32], octaves, intrinsics) * 8.0f32) as u32
-							sink(el);
-							true
-						}
-						else {
-							thread.atomic_exch_global_u32(next_input, num_elements);
-							false
-						}
-					}
-
-					fn consumer(thread: gpu_thread_context, el: u32) -> () {
-						output(el) = el;
-					}
-
-
-					fn should_flush(thread: gpu_thread_context) -> bool {
-						// let should_push = if rand_state as i32 < 0 { 1 } else { 0 };
-						// if drain || wave.shfl_i32(should_push, 0, wave.num_threads()) == 0 {  // note: cannot use barrier_any(), would mess up the probabilities
-						queue.size(thread) >= wave.num_threads() as i32
-					}
-
-					producer_consumer_loop_wave(wave, producer, consumer, queue, should_flush);
+		with grid, intrinsics in device.launch_1d(div_up(num_elements as i32, block_dim), block_dim) {
+			with thread in grid.threads() {
+				for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
+					let el = element(intrinsics, i as u32);
+					ref_output(el) = el;
 				}
 			}
 		}
 
-		with grid, intrinsics in device.launch_1d(1, 1) {
+		with grid, intrinsics in device.launch_1d(div_up(num_elements as i32, block_dim), block_dim) {
 			with thread in grid.threads() {
-				if *next_input != num_elements {
-					device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
-					thread.atomic_exch_global_u32(device_failed_flag, -1u32);
+				for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
 				}
 			}
 		}
@@ -209,5 +93,5 @@ fn main() -> i32 {
 		true
 	}
 
-	queue_test.finish()
+	ref_test.finish()
 }

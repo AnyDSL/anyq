@@ -1,0 +1,36 @@
+
+fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, fn(u32) -> ()) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
+	with thread in wave.threads() {
+		fn push() -> bool {
+			// TODO: reserve for entire wave
+			producer(thread, @|el| {
+				while (with i in queue.push(thread) { el }) <= 0 {}
+			})
+		}
+
+		fn pop() -> bool {
+			// TODO: pop for entire wave
+			let num_dequeued = with i, el in queue.pop(thread) {
+				consumer(thread, el)
+			};
+
+			num_dequeued > 0
+		}
+
+
+		let mut drain = false;
+
+		while true {
+			let flush = wave.shfl_i32(if thread.idx(0) == 0u32 { if should_flush(thread) {1} else {0} } else { 0 }, 0, wave.num_threads()) != 0;
+
+			if drain || flush {
+				let done = !pop();
+				if drain && wave.barrier_any(done) { break() }
+			}
+			else {
+				let more_input = push();
+				drain = wave.barrier_any(!more_input);
+			}
+		}
+	}
+}

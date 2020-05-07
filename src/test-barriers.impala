@@ -1,10 +1,12 @@
 
 
 fn main() -> i32 {
+	let device = createAccDevice();
+
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(0u32);
+	let test = createBaseTest(device, 0u32);
 
 	// verify that only all lanes trigger wave barrier_all
 	with device, device_memory, device_failed_flag in test.run_test() {

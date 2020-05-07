@@ -1,13 +1,15 @@
 
 
 fn main() -> i32 {
+	let device = createAccDevice();
+
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(0u32);
+	let test = createBaseTest(device, 0u32);
 
 	// verify that each lane can read from each other lane
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -29,7 +31,7 @@ fn main() -> i32 {
 	}
 
 	// verify shuffle up for all possible lane deltas
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -50,7 +52,7 @@ fn main() -> i32 {
 	}
 
 	// verify shuffle down for all possible lane deltas
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -71,7 +73,7 @@ fn main() -> i32 {
 	}
 
 	// verify butterfly shuffle for all possible lane deltas
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
