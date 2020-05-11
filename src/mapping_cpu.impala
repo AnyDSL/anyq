@@ -180,10 +180,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		num_threads: num_threads,
 
 		barrier: @|| { },
-		barrier_all: @|predicate| { rv_all(predicate != 0) as i32 },
-		barrier_any: @|predicate| { rv_any(predicate != 0) as i32 },
-		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate != 0)) },
-		barrier_vote: @|predicate| { rv_ballot(predicate != 0) as u64 },
+		barrier_all: @|predicate| { rv_all(predicate) },
+		barrier_any: @|predicate| { rv_any(predicate) },
+		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate)) },
+		barrier_vote: @|predicate| { rv_ballot(predicate) as u64 },
 
 		/* TODO: assert width == num_threads == warp_size */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { warp_shuffle_i32(x, src_lane) },
@@ -222,25 +222,25 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
 		// TODO: this will only work with fibers, coroutines or alike
-		barrier: @|| { fibers_sync_block(idx.block_id as i32); },
-		barrier_all: @|predicate:i32| {
-			let warp_pred = rv_all(predicate != 0) as i32;
+		barrier: @|| -> () { fibers_sync_block(idx.block_id as i32); },
+		barrier_all: @|predicate:bool| -> bool {
+			let warp_pred = rv_all(predicate) as i32;
 			// atomic_and_global_i32
 			atomic(3u32, addr(1), warp_pred, 7u32, "");
 			fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
 			let result = *(addr(0));
-			result
+			result != 0
 		},
-		barrier_any: @|predicate:i32| {
-			let warp_pred = rv_any(predicate != 0) as i32;
+		barrier_any: @|predicate:bool| -> bool {
+			let warp_pred = rv_any(predicate) as i32;
 			// atomic_or_global_i32
 			atomic(5u32, addr(2), warp_pred, 7u32, "");
 			fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
 			let result = *(addr(0));
-			result
+			result != 0
 		},
-		barrier_count: @|predicate:i32| {
-			let warp_count = cpu_popcount32(rv_ballot(predicate != 0));
+		barrier_count: @|predicate:bool| -> i32 {
+			let warp_count = cpu_popcount32(rv_ballot(predicate));
 			// atomic_add_global_i32
 			atomic(1u32, addr(3), warp_count, 7u32, "");
 			fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
