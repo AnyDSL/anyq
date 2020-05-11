@@ -9,7 +9,7 @@ fn main() -> i32 {
 	let test = createBaseTest(device, 0u32);
 
 	// verify that only all lanes trigger wave barrier_all
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -31,7 +31,7 @@ fn main() -> i32 {
 	}
 
 	// verify that any lane can trigger wave barrier_any
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -53,7 +53,7 @@ fn main() -> i32 {
 	}
 
 	// verify that every vote counts in wave barrier_vote
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -78,7 +78,7 @@ fn main() -> i32 {
 	}
 
 	// verify that every lane counts in wave barrier_count
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with wave in grid.waves() {
 				with thread in wave.threads() {
@@ -101,7 +101,7 @@ fn main() -> i32 {
 
 
 	// verify that only all threads trigger group barrier_all
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with group in grid.groups() {
 				with thread in group.threads() {
@@ -123,7 +123,7 @@ fn main() -> i32 {
 	}
 
 	// verify that any threads can trigger group barrier_any
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with group in grid.groups() {
 				with thread in group.threads() {
@@ -145,7 +145,7 @@ fn main() -> i32 {
 	}
 
 	// verify that every thread counts in group barrier_count
-	with device, device_memory, device_failed_flag in test.run_test() {
+	with device_memory, device_failed_flag in test.run_test() {
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 			with group in grid.groups() {
 				with thread in group.threads() {
