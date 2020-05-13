@@ -102,10 +102,10 @@ fn @cpu_thread(idx: fn (i32) -> u32, body: fn (gpu_thread_context) -> ()) -> () 
 
 			// this is optimized for val being 2**n-1
 			/*
-			// atomic add
+			// atomic_add
 			let old:u32 = atomic(1u, ptr, 1u, 7u, "");
 			if old >= val {
-				// atomic and to mask overflow bits
+				// atomic_and to mask overflow bits
 				// however, we must ensure that addr will not be read outside of this function
 				atomic(3u, ptr, val, 7u, "");
 			}
@@ -220,7 +220,6 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 		num_waves: num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
-		// TODO: this will only work with fibers, coroutines or alike
 		barrier: @|| -> () { fibers_sync_block(idx.block_id as i32); },
 		barrier_all: @|predicate:bool| -> bool {
 			let warp_pred = rv_all(predicate) as i32;
