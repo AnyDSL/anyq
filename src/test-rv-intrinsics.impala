@@ -35,6 +35,7 @@ fn main() -> i32 {
 	//	data(j) = rv_shuffle_i32(data(j), $delta);
 	//}
 
+	/*
 	fn shuffle_i32(self: i32, value: i32, src_lane: i32) -> i32 {
 		// use rv_extract / FAIL
 		//let result = rv_extract_i32(value, src_lane);
@@ -64,20 +65,43 @@ fn main() -> i32 {
 	fn shuffle_bfly_i32(self: i32, value: i32, xor: i32) -> i32 {
 		shuffle_i32(self, value, self ^ xor)
 	}
-
-	for j in vectorize(vec_width) {
+	*/
+	//for j in vectorize(vec_width) {
 		//let mydata = rv_load_i32(data, 0);
-		let mydata = data(j);
+		//let mydata = data(j);
 
 		//mydata = -mydata;
-		let laneid = 7 - j;
+		//let laneid = 7 - j;
 
 		//let new_data = shuffle_i32(j, mydata, laneid);
 		//let new_data = shuffle_up_i32(j, mydata, 3);
-		let new_data = shuffle_bfly_i32(j, mydata, 0x3);
+		//let new_data = shuffle_bfly_i32(j, mydata, 0x3);
 
 		//rv_store_i32(data, j, mydata);
-		data(j) = new_data;
+		//data(j) = new_data;
+	//}
+
+	//fn tid(x: i32) -> i32 { x }
+
+	for j in vectorize(vec_width) {
+		// this produces as output: "0: 01234567"
+		// and the generated code contains
+		//  * 1 call for print_i32(j)
+		//  * 1 call for print_string(": ")
+		//  * n calls to print_i32(data(j))
+		//print_i32(j); print_string(": "); print_i32(data(j)); print_string("\n");
+
+
+		for i in unroll(0, vec_width) {
+			if i == j {
+				let j0 = rv_extract_i32(j, i);
+				// this works too, but is less reliable
+				//let j1 = data(j);
+				let j1 = rv_extract_i32(data(j), i);
+				print_i32(j0); print_string(": "); print_i32(j1); print_string("\n");
+			}
+		}
+
 	}
 
 	//let delta = 12;
@@ -103,9 +127,9 @@ fn main() -> i32 {
 		//data(j) = rv_ballot(data(j) % 2 == 0);
 	//}
 
-	for i in range(0, warp_size) {
-		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
-	}
+	//for i in range(0, warp_size) {
+	//	print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+	//}
 
 	release(buffer);
 
