@@ -264,7 +264,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 	let num_threads = num_blocks * num_threads_per_block;
 
 	// TODO: assert(warp_size/l == vec_width)
-	let warp_loop = @|l:u32, body: fn(u32)->()| vectorize(vec_width as i32, @|i:i32| @@body(i as u32));
+	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(vec_width as i32, body);
 	//let warp_loop = @|l:u32, body: fn(u32)->()| range(0, l as i32, @|i:i32| body(i as u32));
 
 	// we need a buffer to accumulate block level results of barriers
@@ -285,7 +285,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 			let idx = Index {
 				block_id: block_id as u32,
 				 warp_id:  warp_id as u32,
-				local_id: local_id,
+				local_id: local_id as u32,
 			};
 
 			let context = gpu_grid_context {
