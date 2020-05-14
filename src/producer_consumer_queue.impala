@@ -32,9 +32,9 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 				0
 			}
 			else {
-				let new_size = thread.atomic_add_global_i32(size, 1) + 1;
+				let new_size = thread.atomic_add_global_i32(size, 1);
 
-				if new_size > buffer_size {
+				if new_size >= buffer_size {
 					thread.atomic_sub_global_i32(size, 1);
 					0
 				}
