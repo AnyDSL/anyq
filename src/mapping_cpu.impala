@@ -169,7 +169,7 @@ fn @cpu_thread(tid: fn (i32) -> u32, idx: Index, body: fn (gpu_thread_context) -
 			old
 		},
 
-		yield: @|| { fibers_yield(); }
+		yield: @|| { if idx.local_id == 0u { fibers_yield(); } }
 	});
 }
 
