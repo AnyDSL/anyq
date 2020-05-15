@@ -11,6 +11,8 @@ void anydsl_fibers_sync_block(int32_t block);
 void anydsl_fibers_sync_block_with_result(int32_t* output, int32_t* result, int32_t reset, int32_t block);
 void anydsl_fibers_yield();
 
+int32_t anyq_print_i32a(const char* format, int32_t val0, int32_t val1);
+
 #ifdef __cplusplus
 }
 #endif

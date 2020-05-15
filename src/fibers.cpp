@@ -304,3 +304,14 @@ void anydsl_fibers_spawn(
 	BOOST_ASSERT(0 == ctx.fiber_count);
 }
 
+
+static std::mutex fiber_print_mtx{};
+
+int32_t anyq_print_i32a(const char* format, int32_t val0, int32_t val1) {
+	lock_type lk(fiber_print_mtx);
+
+	fprintf(stdout, format, val0, val1);
+	fflush(stdout);
+
+	return 0;
+}
