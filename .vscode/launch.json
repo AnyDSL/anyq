@@ -1,0 +1,56 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "debug nvvm",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/bin/Release/${fileBasenameNoExtension}-nvvm.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{
+					"name": "ANYDSL_PROFILE",
+					"value": "FULL"
+				},
+				{
+					"name": "ANYDSL_DUMP_CUDA_BINARIES",
+					"value": "1"
+				}
+			],
+			"externalConsole": false
+		},
+		{
+			"name": "debug cuda",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/bin/Release/${fileBasenameNoExtension}-cuda.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{
+					"name": "ANYDSL_PROFILE",
+					"value": "FULL"
+				},
+				{
+					"name": "ANYDSL_DUMP_CUDA_BINARIES",
+					"value": "1"
+				}
+			],
+			"externalConsole": false
+		},
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			// "args": ["-deps"],
+			"console": "integratedTerminal"
+		}
+	]
+}

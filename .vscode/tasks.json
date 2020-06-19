@@ -1,0 +1,74 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build nvvm",
+			"type": "shell",
+			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-nvvm --config Release",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "build cuda",
+			"type": "shell",
+			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-cuda --config Release",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "build opencl",
+			"type": "shell",
+			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-opencl --config Release",
+			"group": {
+				"kind": "build"
+			},
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "build amdgpu",
+			"type": "shell",
+			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-amdgpu --config Release",
+			"group": {
+				"kind": "build"
+			},
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "ptxas nvvm",
+			"type": "shell",
+			"command": "ptxas ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-nvvm.nvvm.ptx",
+			"problemMatcher": []
+		},
+		{
+			"label": "ptxas cuda",
+			"type": "shell",
+			"command": "ptxas -arch=sm_61 -lineinfo ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-cuda.cu.ptx",
+			"problemMatcher": []
+		},
+		{
+			"label": "nvdisasm nvvm",
+			"type": "shell",
+			"command": "nvdisasm ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-nvvm.nvvm.cubin > ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-nvvm.nvvm.cubin.asm",
+			"problemMatcher": []
+		},
+		{
+			"label": "nvdisasm cuda",
+			"type": "shell",
+			"command": "nvdisasm -g ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-cuda.cu.cubin > ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-cuda.cubin.asm",
+			"problemMatcher": []
+		}
+	]
+}
