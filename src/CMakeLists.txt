@@ -74,6 +74,8 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-barriers.impala nvvm)
 	add_schedule_test(test-producer-consumer-queue.impala cuda)
 	add_schedule_test(test-producer-consumer-queue.impala nvvm)
+	add_schedule_test(test-pipeline.impala cuda)
+	add_schedule_test(test-pipeline.impala nvvm)
 endif()
 
 if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)

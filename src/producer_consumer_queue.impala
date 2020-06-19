@@ -1,45 +1,63 @@
 
-struct ProducerConsumerQueue
-{
+
+struct QueueElement {
+	clear: fn () -> ()
+}
+
+enum LockedQueueElement {
+	Result(QueueElement),
+	None
+}
+
+struct QueueElementType {
+	size: fn () -> i32,
+	alignment: fn () -> i32,
+	try_lock: fn (gpu_thread_context, &[1][u8]) -> LockedQueueElement
+}
+
+struct ProducerConsumerQueue {
 	push: fn(gpu_thread_context, fn (u32) -> u32) -> i32,
 	pop: fn(gpu_thread_context, fn (u32, u32) -> ()) -> i32,
 	// pop_wave: fn(gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
 	size: fn(gpu_thread_context) -> i32,
-	reset: fn() -> (),
-	validate: fn(&mut[1]u32) -> (),
+	reset: fn(gpu_grid_context) -> (),
+	validate: fn(&mut[1]u32, gpu_grid_context) -> (),
 	release: fn() -> ()
 };
 
 // note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently
 //                  this is fine as long as a warp only ever acts as either a producer or consumer at a time
-fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> ProducerConsumerQueue {
-	let buffer_data_offset = 4;
+fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: QueueElementType, num_elements: i32) -> ProducerConsumerQueue {
+	let element_size = element_type.size();
+	let element_alignment = element_type.alignment();
+	let element_stride = max(element_size, element_alignment);
 
-	let queue_device_state_alloc = device.alloc((buffer_data_offset + buffer_size) * sizeof[u32]());
+	let buffer_data_offset = round_up(4 * sizeof[u32](), element_alignment);
+
+	let queue_device_state_alloc = device.alloc(buffer_data_offset + num_elements * element_stride);
 	let queue_device_memory = queue_device_state_alloc.data;
 	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
 
 	let size = bitcast[&mut[1]i32](&mut queue_counters(0));
 	let head = &mut queue_counters(1);
 	let tail = &mut queue_counters(2);
-	let buffer = bitcast[&mut[1][u32]](&mut queue_counters(buffer_data_offset));
+	let buffer = bitcast[&mut[1][u8]](&mut queue_counters(buffer_data_offset));
 
-	let FREE = !0u32;
 
 	ProducerConsumerQueue {
 		push: @|thread, source| -> i32 {
-			if thread.atomic_load_global_i32(size) >= buffer_size {
+			if thread.atomic_load_global_i32(size) >= num_elements {
 				0
 			}
 			else {
 				let new_size = thread.atomic_add_global_i32(size, 1);
 
-				if new_size >= buffer_size {
+				if new_size >= num_elements {
 					thread.atomic_sub_global_i32(size, 1);
 					0
 				}
 				else {
-					let i = thread.atomic_inc_global_u32(tail, (buffer_size - 1) as u32);
+					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
 					let value = source(i);
 
@@ -64,7 +82,7 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 					0
 				}
 				else {
-					let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
+					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
 					let tryDequeue = @|sink, i| {
 						let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
@@ -90,39 +108,29 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 			thread.atomic_load_global_i32(size)
 		},
 
-		reset: @|| {
-			let block_dim = 256;
-			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
+		reset: @|grid| {
+			with thread in grid.threads() {
+				let idx = thread.idx(0) as i32;
 
-			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
-				with thread in grid.threads() {
-					let idx = thread.idx(0) as i32;
+				if idx == 0 {
+					*size = 0;
+					*head = 0u32;
+					*tail = 0u32;
+				}
 
-					if idx == 0 {
-						*size = 0;
-						*head = 0u32;
-						*tail = 0u32;
-					}
-
-					if idx < buffer_size {
-						buffer(idx) = FREE;
-					}
+				for i in range_step(idx, num_elements, grid.num_threads()) {
+					buffer(i) = FREE;
 				}
 			}
 		},
 
-		validate: @|corrupted: &mut[1]u32| {
-			let block_dim = 256;
-			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
-
-			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
-				with thread in grid.threads() {
-					let idx = thread.idx(0) as i32;
-					if idx < buffer_size {
-						if buffer(idx) != FREE {
-							thread.atomic_or_global_u32(corrupted, 1u32);
-							device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
-						}
+		validate: @|corrupted: &mut[1]u32, grid| {
+			with thread in grid.threads() {
+				let idx = thread.idx(0) as i32;
+				if idx < num_elements {
+					if buffer(idx) != FREE {
+						thread.atomic_or_global_u32(corrupted, 1u32);
+						device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
 					}
 				}
 			}
@@ -132,4 +140,27 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 			release(queue_device_state_alloc);
 		}
 	}
+}
+
+fn indexQueueElement(location: &mut[u8], thread: gpu_thread_context) -> QueueElementType {
+	let FREE = !0u32;
+
+	QueueElementType {
+		size: @|| sizeof[u32](),
+		element_alignment: @|| sizeof[u32](),
+		try_lock: @|thread:gpu_thread_context, location:&[1][u8]| {
+			
+			QueueElement {
+				is_free: @|| {
+					true
+				},
+				clear: @|location:&mut[1][u8]| {
+				}
+			}
+		}
+	}
+}
+
+fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) -> ProducerConsumerQueue {
+
 }
