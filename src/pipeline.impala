@@ -8,7 +8,7 @@ struct Stage {
 }
 
 struct WorkDistribution {
-	schedule: fn (sink, gpu_grid_context) -> bool,
+	schedule: fn (Sink, gpu_grid_context) -> bool,
 	init: fn(gpu_grid_context) -> (),
 	release: fn () -> ()
 }
@@ -35,7 +35,7 @@ fn @inputDistributor(stage: Stage) -> work_dist {
 		// }
 
 		WorkDistribution {
-			schedule: @|grid| {
+			schedule: @|sink, grid| {
 				false
 			},
 
@@ -58,7 +58,7 @@ fn @persistentRedistributor(stage: Stage, queue_size: i32) -> work_dist {
 		let queue = createConcurrentProducerConsumerQueue(device, queue_size);
 
 		WorkDistribution {
-			schedule: @|grid| {
+			schedule: @|sink, grid| {
 				false
 			},
 
@@ -74,12 +74,12 @@ fn @persistentRedistributor(stage: Stage, queue_size: i32) -> work_dist {
 	}
 }
 
-fn pipeline(source: WorkDistribution) -> {
+// fn pipeline(source: WorkDistribution) -> {
 
-}
+// }
 
 
-fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, sink) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
+fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, Sink) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
 	with thread in wave.threads() {
 		fn push() -> bool {
 			// TODO: reserve for entire wave
@@ -90,7 +90,7 @@ fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_c
 
 		fn pop() -> bool {
 			// TODO: pop for entire wave
-			let num_dequeued = with i, el in queue.pop(thread) {
+			let num_dequeued = with el, i in queue.pop(thread) {
 				consumer(thread, el)
 			};
 

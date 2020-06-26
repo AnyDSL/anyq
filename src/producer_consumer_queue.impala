@@ -1,23 +1,26 @@
 
 
 struct QueueElement {
-	clear: fn () -> ()
+	clear: fn () -> (),
+	is_free: fn () -> bool,
+	store: fn (fn (i32) -> u32, gpu_thread_context) -> (),
+	load: fn (fn (u32, i32) -> (), gpu_thread_context) -> ()
 }
 
-enum LockedQueueElement {
-	Result(QueueElement),
-	None
-}
+// enum LockedQueueElement {
+// 	Result(QueueElement),
+// 	None
+// }
 
 struct QueueElementType {
-	size: fn () -> i32,
-	alignment: fn () -> i32,
-	try_lock: fn (gpu_thread_context, &[1][u8]) -> LockedQueueElement
+	buffer_size: fn (i32) -> i32,
+	buffer_alignment: fn () -> i32,
+	buffer_element: fn (&[1][u8], i32) -> QueueElement
 }
 
 struct ProducerConsumerQueue {
 	push: fn(gpu_thread_context, fn (u32) -> u32) -> i32,
-	pop: fn(gpu_thread_context, fn (u32, u32) -> ()) -> i32,
+	pop: fn(gpu_thread_context, fn (u32, i32) -> ()) -> i32,
 	// pop_wave: fn(gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
 	size: fn(gpu_thread_context) -> i32,
 	reset: fn(gpu_grid_context) -> (),
@@ -28,20 +31,18 @@ struct ProducerConsumerQueue {
 // note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently
 //                  this is fine as long as a warp only ever acts as either a producer or consumer at a time
 fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: QueueElementType, num_elements: i32) -> ProducerConsumerQueue {
-	let element_size = element_type.size();
-	let element_alignment = element_type.alignment();
-	let element_stride = max(element_size, element_alignment);
+	let buffer_size = element_type.buffer_size(num_elements);
+	let buffer_alignment = element_type.buffer_alignment();
 
-	let buffer_data_offset = round_up(4 * sizeof[u32](), element_alignment);
+	let buffer_data_offset = round_up(sizeof[i32]() + 3 * sizeof[u32](), buffer_alignment);
 
-	let queue_device_state_alloc = device.alloc(buffer_data_offset + num_elements * element_stride);
-	let queue_device_memory = queue_device_state_alloc.data;
-	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
+	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
+	let queue_device_memory = bitcast[&mut[1][u8]](queue_device_state_alloc.data);
 
-	let size = bitcast[&mut[1]i32](&mut queue_counters(0));
-	let head = &mut queue_counters(1);
-	let tail = &mut queue_counters(2);
-	let buffer = bitcast[&mut[1][u8]](&mut queue_counters(buffer_data_offset));
+	let size =   bitcast[&mut[1]i32](&mut queue_device_memory(0));
+	let head =   bitcast[&mut[1]u32](&mut queue_device_memory(sizeof[i32]()));
+	let tail =   bitcast[&mut[1]u32](&mut queue_device_memory(sizeof[i32]() + sizeof[u32]()));
+	let buffer = bitcast[&mut[1][u8]](&mut queue_device_memory(buffer_data_offset));
 
 
 	ProducerConsumerQueue {
@@ -59,11 +60,8 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 				else {
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
-					let value = source(i);
-
-					while thread.atomic_cas_global_u32(&mut buffer(i), FREE, value) != FREE {
-						thread.yield();
-					}
+					let element = element_type.buffer_element(buffer, i as i32);
+					element.store(source, thread);
 
 					1
 				}
@@ -84,20 +82,8 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 				else {
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
-					let tryDequeue = @|sink, i| {
-						let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
-						if el != FREE {
-							sink(i, el);
-							true
-						}
-						else {
-							false
-						}
-					};
-
-					while !tryDequeue(sink, i) {
-						thread.yield();
-					}
+					let element = element_type.buffer_element(buffer, i as i32);
+					element.load(sink, thread);
 
 					1
 				}
@@ -118,8 +104,9 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 					*tail = 0u32;
 				}
 
-				for i in range_step(idx, num_elements, grid.num_threads()) {
-					buffer(i) = FREE;
+				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
+					let element = element_type.buffer_element(buffer, i);
+					element.clear();
 				}
 			}
 		},
@@ -128,7 +115,8 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 			with thread in grid.threads() {
 				let idx = thread.idx(0) as i32;
 				if idx < num_elements {
-					if buffer(idx) != FREE {
+					let element = element_type.buffer_element(buffer, idx);
+					if !element.is_free() {
 						thread.atomic_or_global_u32(corrupted, 1u32);
 						device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
 					}
@@ -142,25 +130,45 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 	}
 }
 
-fn indexQueueElement(location: &mut[u8], thread: gpu_thread_context) -> QueueElementType {
+fn indexQueueElementType() -> QueueElementType {
 	let FREE = !0u32;
 
 	QueueElementType {
-		size: @|| sizeof[u32](),
-		element_alignment: @|| sizeof[u32](),
-		try_lock: @|thread:gpu_thread_context, location:&[1][u8]| {
-			
+		buffer_size: @|num_elements| num_elements * sizeof[u32](),
+		buffer_alignment: @|| sizeof[u32](),
+		buffer_element: @|buffer, i| {
+			let element = &mut (bitcast[&mut[1][u32]](buffer))(i);
+
 			QueueElement {
-				is_free: @|| {
-					true
+				clear: @|| { *element = FREE; },
+				is_free: @|| *element == FREE,
+				load: @|sink, thread| {
+					let tryDequeue = @|sink| {
+						let el = thread.atomic_exch_global_u32(element, FREE);
+						if el != FREE {
+							sink(el);
+							true
+						}
+						else {
+							false
+						}
+					};
+
+					while !tryDequeue(@|el| sink(el, i)) {
+						thread.yield();
+					}
 				},
-				clear: @|location:&mut[1][u8]| {
-				}
+				store: @|source, thread| {
+					let value = source(i);
+					while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
+						thread.yield();
+					}
+				},
 			}
 		}
 	}
 }
 
 fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) -> ProducerConsumerQueue {
-
+	createConcurrentProducerConsumerQueue(device, indexQueueElementType(), num_elements)
 }

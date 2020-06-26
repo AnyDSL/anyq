@@ -19,6 +19,7 @@ set(COMMON_IMPALA_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.impala
+	${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/pipeline.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/demo.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.impala
@@ -74,6 +75,8 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-barriers.impala nvvm)
 	add_schedule_test(test-producer-consumer-queue.impala cuda)
 	add_schedule_test(test-producer-consumer-queue.impala nvvm)
+	add_schedule_test(test-ringbuffer-allocator.impala cuda)
+	add_schedule_test(test-ringbuffer-allocator.impala nvvm)
 	add_schedule_test(test-pipeline.impala cuda)
 	add_schedule_test(test-pipeline.impala nvvm)
 endif()
