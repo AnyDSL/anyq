@@ -55,7 +55,7 @@ fn @persistentRedistributor(stage: Stage, queue_size: i32) -> work_dist {
 		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
 		// let device_memory = bitcast[&mut[1][i8]](device_state_alloc.data);
 
-		let queue = createConcurrentProducerConsumerQueue(device, queue_size);
+		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 
 		WorkDistribution {
 			schedule: @|sink, grid| {

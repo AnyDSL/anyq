@@ -3,8 +3,9 @@
 struct QueueElement {
 	clear: fn () -> (),
 	is_free: fn () -> bool,
-	store: fn (fn (i32) -> u32, gpu_thread_context) -> (),
-	load: fn (fn (u32, i32) -> (), gpu_thread_context) -> ()
+	store: fn (fn (u32) -> u32, gpu_thread_context) -> (),
+	load: fn (fn (u32, u32) -> (), gpu_thread_context) -> (),
+	debug_print: fn(AccDevice) -> ()
 }
 
 // enum LockedQueueElement {
@@ -15,12 +16,12 @@ struct QueueElement {
 struct QueueElementType {
 	buffer_size: fn (i32) -> i32,
 	buffer_alignment: fn () -> i32,
-	buffer_element: fn (&[1][u8], i32) -> QueueElement
+	buffer_element: fn (&[1][u8], u32) -> QueueElement
 }
 
 struct ProducerConsumerQueue {
 	push: fn(gpu_thread_context, fn (u32) -> u32) -> i32,
-	pop: fn(gpu_thread_context, fn (u32, i32) -> ()) -> i32,
+	pop: fn(gpu_thread_context, fn (u32, u32) -> ()) -> i32,
 	// pop_wave: fn(gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
 	size: fn(gpu_thread_context) -> i32,
 	reset: fn(gpu_grid_context) -> (),
@@ -60,7 +61,7 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 				else {
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
-					let element = element_type.buffer_element(buffer, i as i32);
+					let element = element_type.buffer_element(buffer, i);
 					element.store(source, thread);
 
 					1
@@ -82,7 +83,7 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 				else {
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
-					let element = element_type.buffer_element(buffer, i as i32);
+					let element = element_type.buffer_element(buffer, i);
 					element.load(sink, thread);
 
 					1
@@ -105,7 +106,7 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 				}
 
 				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
-					let element = element_type.buffer_element(buffer, i);
+					let element = element_type.buffer_element(buffer, i as u32);
 					element.clear();
 				}
 			}
@@ -113,12 +114,12 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 
 		validate: @|corrupted: &mut[1]u32, grid| {
 			with thread in grid.threads() {
-				let idx = thread.idx(0) as i32;
-				if idx < num_elements {
+				let idx = thread.idx(0);
+				if idx < num_elements as u32 {
 					let element = element_type.buffer_element(buffer, idx);
 					if !element.is_free() {
 						thread.atomic_or_global_u32(corrupted, 1u32);
-						device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
+						element.debug_print(device);
 					}
 				}
 			}
@@ -164,6 +165,9 @@ fn indexQueueElementType() -> QueueElementType {
 						thread.yield();
 					}
 				},
+				debug_print: @|device| {
+					device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, element as i32]);
+				}
 			}
 		}
 	}

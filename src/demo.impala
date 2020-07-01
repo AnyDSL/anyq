@@ -107,7 +107,7 @@ type stage_factory = fn (AccDevice, Intrinsics) -> Stage;
 
 fn demoStage1() -> Stage {
 	Stage {
-		produce: |sink, i| {
+		produce: |sink| {
 			// let rand_state = xorshift32(i);
 			// let elements = (rand_state % 8u32) as i32;
 			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2u32, intrinsics), randf(i * 3u32, intrinsics)], octaves, intrinsics) * 8.0f32) as u32

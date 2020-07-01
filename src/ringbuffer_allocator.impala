@@ -23,7 +23,7 @@ fn @createRingbufferAllocator(device: AccDevice, element_size: i32, element_alig
 
 
 	RingbufferAllocator {
-		acquire: @|thread, i| -> i32 {
+		acquire: @|thread, i| {
 
 		},
 
