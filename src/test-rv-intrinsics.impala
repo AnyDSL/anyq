@@ -23,7 +23,7 @@ fn main() -> i32 {
 	// works for values atleast up to 128
 	let vec_width = warp_size;
 
-	let buffer = alloc_cpu(2*warp_size*sizeof[i32]());
+	let buffer = alloc_cpu((2*warp_size) as i64 *sizeof[i32]());
 	let data = bitcast[&mut[i32]](rv_align_i8(buffer.data, vec_width));
 
 	for i in range(0, warp_size) {

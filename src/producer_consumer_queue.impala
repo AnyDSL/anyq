@@ -15,7 +15,7 @@ struct ProducerConsumerQueue
 fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> ProducerConsumerQueue {
 	let buffer_data_offset = 4;
 
-	let queue_device_state_alloc = device.alloc((buffer_data_offset + buffer_size) * sizeof[u32]());
+	let queue_device_state_alloc = device.alloc((buffer_data_offset + buffer_size) as i64 * sizeof[u32]());
 	let queue_device_memory = queue_device_state_alloc.data;
 	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
 
