@@ -14,8 +14,8 @@ struct QueueElement {
 // }
 
 struct QueueElementType {
-	buffer_size: fn (i32) -> i32,
-	buffer_alignment: fn () -> i32,
+	buffer_size: fn (i32) -> i64,
+	buffer_alignment: fn () -> i64,
 	buffer_element: fn (&[1][u8], u32) -> QueueElement
 }
 
@@ -35,7 +35,7 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 	let buffer_size = element_type.buffer_size(num_elements);
 	let buffer_alignment = element_type.buffer_alignment();
 
-	let buffer_data_offset = round_up(sizeof[i32]() + 3 * sizeof[u32](), buffer_alignment);
+	let buffer_data_offset = round_up_i64(sizeof[i32]() + 3i64 * sizeof[u32](), buffer_alignment);
 
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
 	let queue_device_memory = bitcast[&mut[1][u8]](queue_device_state_alloc.data);
@@ -135,8 +135,8 @@ fn indexQueueElementType() -> QueueElementType {
 	let FREE = !0u32;
 
 	QueueElementType {
-		buffer_size: @|num_elements| num_elements * sizeof[u32](),
-		buffer_alignment: @|| sizeof[u32](),
+		buffer_size: @|num_elements| num_elements as i64 * sizeof[u32](),
+		buffer_alignment: @|| alignof[u32](),
 		buffer_element: @|buffer, i| {
 			let element = &mut (bitcast[&mut[1][u32]](buffer))(i);
 

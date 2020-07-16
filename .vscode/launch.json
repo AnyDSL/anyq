@@ -14,6 +14,10 @@
 			"cwd": "${workspaceFolder}",
 			"environment": [
 				{
+					"name": "Path",
+					"value": "${env:Path};${env:CUDA_PATH}/nvvm/bin"
+				},
+				{
 					"name": "ANYDSL_PROFILE",
 					"value": "FULL"
 				},

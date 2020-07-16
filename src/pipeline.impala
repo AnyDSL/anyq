@@ -17,7 +17,7 @@ type work_dist = fn (AccDevice) -> WorkDistribution;
 
 fn @inputDistributor(stage: Stage) -> work_dist {
 	@|device| {
-		let device_state_alloc = device.alloc(1 * sizeof[u32]());
+		let device_state_alloc = device.alloc(sizeof[u32]());
 		let device_memory = bitcast[&mut[1][i8]](device_state_alloc.data);
 		let next_input = &mut device_memory(0);
 
