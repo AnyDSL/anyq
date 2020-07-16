@@ -114,6 +114,12 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 		finish: @|| {
 			device.synchronize();
 
+
+			print_string("gpu_result ");
+			print_i32(*gpu_result as i32);
+			print_string("\ncpu_result ");
+			print_i32((if cpu_result { 0 } else { 1 }));
+
 			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]());
 
 			print_string("gpu_result ");
