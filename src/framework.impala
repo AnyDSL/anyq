@@ -82,7 +82,7 @@ fn @wrap_dim_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 struct AccDevice {
 	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
 	synchronize: fn() -> (),
-	alloc: fn(i32) -> Buffer,
+	alloc: fn(i64) -> Buffer,
 	platform_device: i32,
 	print_i32: fn(&[u8], i32) -> (),
 	print_i32a: fn(&[u8], &[i32]) -> ()
@@ -94,14 +94,14 @@ struct BaseTest {
 }
 
 fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
-	let memory_size = round_up(additional_mem as i32 + sizeof[u32](), sizeof[u32]());
+	let memory_size = round_up_i64(additional_mem as i64 + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
-	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory(memory_size - sizeof[u32]()));
+	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
 
 	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
 	*gpu_result = 0u32;
-	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]() as i64);
+	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]());
 
 
 	let mut cpu_result: bool = true;
@@ -114,7 +114,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 		finish: @|| {
 			device.synchronize();
 
-			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]() as i64);
+			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]());
 
 			print_string("gpu_result ");
 			print_i32(*gpu_result as i32);

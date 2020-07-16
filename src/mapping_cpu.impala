@@ -298,7 +298,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 
 	// we need a buffer to accumulate block level results of barriers
 	let num_block_variables = 4; // output, all, any, count
-	let block_pred_buffer = alloc(0, num_block_variables * num_blocks as i32 * sizeof[i32]());
+	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks as i64 * sizeof[i32]());
 	let addr = bitcast[&mut[i32]](block_pred_buffer.data);
 
 	// reset all variables
