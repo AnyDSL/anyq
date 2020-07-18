@@ -99,7 +99,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
 
-	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
+	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]()));
 	*gpu_result = 0u32;
 	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]());
 
