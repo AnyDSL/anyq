@@ -249,20 +249,20 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 		num_waves: num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
-		barrier: @|| -> () { fibers_sync_block(idx.block_id as i32); },
+		barrier: @|| -> () { if idx.local_id == 0u { fibers_sync_block(idx.block_id as i32); } },
 		barrier_all: @|predicate:bool| -> bool {
-			let warp_pred = rv_all(predicate) as i32;
+			let warp_pred = if rv_all(predicate) { 1 } else {0 };
 			// atomic_and_global_i32
 			atomic(3u, addr(1), warp_pred, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32); }
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any: @|predicate:bool| -> bool {
-			let warp_pred = rv_any(predicate) as i32;
+			let warp_pred = if rv_any(predicate) { 1 } else {0 };
 			// atomic_or_global_i32
 			atomic(5u, addr(2), warp_pred, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32); }
 			let result = *(addr(0));
 			result != 0
 		},
@@ -270,7 +270,7 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 			let warp_count = cpu_popcount32(rv_ballot(predicate));
 			// atomic_add_global_i32
 			atomic(1u, addr(3), warp_count, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32); }
 			let result = *(addr(0));
 			result
 		},
