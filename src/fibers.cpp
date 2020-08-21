@@ -246,9 +246,6 @@ void anydsl_fibers_spawn(
 			threads.emplace_back(thread_fun, &ctx, &b);
 		}
 
-		// wait for all threads to join work scheduling
-		b.wait();
-
 		// main thread must not join scheduling multiple times
 		if (false) {
 			std::ostringstream buffer;
@@ -256,6 +253,9 @@ void anydsl_fibers_spawn(
 			std::cerr << buffer.str() << std::flush;
 		}
 		boost::fibers::use_scheduling_algorithm<boost::fibers::algo::work_stealing>(ctx.num_threads);
+
+		// wait for all threads to join work scheduling
+		b.wait();
 	});
 
 	// TODO: incorporate num_blocks_in_flight to reuse fibers for multiple blocks
