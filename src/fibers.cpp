@@ -235,7 +235,7 @@ void anydsl_fibers_spawn(
 	// Launch a couple of additional threads that join the work sharing.
 	static thread_pool threads(ctx.num_threads, b, ctx.terminate);
 	static std::once_flag init_workers;
-	std::call_once(init_workers, [&ctx, &b] {
+	std::call_once(init_workers, [&] {
 		if (true) {
 			std::ostringstream buffer;
 			buffer << "using " << ctx.num_threads << " worker threads " << std::endl;
@@ -268,7 +268,7 @@ void anydsl_fibers_spawn(
 		for (int warp = 0; warp < num_warps; ++warp) {
 			// Launch a number of worker fibers
 			// Each worker fiber gets detached.
-			boost::fibers::fiber([&ctx, &args, &fun_ptr, block, warp](){ fiber_fun(ctx, block, warp, args, fun_ptr); }).detach();
+			boost::fibers::fiber([&args, &fun_ptr, block, warp](){ fiber_fun(ctx, block, warp, args, fun_ptr); }).detach();
 			++ctx.fiber_count;
 		}
 	}
@@ -285,7 +285,7 @@ void anydsl_fibers_spawn(
 
 	{
 		lock_type lk(ctx.mtx_count);
-		ctx.cnd_count.wait(lk, [&ctx](){ return 0 == ctx.fiber_count; });
+		ctx.cnd_count.wait(lk, [](){ return 0 == ctx.fiber_count; });
 		/*
 			Suspend main fiber and resume worker fibers in the meanwhile.
 			Main fiber gets resumed (e.g returns from `condition_variable_any::wait()`)
