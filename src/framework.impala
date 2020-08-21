@@ -79,6 +79,23 @@ fn @wrap_dim_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
+fn @print_binary(value: u32) -> () {
+	let group = 4;
+	let length = 16;
+	for j in range_step(1, length + 1, group) {
+		for i in range(j, j + group) {
+			let b = 1u << (length - i) as u32;
+			if value & b == b {
+				print_char('1');
+			} else {
+				print_char('0');
+			}
+		}
+		print_char(' ');
+	}
+}
+
+
 struct AccDevice {
 	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
 	synchronize: fn() -> (),
@@ -117,7 +134,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]());
 
 			print_string("gpu_result ");
-			print_i32(*gpu_result as i32);
+			print_binary(*gpu_result);
 			print_char('\n');
 			print_string("cpu_result ");
 			print_i32((if cpu_result { 0 } else { 1 }));
