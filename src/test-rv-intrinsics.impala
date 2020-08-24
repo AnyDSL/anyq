@@ -81,8 +81,166 @@ fn main() -> i32 {
 		//data(j) = new_data;
 	//}
 
-	//fn tid(x: i32) -> i32 { x }
+	// vector load and store from aligned pointers
+	/*
+	for j in vectorize(vec_width) {
+		let mydata = data(j);
 
+		let new_data = if mydata % 2 == 0 { -mydata } else { mydata };
+
+		data(j) = new_data;
+	}
+	*/
+
+	// atomics
+	let mut value = 10;
+	let ptr = &mut value;
+
+	/* // works
+	let mut intermediate:[i32*8];
+
+	fn atomic_add_i32(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut result:i32;
+		//let ptr_result = &mut result;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = rv_extract_i32(val, l);
+			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			intermediate(l) = lane_res;
+			//rv_store_i32(ptr_result, l, lane_res);
+			result = rv_insert_i32(result, l, lane_res);
+		}
+
+		//for l in unroll(0, vec_width) {
+		//	result = rv_insert_i32(result, l, intermediate(l));
+		//}
+
+		intermediate(self)
+	}
+	*/
+
+	/* // works
+	fn atomic_add_i32(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut result:i32;
+		//let ptr_result = &mut result;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = rv_extract_i32(val, l);
+			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			//intermediate(l) = lane_res;
+			//rv_store_i32(ptr_result, l, lane_res);
+			if self == l {
+				result = lane_res;
+			}
+		}
+
+		result
+	}
+	*/
+
+	/* // works
+	fn atomic_add_i32(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut aggregate = 0;
+		let mut intermediate:[i32*8];
+
+		for l in unroll(0, vec_width) {
+			let lane_val = rv_extract_i32(val, l);
+			intermediate(l) = aggregate;
+			aggregate += lane_val;
+		}
+
+		let old = atomic(1u, ptr, aggregate, 7u, "");
+
+		old + intermediate(self)
+	}
+	*/
+
+	/* // works
+	fn atomic_add_i32(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut aggregate = 0;
+		let mut intermediate:i32;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = rv_extract_i32(val, l);
+			if l == self { intermediate = aggregate; }
+			aggregate += lane_val;
+		}
+
+		let old = atomic(1u, ptr, aggregate, 7u, "");
+
+		old + intermediate
+	}
+	*/
+	
+	//
+	fn atomic_add_i32(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut aggregate = 0;
+		let mut intermediate:i32;
+		let mut old:i32;
+
+		for l in range(0, vec_width) {
+			let lane_val = rv_extract_i32(val, l);
+			if l == self { intermediate = aggregate; }
+			aggregate += lane_val;
+		}
+
+		old = atomic(1u, ptr, aggregate, 7u, "");
+
+		old + intermediate
+	}
+
+
+	fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+		let mydata = read(lane);
+
+		//let new_data = atomic_add_i32(lane, global(0), mydata);
+		let new_data = atomic_add_i32(lane, global(0), 1);
+		//let new_data = if mydata % 2 == 0 { atomic_add_i32(lane, global(0), 1) } else { mydata };
+		//let mut new_data;
+		//if mydata % 2 == 0 {
+		//	new_data = atomic_add_i32(lane, global(0), 1);
+		//} else {
+		//	new_data = mydata;
+		//}
+
+		write(lane, new_data);
+	}
+
+
+	let read = @|i:i32| data(i);
+	let write = @|i:i32, val:i32| data(i) = val;
+	let global = @|i:i32| ptr;
+
+	for j in vectorize(vec_width) {
+		loop_body(j, vec_width, read, write, global);
+	}
+
+	//for j in vectorize(vec_width) {
+		//let mydata = data(j);
+
+		//let new_data = atomic_add_i32(j, ptr, mydata);
+		//let new_data = atomic_add_i32(j, ptr, 1);
+		//let new_data = if mydata % 2 == 0 { atomic_add_i32(j, ptr, 1) } else { mydata };
+		//let mut new_data;
+		//if mydata % 2 == 0 {
+		//	new_data = atomic_add_i32(j, ptr, 1);
+		//} else {
+		//	new_data = mydata;
+		//}
+
+		//data(j) = new_data;
+	//}
+
+
+	//for i in range(0, warp_size) {
+	//	print_i32(i); print_string(": "); print_i32(intermediate(i)); print_string("\n");
+	//}
+	print_string("value: "); print_i32(value); print_char('\n');
+
+
+	//fn tid(x: i32) -> i32 { x }
+	/*
 	for j in vectorize(vec_width) {
 		// this produces as output: "0: 01234567"
 		// and the generated code contains
@@ -91,7 +249,7 @@ fn main() -> i32 {
 		//  * n calls to print_i32(data(j))
 		//print_i32(j); print_string(": "); print_i32(data(j)); print_string("\n");
 
-
+	
 		for i in unroll(0, vec_width) {
 			if i == j {
 				let j0 = rv_extract_i32(j, i);
@@ -103,7 +261,7 @@ fn main() -> i32 {
 		}
 
 	}
-
+	*/
 	//let delta = 12;
 	//for j in vectorize(vec_width) {
 	//	data(j) = rv_shuffle_f32(data(j) as f32, $delta) as i32;
@@ -127,9 +285,9 @@ fn main() -> i32 {
 		//data(j) = rv_ballot(data(j) % 2 == 0);
 	//}
 
-	//for i in range(0, warp_size) {
-	//	print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
-	//}
+	for i in range(0, warp_size) {
+		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+	}
 
 	release(buffer);
 
