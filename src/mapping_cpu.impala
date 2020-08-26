@@ -67,7 +67,7 @@ extern "C" {
 	fn "rv_extract" rv_extract_u32(u32, i32) -> u32;
 }
 
-fn @cpu_thread(tid: fn (i32) -> u32, idx: Index, body: fn (gpu_thread_context) -> ()) -> () {
+fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body: fn (gpu_thread_context) -> ()) -> () {
 	@@body(gpu_thread_context {
 		idx: tid,
 
@@ -203,7 +203,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		membermask: @|| membermask,
 
 		// TODO: return simd_lane
-		threads: @|body| cpu_thread(@|i:i32| idx.local_id, idx, body),
+		threads: @|body| cpu_thread(@|i:i32| self, num_threads, idx, body),
 
 		num_threads: num_threads,
 
@@ -245,7 +245,7 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 		// TODO: dispatch ndim-block_id
 		idx: @|i:i32| idx.block_id,
 		waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
-		threads: @|body| cpu_thread(@|i:i32| idx.warp_id * warp_size + idx.local_id, idx, body),
+		threads: @|body| cpu_thread(@|i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 		num_waves: num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
@@ -293,7 +293,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 	let num_threads = num_blocks * num_threads_per_block;
 
 	// TODO: assert(warp_size/l == vec_width)
-	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(vec_width as i32, body);
+	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(l as i32, body);
 	//let warp_loop = @|l:u32, body: fn(u32)->()| range(0, l as i32, @|i:i32| body(i as u32));
 
 	// we need a buffer to accumulate block level results of barriers
@@ -321,7 +321,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 				device: 0,
 				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
 				waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: idx.block_id, warp_id: idx.block_id * num_warps_per_block + idx.warp_id, local_id: idx.local_id }, body),
-				threads: @|body| cpu_thread(@|i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, idx, body),
+				threads: @|body| cpu_thread(@|i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 				num_groups: @|i:i32| num_blocks,
 				num_waves: @|| num_warps,
 				num_threads: @|i:i32| num_threads
