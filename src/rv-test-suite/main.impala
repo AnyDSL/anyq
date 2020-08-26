@@ -1,22 +1,10 @@
 
 extern "C" {
 	fn "rv_load" rv_load_i32(&[i32], i32) -> i32;
-	//fn "rv_load" rv_load_u32(&[u32], i32) -> u32;
-	//fn "rv_load" rv_load_f32(&[f32], i32) -> f32;
-
 	fn "rv_store" rv_store_i32(&[i32], i32, i32) -> ();
-	//fn "rv_store" rv_store_u32(&[u32], i32, u32) -> ();
-	//fn "rv_store" rv_store_f32(&[f32], i32, f32) -> ();
-
-    fn "rv_align" rv_align_i8(&[i8], i32)-> &[i8];
-
-
-    fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
-    //fn "rv_insert" rv_insert_u32(u32, i32, u32) -> u32;
-    //fn "rv_insert" rv_insert_f32(f32, i32, f32) -> f32;
-
+	fn "rv_align" rv_align_i8(&[i8], i32)-> &[i8];
+	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
 	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
-	//fn "rv_extract" rv_extract_u32(u32, i32) -> u32;
 }
 
 
