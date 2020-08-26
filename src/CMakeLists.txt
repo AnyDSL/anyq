@@ -85,11 +85,11 @@ endif()
 
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	add_schedule_test(test-basics.impala cpu)
-	# add_schedule_test(test-shuffles.impala cpu)
+	add_schedule_test(test-shuffles.impala cpu)
 	add_schedule_test(test-barriers.impala cpu)
 	# add_schedule_test(test-producer-consumer-queue.impala cpu)
 
-	add_schedule_test(test-rv-intrinsics.impala cpu)
+	# add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT)
