@@ -66,6 +66,11 @@ extern "C" {
 	fn "rv_ballot" rv_ballot_u32(bool) -> u32;
 }
 
+extern "device" {
+    fn "llvm.ctpop.i32"       cpu_popcount_u32(u32) -> i32;
+}
+
+
 fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
 	@|value: i32, src_lane: i32| -> i32 {
 		let mut result:i32 = self as i32; // self is needed to make result marked as varying
@@ -260,8 +265,8 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		barrier: @|| { },
 		barrier_all: @|predicate| { rv_all(predicate) },
 		barrier_any: @|predicate| { rv_any(predicate) },
-		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate)) },
-		barrier_vote: @|predicate| { rv_ballot(predicate) as u64 },
+		barrier_count: @|predicate| { cpu_popcount_u32(rv_ballot_u32(predicate)) },
+		barrier_vote: @|predicate| { rv_ballot_u32(predicate) as u64 },
 
 		/* TODO: assert width <= num_threads == warp_size */
 		/* TODO: assert width 2^n */
@@ -318,7 +323,7 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 			result != 0
 		},
 		barrier_count: @|predicate:bool| -> i32 {
-			let warp_count = cpu_popcount32(rv_ballot(predicate));
+			let warp_count = cpu_popcount_u32(rv_ballot_u32(predicate));
 			// atomic_add_global_i32
 			atomic(1u, addr(3), warp_count, 7u, "");
 			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32); }
