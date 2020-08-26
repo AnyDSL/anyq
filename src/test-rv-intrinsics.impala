@@ -17,9 +17,93 @@ extern "C" {
 }
 
 fn main() -> i32 {
-	atomics()
+	shuffles()
 }
 
+fn shuffles() -> i32 {
+
+	let warp_size = 8;
+	// works for values atleast up to 128
+	let vec_width = warp_size;
+
+	let buffer = alloc_cpu((2*warp_size) as i64 *sizeof[i32]());
+	let data = bitcast[&mut[i32]](rv_align_i8(buffer.data, vec_width));
+
+	for i in range(0, warp_size) {
+		data(i) = i;
+	}
+
+
+	// broken and triggers assertion in RV
+	fn shuffle_i32_v0(self: i32, value: i32, src_lane: i32) -> i32 {
+		rv_extract_i32(value, src_lane)
+	}
+
+	// broken and triggers assertion in RV
+	fn shuffle_i32_v1(self: i32, value: i32, src_lane: i32) -> i32 {
+		let lane_src_lane = rv_extract_i32(src_lane, self);
+		let src_value = rv_extract_i32(value, lane_src_lane);
+		src_value
+	}
+
+	// works
+	fn shuffle_i32_v2(self: i32, value: i32, src_lane: i32) -> i32 {
+		let mut result:i32 = self; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+
+	// broken for constants (triggers assertion)
+	fn shuffle_i32_v3(self: i32, value: i32, src_lane: i32) -> i32 {
+		let mut result:i32 = value; // result is marked as varying/uniform depending on value
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+
+	let shuffle_i32 = shuffle_i32_v2;
+
+
+	fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+		let mydata = read(lane);
+
+		//let new_data = shuffle_i32(lane, mydata, 7 - lane);
+		//let new_data = shuffle_i32(lane, mydata, 7 - mydata);
+		//let new_data = shuffle_i32(lane, lane, lane ^ 3);
+
+		let val = shuffle_i32(lane, mydata, 4); //if lane == 7 { 42 } else { 23 };
+		let new_data = shuffle_i32(lane, val, lane ^ 3) + mydata;
+
+		write(lane, new_data);
+	}
+
+
+	let read = @|i:i32| data(i);
+	let write = @|i:i32, val:i32| data(i) = val;
+	let global = @|i:i32| undef[&mut i32]();
+
+	for j in vectorize(vec_width) {
+		loop_body(j, vec_width, read, write, global);
+	}
+
+	//print_string("value: "); print_i32(value); print_char('\n');
+
+	for i in range(0, warp_size) {
+		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+	}
+
+	release(buffer);
+
+	0
+}
 
 fn atomics() -> i32 {
 
