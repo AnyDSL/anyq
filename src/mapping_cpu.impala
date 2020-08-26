@@ -1,6 +1,6 @@
 
 static cpu_threads = 0;
-static vec_width = 8u;
+//static vec_width = 8u;
 static warp_size = 8u;
 
 fn @createAccDevice() -> AccDevice {
@@ -64,6 +64,30 @@ extern "C" {
 	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
 	fn "rv_insert" rv_insert_u32(u32, i32, u32) -> u32;
 	fn "rv_ballot" rv_ballot_u32(bool) -> u32;
+}
+
+fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
+	@|value: i32, src_lane: i32| -> i32 {
+		let mut result:i32 = self as i32; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
+	@|value: u32, src_lane: i32| -> u32 {
+		let mut result:u32 = self; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_u32(value, lane_src_lane);
+			result = rv_insert_u32(result, l, lane_value);
+		}
+		result
+	}
 }
 
 fn @atomic_op_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32, fn(i32, i32)->i32) -> i32 {
@@ -217,27 +241,11 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 
 fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn (gpu_wave_context) -> ()) -> () {
 
-	fn @warp_shuffle_i32(value: i32, src_lane: i32) -> i32 {
-		let mut result:i32;
-		for i in unroll(0, num_threads() as i32) {
-			if i == src_lane {
-				result = rv_extract_i32(value, src_lane);
-			}
-		}
-		result
-	}
-
-	fn @warp_shuffle_u32(value: u32, src_lane: i32) -> u32 {
-		let mut result:u32;
-		for i in unroll(0, num_threads() as i32) {
-			if i == src_lane {
-				result = rv_extract_u32(value, src_lane);
-			}
-		}
-		result
-	}
-
 	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
 
 	@@body(gpu_wave_context{
 		idx: @|| idx.warp_id,
@@ -255,23 +263,24 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate)) },
 		barrier_vote: @|predicate| { rv_ballot(predicate) as u64 },
 
-		/* TODO: assert width == num_threads == warp_size */
+		/* TODO: assert width <= num_threads == warp_size */
+		/* TODO: assert width 2^n */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { warp_shuffle_i32(x, src_lane) },
 		shfl_u32: @|x:u32, src_lane:i32, width:u32| { warp_shuffle_u32(x, src_lane) },
 		//shfl_f32: @|x:f32, src_lane:i32, width:u32| { undef[f32]() },
 
 		//shfl_up_i32: @|x:i32, delta:u32, width:u32| { rv_shuffle_i32(x, -(delta as i32)) },
 		//shfl_up_u32: @|x:u32, delta:u32, width:u32| { rv_shuffle_u32(x, -(delta as i32)) },
-		shfl_up_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, ((self - delta) & (warp_size - 1u)) as i32) },
-		shfl_up_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, ((self - delta) & (warp_size - 1u)) as i32) },
+		shfl_up_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, if (self & (width - 1u)) < delta { self } else { self - delta } as i32) },
+		shfl_up_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, if (self & (width - 1u)) < delta { self } else { self - delta } as i32) },
 		//shfl_up_f32: @|x:f32, delta:u32, width:u32| { undef[f32]() },
 
-		shfl_down_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, (idx.local_id as i32 + delta as i32)) },
-		shfl_down_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, (idx.local_id as i32 + delta as i32)) },
+		shfl_down_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, if (self & (width - 1u)) + delta >= width { self } else { self + delta } as i32) },
+		shfl_down_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, if (self & (width - 1u)) + delta >= width { self } else { self + delta } as i32) },
 		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { undef[f32]() },
 
-		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, (idx.local_id ^ lane_mask as u32) as i32) },
-		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, (idx.local_id ^ lane_mask as u32) as i32) },
+		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, ((self ^ lane_mask as u32) & (width - 1u)) as i32) },
+		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, ((self ^ lane_mask as u32) & (width - 1u)) as i32) },
 		//shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() },
 
 		lanemask: @|| 1u64 << idx.local_id as u64,
