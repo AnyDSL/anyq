@@ -76,13 +76,6 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	add_schedule_test(test-producer-consumer-queue.impala nvvm)
 endif()
 
-if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
-	add_schedule_test(test-basics.impala opencl)
-	add_schedule_test(test-shuffles.impala opencl)
-	add_schedule_test(test-barriers.impala opencl)
-	add_schedule_test(test-producer-consumer-queue.impala opencl)
-endif()
-
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 	add_schedule_test(test-basics.impala amdgpu)
 	add_schedule_test(test-shuffles.impala amdgpu)
