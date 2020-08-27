@@ -97,6 +97,7 @@ if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 endif()
 
 set(TEST_SUITE_FILES
+	test-suite-atomic_add.impala
 )
 
 foreach(_test_platform ${TEST_PLATFORMS})

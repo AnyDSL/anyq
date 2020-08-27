@@ -1,0 +1,36 @@
+
+fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
+	let global = @|g| { 0 };
+	let local  = @|l| { l };
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	with thread in grid.threads() {
+		let mydata = read(thread.idx(0) as i32);
+		thread.atomic_add_global_i32(global(0), mydata);
+	}
+
+	/*
+	let mydata = read(lane);
+
+	let shuffle = shuffle_i32(lane, vec_width);
+
+	let value0 = shuffle(mydata, lane ^ (1 << 0)) + mydata;
+	let value1 = shuffle(value0, lane ^ (1 << 1)) + value0;
+	let value2 = shuffle(value1, lane ^ (1 << 2)) + value1;
+
+	let new_data = value2;
+
+	write(lane, new_data);
+	*/
+}
+
+fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+
+	let values = |l| l;
+	let result = |g| if g == 0 { 130816 } else { 0 };
+
+	(result, values)
+}
