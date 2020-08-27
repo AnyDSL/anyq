@@ -1,5 +1,5 @@
 
-// width must be less or equal to wave.num_threads()
+// width must be less or equal to wave.num_threads() and match the num of calls to shfl_bfly()
 static width = 8;
 
 fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {

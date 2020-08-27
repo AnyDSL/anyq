@@ -1,7 +1,7 @@
 
 static cpu_threads = 0;
 //static vec_width = 8u;
-static warp_size = 8u;
+static warp_size = 32u;
 
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
@@ -304,8 +304,8 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		shfl_down_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, if (self & (width - 1u)) + delta >= width { self } else { self + delta } as i32) },
 		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { undef[f32]() },
 
-		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, ((self ^ lane_mask as u32) & (width - 1u)) as i32) },
-		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, ((self ^ lane_mask as u32) & (width - 1u)) as i32) },
+		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, (((self ^ lane_mask as u32) & (width - 1u)) | (self & !(width - 1u))) as i32) },
+		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, (((self ^ lane_mask as u32) & (width - 1u)) | (self & !(width - 1u))) as i32) },
 		//shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() },
 
 		lanemask:    @|| { lanemask_eq() },
