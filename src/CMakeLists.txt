@@ -52,7 +52,7 @@ endif()
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
-	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile})
+	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
 	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")
@@ -64,8 +64,10 @@ function(add_schedule_test _testfile _mapping)
 	endif()
 endfunction()
 
+set(TEST_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
+	list(APPEND TEST_PLATFORMS cuda nvvm)
 	add_schedule_test(test-basics.impala cuda)
 	add_schedule_test(test-basics.impala nvvm)
 	add_schedule_test(test-shuffles.impala cuda)
@@ -77,6 +79,7 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
+	list(APPEND TEST_PLATFORMS amdgpu)
 	add_schedule_test(test-basics.impala amdgpu)
 	add_schedule_test(test-shuffles.impala amdgpu)
 	add_schedule_test(test-barriers.impala amdgpu)
@@ -84,6 +87,7 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
+	list(APPEND TEST_PLATFORMS cpu)
 	add_schedule_test(test-basics.impala cpu)
 	add_schedule_test(test-shuffles.impala cpu)
 	add_schedule_test(test-barriers.impala cpu)
@@ -91,6 +95,16 @@ if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 
 	# add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()
+
+set(TEST_SUITE_FILES
+)
+
+foreach(_test_platform ${TEST_PLATFORMS})
+	foreach(_test_case ${TEST_SUITE_FILES})
+		add_schedule_test(${_test_case} ${_test_platform} test-suite.impala)
+	endforeach()
+endforeach()
+
 
 if (Thorin_HAS_RV_SUPPORT)
 	add_subdirectory(rv-test-suite)
