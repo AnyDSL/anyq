@@ -98,6 +98,7 @@ endif()
 
 set(TEST_SUITE_FILES
 	test-suite-atomic_add.impala
+	test-suite-shfl_bfly.impala
 )
 
 foreach(_test_platform ${TEST_PLATFORMS})
