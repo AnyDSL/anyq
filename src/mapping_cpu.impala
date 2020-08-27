@@ -252,6 +252,26 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
 	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
 
+	fn @lanemask_eq() -> u64 {
+		1u64 << self as u64
+	}
+
+	fn @lanemask_lt() -> u64 {
+		let ballot = rv_ballot_u32(true) as u64;
+		let mask = (1u64 << self as u64) - 1u64;
+		mask & ballot
+	}
+
+	fn @lanemask_gt() -> u64 {
+		if (vec_width == 64 && self == 63u) || (vec_width == 32 && self == 31u) {
+			0u64
+		} else {
+			let ballot = rv_ballot_u32(true) as u64;
+			let mask = (!0u64) << (self as u64 + 1u64);
+			mask & ballot
+		}
+	}
+
 	@@body(gpu_wave_context{
 		idx: @|| idx.warp_id,
 
@@ -288,11 +308,11 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, ((self ^ lane_mask as u32) & (width - 1u)) as i32) },
 		//shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() },
 
-		lanemask: @|| 1u64 << idx.local_id as u64,
-		lanemask_le: @|| undef[u64](),
-		lanemask_lt: @|| undef[u64](),
-		lanemask_ge: @|| undef[u64](),
-		lanemask_gt: @|| undef[u64]()
+		lanemask:    @|| { lanemask_eq() },
+		lanemask_le: @|| { lanemask_lt() | lanemask_eq() },
+		lanemask_lt: @|| { lanemask_lt() },
+		lanemask_ge: @|| { lanemask_gt() | lanemask_eq() },
+		lanemask_gt: @|| { lanemask_gt() }
 	});
 }
 
