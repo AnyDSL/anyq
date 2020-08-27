@@ -150,6 +150,76 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 	}
 }
 
+type ReadFn = fn(i32) -> i32;
+type WriteFn = fn(i32, i32) -> ();
+type GlobalFn = fn(i32) -> &mut[1]i32;
+type ValidateFn = fn (fn(i32,i32)->bool, fn(i32,i32)->bool, bool) -> bool;
+
+struct IntrinsicsTest {
+	run_test: fn (fn (ReadFn, WriteFn, GlobalFn, &mut[1]u32, ValidateFn) -> bool) -> (),
+	finish: fn () -> i32
+}
+
+fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32)->i32, num_locals: i32, init_local: fn(i32)->i32) -> IntrinsicsTest {
+	let additional_mem = ((num_globals + num_locals) * sizeof[i32]() as i32) as u32;
+	let test = createBaseTest(device, additional_mem);
+
+	let buffer = alloc_cpu(additional_mem as i64);
+	let data = bitcast[&mut[i32]](buffer.data);
+
+	IntrinsicsTest {
+		run_test: @|body| {
+			for idx in range(0, num_globals) {
+				data(idx) = init_global(idx);
+			}
+			for idx in range(0, num_locals) {
+				data(num_globals + idx) = init_local(idx);
+			}
+
+			with device_memory, device_failed_flag in test.run_test() {
+				runtime_copy(0, buffer.data, 0i64, device.platform_device, device_memory as &mut[i8], 0i64, additional_mem as i64);
+
+				let read = @|idx:i32| -> i32 { let ptr = bitcast[&[1][i32]](device_memory); ptr(idx + num_globals) };
+				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut[1][i32]](device_memory); ptr(idx + num_globals) = value; };
+				let global = @|idx:i32| -> &mut[1] i32 { let ptr = bitcast[&mut[1][i32]](device_memory); &mut(ptr(idx)) };
+
+				let validate = @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| {
+					let mut result = true;
+
+					runtime_copy(device.platform_device, device_memory as &mut[i8], 0i64, 0, buffer.data, 0i64, additional_mem as i64);
+
+					for idx in range(0, num_globals) {
+						 let check = validate_global(idx, data(idx));
+						 if !check {
+							 print_string("validation failed! global("); print_i32(idx); print_string(") = "); print_i32(data(idx)); print_char('\n');
+							 if stop_on_first_fail { return(false) }
+						 }
+						 result &= check;
+					}
+					for idx in range(0, num_locals) {
+						 let check = validate_local(idx, data(num_globals + idx));
+						 if !check {
+							 print_string("validation failed! local("); print_i32(idx); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
+							 if stop_on_first_fail { return(false) }
+						 }
+						 result &= check;
+					}
+
+					result
+				};
+
+				body(read, write, global, device_failed_flag, validate)
+			}
+		},
+
+		finish: @|| {
+			release(buffer);
+
+			test.finish()
+		}
+	}
+}
+
 
 struct QueueTest {
 	run_test: fn (i32, fn (ProducerConsumerQueue, &mut[1][i8], &mut[1]u32) -> bool) -> (),
