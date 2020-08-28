@@ -178,8 +178,8 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| atomic(10u, bitcast[&mut u32](addr), val, 7u, ""),
 		atomic_min_global_u64: @|addr: &mut[1] u64, val: u64| atomic(10u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| atomic(7u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| atomic(9u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(7u, bitcast[&mut i32](addr), val, -0x7fffffff, @|a, x| if a > x { a } else { x }, @|b, i| b),
+		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(9u, bitcast[&mut u32](addr), val,          0u, @|a, x| if a > x { a } else { x }, @|b, i| b),
 		atomic_max_global_u64: @|addr: &mut[1] u64, val: u64| atomic(9u, bitcast[&mut u64](addr), val, 7u, ""),
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
