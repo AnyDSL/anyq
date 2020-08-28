@@ -99,6 +99,7 @@ endif()
 set(TEST_SUITE_FILES
 	test-suite-atomic_add.impala
 	test-suite-atomic_sub.impala
+	test-suite-atomic_sub_u32.impala
 	test-suite-shfl_bfly.impala
 )
 
