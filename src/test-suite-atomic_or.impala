@@ -1,0 +1,27 @@
+
+fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
+	let global = @|g| { 0 };
+	let local  = @|l| { l };
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	with thread in grid.threads() {
+		let mydata = read(thread.idx(0) as i32);
+		
+		let i = mydata >> 7;
+		let j = mydata & 0x7f;
+
+		thread.atomic_or_global_i32(global(i), j << (8*i));
+	}
+
+}
+
+fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+
+	let values = |l| l;
+	let result = |g| match g { 0 => 0x0000007f, 1 => 0x00007f00, 2 => 0x007f0000, 3 => 0x7f000000, _ => 0x0 };
+
+	(result, values)
+}
