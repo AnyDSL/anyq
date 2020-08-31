@@ -35,7 +35,7 @@ fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32,
 		let o = i * width;
 		let mut sum = 0;
 		for j in range(o, o + width) {
-			sum += local(j);
+			sum += j;
 		}
 		sum
 	};
