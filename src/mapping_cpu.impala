@@ -95,6 +95,51 @@ fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
 	}
 }
 
+fn @(?width) unroll_reduction_step(mask: i32, width: i32, body: fn(i32) -> ()) -> () {
+	if width > 0 {
+		@@body(mask);
+		unroll_reduction_step(mask << 1, width >> 1, body)
+	}
+}
+
+fn @atomic_red_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32) -> i32 {
+	let shuffle = @|v, l| shuffle_i32(self, vec_width)(v, l as i32);
+
+	@|op, ptr, val, nop, combine| {
+		let active_lane = rv_ballot_u32(true) & (1u << self) != 0u;
+		let mut my_value = if active_lane { val } else { nop };
+
+		for mask in unroll_reduction_step(0x1, vec_width) {
+			let other_value = shuffle(my_value, self ^ mask as u32);
+			my_value = combine(other_value, my_value);
+		}
+
+		let result0 = rv_extract_i32(my_value, 0);
+		let result = atomic(op, ptr, result0, 7u, "");
+
+		result
+	}
+}
+
+fn @atomic_red_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32) -> u32 {
+	let shuffle = @|v, l| shuffle_u32(self, vec_width)(v, l as i32);
+
+	@|op, ptr, val, nop, combine| {
+		let active_lane = rv_ballot_u32(true) & (1u << self) != 0u;
+		let mut my_value = if active_lane { val } else { nop };
+
+		for mask in unroll_reduction_step(0x1, vec_width) {
+			let other_value = shuffle(my_value, self ^ mask as u32);
+			my_value = combine(other_value, my_value);
+		}
+
+		let result0 = rv_extract_u32(my_value, 0);
+		let result = atomic(op, ptr, result0, 7u, "");
+
+		result
+	}
+}
+
 fn @atomic_op_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32, fn(i32, i32)->i32) -> i32 {
 	@|op, ptr, val, nop, combine, extract| {
 		let mut aggregate = 0;
@@ -139,6 +184,8 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 	let atomic_i32 = atomic_op_i32(self, vec_width);
 	let atomic_u32 = atomic_op_u32(self, vec_width);
 
+	let reduction_i32 = atomic_red_i32(self, vec_width);
+	let reduction_u32 = atomic_red_u32(self, vec_width);
 	@@body(gpu_thread_context {
 		idx: tid,
 
@@ -174,12 +221,12 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| atomic(0u, bitcast[&mut u32](addr), val, 7u, ""),
 		atomic_exch_global_u64: @|addr: &mut[1] u64, val: u64| atomic(0u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32( 8u, bitcast[&mut i32](addr), val,  0x7fffffff, @|a, x| if a < x { a } else { x }, @|b, i| b),
-		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(10u, bitcast[&mut u32](addr), val, 0xffffffffu, @|a, x| if a < x { a } else { x }, @|b, i| b),
+		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| reduction_i32( 8u, bitcast[&mut i32](addr), val,  0x7fffffff, @|a, b| if a < b { a } else { b }),
+		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| reduction_u32(10u, bitcast[&mut u32](addr), val, 0xffffffffu, @|a, b| if a < b { a } else { b }),
 		atomic_min_global_u64: @|addr: &mut[1] u64, val: u64| atomic(10u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(7u, bitcast[&mut i32](addr), val, -0x7fffffff, @|a, x| if a > x { a } else { x }, @|b, i| b),
-		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(9u, bitcast[&mut u32](addr), val,          0u, @|a, x| if a > x { a } else { x }, @|b, i| b),
+		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| reduction_i32( 7u, bitcast[&mut i32](addr), val, -0x7fffffff, @|a, b| if a > b { a } else { b }),
+		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| reduction_u32( 9u, bitcast[&mut u32](addr), val,          0u, @|a, b| if a > b { a } else { b }),
 		atomic_max_global_u64: @|addr: &mut[1] u64, val: u64| atomic(9u, bitcast[&mut u64](addr), val, 7u, ""),
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
