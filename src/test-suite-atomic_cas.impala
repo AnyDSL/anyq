@@ -1,0 +1,34 @@
+
+fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
+	let global = @|g| { 0 };
+	let local  = @|l| { l };
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	with thread in grid.threads() {
+		let tidx = thread.idx(0) as i32;
+
+		let mydata = read(tidx);
+		let newdata = mydata + 1;
+
+		let mut old = -1;
+		let assumed = mydata;
+
+		while assumed != old {
+			old = thread.atomic_cas_global_i32(global(0), assumed, newdata);
+		}
+
+		write(tidx, newdata);
+	}
+
+}
+
+fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+
+	let values = |l| l + 1;
+	let result = |g| match g { 0 => 512, _ => 0x0 };
+
+	(result, values)
+}
