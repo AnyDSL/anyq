@@ -104,6 +104,7 @@ set(TEST_SUITE_FILES
 	test-suite-atomic_max.impala
 	test-suite-atomic_or.impala
 	test-suite-atomic_cas.impala
+	test-suite-atomic_exch.impala
 	test-suite-shfl_bfly.impala
 )
 
