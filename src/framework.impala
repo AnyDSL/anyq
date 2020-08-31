@@ -156,7 +156,10 @@ type GlobalFn = fn(i32) -> &mut[1]i32;
 type ValidateFn = fn (fn(i32,i32)->bool, fn(i32,i32)->bool, bool) -> bool;
 
 struct IntrinsicsTest {
-	run_test: fn (fn (ReadFn, WriteFn, GlobalFn, &mut[1]u32, ValidateFn) -> bool) -> (),
+	run_test: fn (fn (ReadFn, WriteFn, GlobalFn, &mut[1]u32) -> bool) -> (),
+	globals: fn(i32) -> i32,
+	locals: fn(i32) -> i32,
+	validate: ValidateFn,
 	finish: fn () -> i32
 }
 
@@ -166,6 +169,8 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 
 	let buffer = alloc_cpu(additional_mem as i64);
 	let data = bitcast[&mut[i32]](buffer.data);
+
+	let mut validation_result = true;
 
 	IntrinsicsTest {
 		run_test: @|body| {
@@ -183,39 +188,47 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut[1][i32]](device_memory); ptr(idx + num_globals) = value; };
 				let global = @|idx:i32| -> &mut[1] i32 { let ptr = bitcast[&mut[1][i32]](device_memory); &mut(ptr(idx)) };
 
-				let validate = @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| {
-					let mut result = true;
+				let result = body(read, write, global, device_failed_flag);
 
-					runtime_copy(device.platform_device, device_memory as &mut[i8], 0i64, 0, buffer.data, 0i64, additional_mem as i64);
+				runtime_copy(device.platform_device, device_memory as &mut[i8], 0i64, 0, buffer.data, 0i64, additional_mem as i64);
 
-					for idx in range(0, num_globals) {
-						 let check = validate_global(idx, data(idx));
-						 if !check {
-							 print_string("validation failed! global("); print_i32(idx); print_string(") = "); print_i32(data(idx)); print_char('\n');
-							 if stop_on_first_fail { return(false) }
-						 }
-						 result &= check;
-					}
-					for idx in range(0, num_locals) {
-						 let check = validate_local(idx, data(num_globals + idx));
-						 if !check {
-							 print_string("validation failed! local("); print_i32(idx); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
-							 if stop_on_first_fail { return(false) }
-						 }
-						 result &= check;
-					}
-
-					result
-				};
-
-				body(read, write, global, device_failed_flag, validate)
+				result
 			}
+		},
+
+		globals: @|idx| { data(idx) },
+		locals:  @|idx| { data(num_globals + idx) },
+
+		validate: @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| -> bool {
+			let mut result = true;
+
+			for idx in range(0, num_globals) {
+					let check = validate_global(idx, data(idx));
+					if !check {
+						print_string("validation failed! global("); print_i32(idx); print_string(") = "); print_i32(data(idx)); print_char('\n');
+						if stop_on_first_fail { return(false) }
+					}
+					result &= check;
+			}
+			for idx in range(0, num_locals) {
+					let check = validate_local(idx, data(num_globals + idx));
+					if !check {
+						print_string("validation failed! local("); print_i32(idx); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
+						if stop_on_first_fail { return(false) }
+					}
+					result &= check;
+			}
+
+			validation_result &= result;
+
+			result
 		},
 
 		finish: @|| {
 			release(buffer);
 
-			test.finish()
+			let test_result = test.finish();
+			if !validation_result { -2 } else { test_result }
 		}
 	}
 }

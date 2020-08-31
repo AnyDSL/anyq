@@ -11,7 +11,7 @@ fn main() -> i32 {
 	let init = setup_input(num_globals, num_locals);
 	let test = createIntrinsicsTest(device, num_globals, init(0), num_locals, init(1));
 
-	with read, write, global, device_failed_flag, validate in test.run_test() {
+	with read, write, global, device_failed_flag in test.run_test() {
 
 		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
 
@@ -19,16 +19,18 @@ fn main() -> i32 {
 
 		}
 
-		let expected = expected_result(init(0), init(1));
-		let expected_global = expected(0);
-		let expected_local = expected(1);
-
-		validate(
-			@|global, value| { value == expected_global(global) },
-			@|local, value| { value == expected_local(local) },
-			true
-		)
+		true
 	}
+
+	let expected = expected_result(test.globals, test.locals);
+	let expected_global = expected(0);
+	let expected_local = expected(1);
+
+	test.validate(
+		@|global, value| { value == expected_global(global) },
+		@|local, value| { value == expected_local(local) },
+		false
+	);
 
 	test.finish()
 }
