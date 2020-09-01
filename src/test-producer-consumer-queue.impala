@@ -4,15 +4,15 @@ fn main() -> i32 {
 
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;
-	let queue_test = createQueueTest(device, (num_elements + 1u32) * sizeof[u32]() as u32);
+	let queue_test = createQueueTest(device, (num_elements + 2u) * sizeof[u32]() as u32);
 	let block_dim = 256;
 
-	let ref_test = createBaseTest(device, (num_elements + 0u32) * sizeof[u32]() as u32);
+	let ref_test = createBaseTest(device, (num_elements + 0u) * sizeof[u32]() as u32);
 
 	fn element(intrinsics: Intrinsics, i: u32) -> u32 {
 		let rand_state = xorshift32(i);
 		let octaves = (rand_state % 8u32) as i32;
-		(simplexNoiseFractal([randf(i, intrinsics), randf(i * 2u32, intrinsics), randf(i * 3u32, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+		i*i // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2u32, intrinsics), randf(i * 3u32, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
 	}
 
 	with device_memory, device_failed_flag in ref_test.run_test() {
@@ -21,6 +21,7 @@ fn main() -> i32 {
 		with queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
 			let output = bitcast[&mut[1][u32]](device_memory);
 			let next_input = &mut output(num_elements);
+			let next_output = &mut output(num_elements + 1u);
 
 			with grid, intrinsics in device.launch_1d(1, 1) {
 				with thread in grid.threads() {
@@ -30,13 +31,13 @@ fn main() -> i32 {
 
 			with grid, intrinsics in device.launch_1d(42, block_dim) {
 				with wave in grid.waves() {
-					with thread in wave.threads() {
 						// let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
 
 						fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
-							let el = thread.atomic_add_global_u32(next_input, 1u32);
+							let el = thread.atomic_add_global_u32(next_input, 1u);
 
 							if el < num_elements {
+								//device.print_i32("produce - el: %d\n", el as i32);
 								sink(element(intrinsics, el));
 								true
 							}
@@ -47,7 +48,8 @@ fn main() -> i32 {
 						}
 
 						fn consumer(thread: gpu_thread_context, el: u32) -> () {
-							output(el) = el;
+							let i = thread.atomic_add_global_u32(next_output, 1u);
+							output(i) = el;
 						}
 
 
@@ -58,7 +60,6 @@ fn main() -> i32 {
 						}
 
 						producer_consumer_loop_wave(wave, producer, consumer, queue, should_flush);
-					}
 				}
 			}
 
@@ -71,26 +72,34 @@ fn main() -> i32 {
 				}
 			}
 
-			queue_test.finish() == 0
-		}
+			/*
+			let num_per_block = 256;
+			let num_blocks = div_up(num_elements as i32, block_dim);
 
-		with grid, intrinsics in device.launch_1d(div_up(num_elements as i32, block_dim), block_dim) {
-			with thread in grid.threads() {
-				for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
-					let el = element(intrinsics, i as u32);
-					ref_output(el) = el;
+			with grid, intrinsics in device.launch_1d(num_blocks / num_per_block, block_dim) {
+				with thread in grid.threads() {
+					for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
+						let el = element(intrinsics, i as u32);
+						ref_output(i) = el;
+					}
 				}
 			}
-		}
 
-		with grid, intrinsics in device.launch_1d(div_up(num_elements as i32, block_dim), block_dim) {
-			with thread in grid.threads() {
-				for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
+			with grid, intrinsics in device.launch_1d(num_blocks / num_per_block, block_dim) {
+				with thread in grid.threads() {
+					for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
+						if ref_output(i) != output(i) {
+							device.print_i32a("Difference in queue output for element(%d) = %d\n", [i, output(i) as i32]);
+						}
+					}
 				}
 			}
+			*/
+
+			true
 		}
 
-		true
+		queue_test.finish() == 0
 	}
 
 	ref_test.finish()

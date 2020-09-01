@@ -21,6 +21,7 @@ fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_c
 		let mut drain = false;
 
 		while true {
+			// TODO: introduce wave.broadcast[T](fn()->T) -> T
 			let flush = wave.shfl_i32(if thread.idx(0) == 0u32 { if should_flush(thread) {1} else {0} } else { 0 }, 0, wave.num_threads()) != 0;
 
 			if drain || flush {
