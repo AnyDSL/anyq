@@ -222,6 +222,7 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 		atomic_xor_global_u64: @|addr: &mut[1] u64, val: u64| atomic(6u, bitcast[&mut u64](addr), val, 7u, ""),
 
 		atomic_exch_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 {
+			/*
 			let mut result:i32 = self as i32; // mark result as varying for rv
 			let lane_mask = (vec_width as u32 - 1u);
 			if rv_ballot_u32(true) & lane_mask == lane_mask {
@@ -240,8 +241,17 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 				}
 			}
 			result
+			*/
+			let mut val_per_lane:i32 = self as i32; // mark new_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_val = rv_extract_i32(val, l);
+				val_per_lane = rv_insert_i32(val_per_lane, l, lane_val);
+			}
+
+			atomic(0u, bitcast[&mut i32](addr), val_per_lane, 7u, "")
 		},
 		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
+			/*
 			let mut result:u32 = self; // mark result as varying for rv
 			let lane_mask = (vec_width as u32 - 1u);
 			if rv_ballot_u32(true) & lane_mask == lane_mask {
@@ -260,6 +270,14 @@ fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body:
 				}
 			}
 			result
+			*/
+			let mut val_per_lane:u32 = self; // mark val_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_val = rv_extract_u32(val, l);
+				val_per_lane = rv_insert_u32(val_per_lane, l, lane_val);
+			}
+
+			atomic(0u, bitcast[&mut u32](addr), val_per_lane, 7u, "")
 		},
 		atomic_exch_global_u64: @|addr: &mut[1] u64, val: u64| atomic(0u, bitcast[&mut u64](addr), val, 7u, ""),
 
