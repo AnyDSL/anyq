@@ -68,33 +68,23 @@ set(TEST_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	list(APPEND TEST_PLATFORMS cuda nvvm)
-	add_schedule_test(test-basics.impala cuda)
-	add_schedule_test(test-basics.impala nvvm)
-	add_schedule_test(test-shuffles.impala cuda)
-	add_schedule_test(test-shuffles.impala nvvm)
-	add_schedule_test(test-barriers.impala cuda)
-	add_schedule_test(test-barriers.impala nvvm)
-	add_schedule_test(test-producer-consumer-queue.impala cuda)
-	add_schedule_test(test-producer-consumer-queue.impala nvvm)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 	list(APPEND TEST_PLATFORMS amdgpu)
-	add_schedule_test(test-basics.impala amdgpu)
-	add_schedule_test(test-shuffles.impala amdgpu)
-	add_schedule_test(test-barriers.impala amdgpu)
-	add_schedule_test(test-producer-consumer-queue.impala amdgpu)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	list(APPEND TEST_PLATFORMS cpu)
-	add_schedule_test(test-basics.impala cpu)
-	add_schedule_test(test-shuffles.impala cpu)
-	add_schedule_test(test-barriers.impala cpu)
-	add_schedule_test(test-producer-consumer-queue.impala cpu)
-
 	# add_schedule_test(test-rv-intrinsics.impala cpu)
 endif()
+
+set(TEST_SCHEDULE_FILES
+	test-basics.impala
+	test-shuffles.impala
+	test-barriers.impala
+	test-producer-consumer-queue.impala
+)
 
 set(TEST_SUITE_FILES
 	test-suite-atomic_add.impala
@@ -111,6 +101,10 @@ set(TEST_SUITE_FILES
 )
 
 foreach(_test_platform ${TEST_PLATFORMS})
+	foreach(_test_schedule ${TEST_SCHEDULE_FILES})
+		add_schedule_test(${_test_schedule} ${_test_platform})
+	endforeach()
+
 	foreach(_test_case ${TEST_SUITE_FILES})
 		add_schedule_test(${_test_case} ${_test_platform} test-suite.impala)
 	endforeach()
