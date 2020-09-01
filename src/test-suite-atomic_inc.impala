@@ -15,17 +15,14 @@ fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, writ
 		with thread in block.threads() {
 
 			let bidx = block.idx(0) as i32;
-			let tidx = bidx * block.num_threads(0) as i32 + thread.idx(0) as i32;
-
-			let mydata = read(tidx);
 
 			let ptr = bitcast[&mut[1]u32](global(bidx));
 
-			//if mydata & 1 == 0 {
+			if (thread.idx(0) & 1u) == 0u {
 				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1u) as i32;
 
 				write(bidx * block.num_threads(0) as i32 + newdata, -(1 << bidx));
-			//}
+			}
 		}
 	}
 
@@ -37,7 +34,7 @@ fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32,
 		let bidx = (l >> 7) & 0x3;
 		let tidx = l & 0x7f;
 		let wrap = wrap_around_value(bidx) as i32;
-		if tidx < wrap /* && tidx & 1 == 0 */ {
+		if (tidx < wrap) && (tidx < 64) {
 			-(1 << bidx)
 		} else {
 			l
@@ -45,7 +42,7 @@ fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32,
 	};
 
 	// atmost the wrap around bit shall be set
-	let result = |g| global(g) & wrap_around_value(g) as i32;
+	let result = |g| match g { 3 => 64, _ => global(g) & wrap_around_value(g) as i32 };
 
 	(result, values)
 }
