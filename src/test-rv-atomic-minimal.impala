@@ -1,0 +1,90 @@
+
+
+fn main() -> i32 {
+
+	let vec_width = 8;
+
+	// broken: constants are uniform resulting in a single atomic with the same constant
+	fn atomic_add_i32_v0(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		atomic(1u, ptr, val, 7u, "")
+	}
+
+	// WORKS as intended
+	fn atomic_add_i32_v1b(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut result:i32 = self; // self is needed to make result varying
+
+		for l in unroll(0, vec_width) {
+			let lane_val = if rv_ballot(true) & (1 << l) != 0 { rv_extract_i32(val, l) } else { 0 };
+			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			result = rv_insert_i32(result, l, lane_res);
+		}
+
+		result
+	}
+
+	// WORKS as intended (optimized with reduction first followed by single atomic)
+	fn atomic_add_i32_v7(self: i32, ptr: &mut i32, val: i32) -> i32 {
+		let mut aggregate = 0;
+		let mut intermediate:i32;
+		let mut old:i32;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = if rv_ballot(true) & (1 << l) != 0 { rv_extract_i32(val, l) } else { 0 };
+			if l == self { intermediate = aggregate; }
+			aggregate += lane_val;
+		}
+
+		old = atomic(1u, ptr, aggregate, 7u, "");
+
+		old + intermediate
+	}
+
+	let buffer = alloc_cpu(vec_width as i64 * sizeof[i32]());
+	let data = bitcast[&mut[i32]](buffer.data);
+
+	for i in range(0, vec_width) {
+		data(i) = i;
+	}
+
+	// atomics
+	let mut value = 10;
+	let ptr = &mut value;
+
+
+	let atomic_add_i32 = atomic_add_i32_v0;
+	//let atomic_add_i32 = atomic_add_i32_v1b;
+	//let atomic_add_i32 = atomic_add_i32_v7;
+
+
+	for j in vectorize(vec_width) {
+		let mydata = data(j);
+
+		// (1) use varying data as value
+		// (R) 38: [10, 10, 11, 13, 16, 20, 25, 31]
+		// (v0) 8x atomicrmw // (v1b) 8x atomicrmw // (v7b) 1x atomicrmw
+		let new_data = atomic_add_i32(j, ptr, mydata);
+
+		// (2) use constant as value
+		// (R) 18: [10, 11, 12, 13, 14, 15, 16, 17]
+		// (v0) 1x atomicrmw // (v1b) 8x atomicrmw // (v7b) 1x atomicrmw
+		//let new_data = atomic_add_i32(j, ptr, 1);
+
+		// (3) use atomic inside control flow
+		// (R) 14: [10, -1, 11, -3, 12, -5, 13, -7]
+		// (v0) 1x atomicrmw // (v1b) 8x atomicrmw // (v7b) 1x atomicrmw
+		//let new_data = if mydata % 2 == 0 { atomic_add_i32(j, ptr, 1) } else { -mydata };
+		//let new_data = if j % 2 == 0 { atomic_add_i32(j, ptr, 1) } else { -mydata };
+
+		data(j) = new_data;
+	}
+
+	print_string("value: "); print_i32(value); print_char('\n');
+
+	for i in range(0, vec_width) {
+		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+	}
+
+	release(buffer);
+
+	0
+}
