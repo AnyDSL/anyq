@@ -1,4 +1,9 @@
 
+extern "C" {
+	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
+	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
+}
+
 
 fn main() -> i32 {
 
@@ -49,6 +54,13 @@ fn main() -> i32 {
 	// atomics
 	let mut value = 10;
 	let ptr = &mut value;
+
+	// test matrix
+	// ----------------
+	//     v0 v1b  v7
+	// (1) ok  ok  opt
+	// (2) !!  ok  opt
+	// (3) !!  ok  ok
 
 
 	let atomic_add_i32 = atomic_add_i32_v0;

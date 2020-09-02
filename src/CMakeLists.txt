@@ -77,7 +77,7 @@ endif()
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	list(APPEND TEST_PLATFORMS cpu)
 	# add_schedule_test(test-rv-intrinsics.impala cpu)
-	# add_schedule_test(test-rv-atomic-minimal.impala cpu)
+	# offline_graph(test-rv-atomic-minimal test-rv-atomic-minimal.impala)
 endif()
 
 set(TEST_SCHEDULE_FILES
