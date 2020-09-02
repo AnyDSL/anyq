@@ -25,7 +25,8 @@ fn main() -> i32 {
 
 			with grid, intrinsics in device.launch_1d(1, 1) {
 				with thread in grid.threads() {
-					*next_input = 0u32;
+					*next_input  = 0u32;
+					*next_output = 0u32;
 				}
 			}
 

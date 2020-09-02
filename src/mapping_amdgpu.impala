@@ -10,14 +10,14 @@ fn @createAccDevice() -> AccDevice {
         synchronize: || synchronize_hsa(amdgpu_device),
         alloc: |size| alloc_hsa(amdgpu_device, size),
         platform_device: runtime_device(3, amdgpu_device),
-        print_i32: @|format: &[u8], arg: i32| { trap() },
-        print_i32a: @|format: &[u8], args: &[i32]| { trap() }
+        print_i32: @|format: &[u8], arg: i32| { /*trap()*/ },
+        print_i32a: @|format: &[u8], args: &[i32]| { /*trap()*/ }
     }
 }
 
 
 fn @amdgpu_pred(b: bool) -> i32 {
-	if b {1} else {0}
+    if b { 1 } else { 0 }
 }
 
 fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
