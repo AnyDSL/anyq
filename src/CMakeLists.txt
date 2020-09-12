@@ -53,7 +53,7 @@ endif()
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
-	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile})
+	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
 	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")
@@ -65,41 +65,58 @@ function(add_schedule_test _testfile _mapping)
 	endif()
 endfunction()
 
+set(TEST_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
-	add_schedule_test(test-basics.impala cuda)
-	add_schedule_test(test-basics.impala nvvm)
-	add_schedule_test(test-shuffles.impala cuda)
-	add_schedule_test(test-shuffles.impala nvvm)
-	add_schedule_test(test-barriers.impala cuda)
-	add_schedule_test(test-barriers.impala nvvm)
-	add_schedule_test(test-producer-consumer-queue.impala cuda)
-	add_schedule_test(test-producer-consumer-queue.impala nvvm)
+	list(APPEND TEST_PLATFORMS cuda nvvm)
 	add_schedule_test(test-ringbuffer-allocator.impala cuda)
 	add_schedule_test(test-ringbuffer-allocator.impala nvvm)
 	add_schedule_test(test-pipeline.impala cuda)
 	add_schedule_test(test-pipeline.impala nvvm)
 endif()
 
-if (AnyDSL_runtime_HAS_OPENCL_SUPPORT)
-	add_schedule_test(test-basics.impala opencl)
-	add_schedule_test(test-shuffles.impala opencl)
-	add_schedule_test(test-barriers.impala opencl)
-	add_schedule_test(test-producer-consumer-queue.impala opencl)
-endif()
-
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
-	add_schedule_test(test-basics.impala amdgpu)
-	add_schedule_test(test-shuffles.impala amdgpu)
-	add_schedule_test(test-barriers.impala amdgpu)
-	add_schedule_test(test-producer-consumer-queue.impala amdgpu)
+	list(APPEND TEST_PLATFORMS amdgpu)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
-	add_schedule_test(test-basics.impala cpu)
-	# add_schedule_test(test-shuffles.impala cpu)
-	add_schedule_test(test-barriers.impala cpu)
-	# add_schedule_test(test-producer-consumer-queue.impala cpu)
+	list(APPEND TEST_PLATFORMS cpu)
+	# add_schedule_test(test-rv-intrinsics.impala cpu)
+	# offline_graph(test-rv-atomic-minimal test-rv-atomic-minimal.impala)
+endif()
 
-	add_schedule_test(test-rv-intrinsics.impala cpu)
+set(TEST_SCHEDULE_FILES
+	test-basics.impala
+	test-shuffles.impala
+	test-barriers.impala
+	test-producer-consumer-queue.impala
+)
+
+set(TEST_SUITE_FILES
+	test-suite-atomic_add.impala
+	test-suite-atomic_sub.impala
+	test-suite-atomic_sub_u32.impala
+	test-suite-atomic_min.impala
+	test-suite-atomic_max.impala
+	test-suite-atomic_or.impala
+	test-suite-atomic_cas.impala
+	test-suite-atomic_exch.impala
+	test-suite-atomic_inc.impala
+	test-suite-scatter_writes.impala
+	test-suite-shfl_bfly.impala
+)
+
+foreach(_test_platform ${TEST_PLATFORMS})
+	foreach(_test_schedule ${TEST_SCHEDULE_FILES})
+		add_schedule_test(${_test_schedule} ${_test_platform})
+	endforeach()
+
+	foreach(_test_case ${TEST_SUITE_FILES})
+		add_schedule_test(${_test_case} ${_test_platform} test-suite.impala)
+	endforeach()
+endforeach()
+
+
+if (Thorin_HAS_RV_SUPPORT)
+	add_subdirectory(rv-test-suite)
 endif()

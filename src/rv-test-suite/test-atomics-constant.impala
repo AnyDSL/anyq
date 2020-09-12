@@ -1,0 +1,19 @@
+
+fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+	let mydata = read(lane);
+
+	let atomic_add = atomic_add_i32(lane, vec_width);
+
+	let new_data = atomic_add(global(0), 1);
+
+	write(lane, new_data);
+}
+
+fn expected_result(data: fn(i32)->i32, global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
+
+	let values = [10, 11, 12, 13, 14, 15, 16, 17];
+	let result = 18;
+
+	(|i| values(i), result)
+}

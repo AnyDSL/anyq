@@ -1,0 +1,30 @@
+
+fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
+	let global = @|g| { 0 };
+	let local  = @|l| { l };
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	with thread in grid.threads() {
+		let tidx = thread.idx(0) as i32;
+		let mydata = read(tidx);
+		
+		//let newdata = if mydata & 1 == 0 { mydata } else { -mydata };
+		//write(tidx, newdata);
+		
+		if mydata & 1 != 0 {
+			write(tidx, -mydata);
+		}
+	}
+
+}
+
+fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+
+	let values = |l| if l & 1 == 0 { l } else { -l };
+	let result = |g| { 0 };
+
+	(result, values)
+}

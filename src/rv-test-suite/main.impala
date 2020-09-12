@@ -1,0 +1,51 @@
+
+extern "C" {
+	fn "rv_load" rv_load_i32(&[i32], i32) -> i32;
+	fn "rv_store" rv_store_i32(&[i32], i32, i32) -> ();
+	fn "rv_align" rv_align_i8(&[i8], i32)-> &[i8];
+	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
+	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
+}
+
+
+fn main() -> i32 {
+
+	let warp_size = 8;
+	// works for values atleast up to 128
+	let vec_width = warp_size;
+
+	let buffer = alloc_cpu((2*warp_size) as i64 *sizeof[i32]());
+	let data = bitcast[&mut[i32]](rv_align_i8(buffer.data, vec_width));
+
+	for i in range(0, warp_size) {
+		data(i) = i;
+	}
+
+	// atomics
+	let mut value = 10;
+	let ptr = &mut value;
+
+	let read = @|i:i32| data(i);
+	let write = @|i:i32, val:i32| data(i) = val;
+	let global = @|i:i32| ptr;
+
+	for j in vectorize(vec_width) {
+		loop_body(j, vec_width, read, write, global);
+	}
+
+	let expected = expected_result(read, global);
+	let mut passed = true;
+
+	print_string("value: "); print_i32(value); print_char('\n');
+	passed &= (value == expected(1));
+
+	for i in range(0, warp_size) {
+		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
+		let expected_value = expected(0);
+		passed &= (expected_value(i) == data(i));
+	}
+
+	release(buffer);
+
+	if passed { 0 } else { -1 }
+}

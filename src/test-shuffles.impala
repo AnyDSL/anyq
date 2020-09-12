@@ -20,7 +20,7 @@ fn main() -> i32 {
 						let passed = (x == 1);
 
 						if !passed {
-							thread.atomic_exch_global_u32(device_failed_flag, 1u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 0u);
 						}
 					}
 				}
@@ -41,7 +41,7 @@ fn main() -> i32 {
 						let passed = if thread.idx(0) as i32 - i < 0 { x == thread.idx(0) } else { x == (thread.idx(0) - i as u32) };
 
 						if !passed {
-							thread.atomic_exch_global_u32(device_failed_flag, 2u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 1u);
 						}
 					}
 				}
@@ -62,7 +62,7 @@ fn main() -> i32 {
 						let passed = if thread.idx(0) + i as u32 >= wave.num_threads() { x == thread.idx(0) } else { x == (thread.idx(0) + i as u32) };
 
 						if !passed {
-							thread.atomic_exch_global_u32(device_failed_flag, 3u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 2u);
 						}
 					}
 				}
@@ -83,7 +83,7 @@ fn main() -> i32 {
 						let passed = if thread.idx(0) ^ i as u32 >= wave.num_threads() { x == thread.idx(0) } else { x == (thread.idx(0) ^ i as u32) };
 
 						if !passed {
-							thread.atomic_exch_global_u32(device_failed_flag, 4u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 3u);
 						}
 					}
 				}

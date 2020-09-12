@@ -1,0 +1,45 @@
+
+// width must be less or equal to wave.num_threads() and match the num of calls to shfl_bfly()
+static width = 8;
+
+fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
+	let global = @|g| { 0 };
+	let local  = @|l| { l };
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	with wave in grid.waves() {
+		with thread in wave.threads() {
+			let idx = (wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
+
+			let mydata = read(idx);
+
+			let value0 = wave.shfl_bfly_i32(mydata, (1 << 0), width as u32) + mydata;
+			let value1 = wave.shfl_bfly_i32(value0, (1 << 1), width as u32) + value0;
+			let value2 = wave.shfl_bfly_i32(value1, (1 << 2), width as u32) + value1;
+
+			let new_data = value2;
+
+			write(idx, new_data);
+		}
+	}
+
+}
+
+fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+
+	let values = |l| {
+		let i = l / width;
+		let o = i * width;
+		let mut sum = 0;
+		for j in range(o, o + width) {
+			sum += j;
+		}
+		sum
+	};
+	let result = |g| 0;
+
+	(result, values)
+}

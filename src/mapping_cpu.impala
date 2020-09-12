@@ -1,7 +1,7 @@
 
 static cpu_threads = 0;
-static vec_width = 8u;
-static warp_size = 8u;
+//static vec_width = 8u;
+static warp_size = 32u;
 
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
@@ -59,15 +59,137 @@ extern "C" {
 
 
 extern "C" {
-	//fn "rv_shuffle" rv_shuffle_f32(f32, i32) -> f32;
-	fn "rv_shuffle" rv_shuffle_i32(i32, i32) -> i32;
-	fn "rv_shuffle" rv_shuffle_u32(u32, i32) -> u32;
-	//fn "rv_extract" rv_extract_f32(f32, i32) -> f32;
 	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
 	fn "rv_extract" rv_extract_u32(u32, i32) -> u32;
+	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
+	fn "rv_insert" rv_insert_u32(u32, i32, u32) -> u32;
+	fn "rv_ballot" rv_ballot_u32(bool) -> u32;
 }
 
-fn @cpu_thread(tid: fn (i32) -> u32, idx: Index, body: fn (gpu_thread_context) -> ()) -> () {
+extern "device" {
+    fn "llvm.ctpop.i32"       cpu_popcount_u32(u32) -> i32;
+}
+
+
+fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
+	@|value: i32, src_lane: i32| -> i32 {
+		let mut result:i32 = self as i32; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
+	@|value: u32, src_lane: i32| -> u32 {
+		let mut result:u32 = self; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_u32(value, lane_src_lane);
+			result = rv_insert_u32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @(?width) unroll_reduction_step(mask: i32, width: i32, body: fn(i32) -> ()) -> () {
+	if width > 0 {
+		@@body(mask);
+		unroll_reduction_step(mask << 1, width >> 1, body)
+	}
+}
+
+fn @atomic_red_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32) -> i32 {
+	let shuffle = @|v, l| shuffle_i32(self, vec_width)(v, l as i32);
+
+	@|op, ptr, val, nop, combine| {
+		let active_lane = rv_ballot_u32(true) & (1u << self) != 0u;
+		let mut my_value = if active_lane { val } else { nop };
+
+		for mask in unroll_reduction_step(0x1, vec_width) {
+			let other_value = shuffle(my_value, self ^ mask as u32);
+			my_value = combine(other_value, my_value);
+		}
+
+		let result0 = rv_extract_i32(my_value, 0);
+		let result = atomic(op, ptr, result0, 7u, "");
+
+		result
+	}
+}
+
+fn @atomic_red_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32) -> u32 {
+	let shuffle = @|v, l| shuffle_u32(self, vec_width)(v, l as i32);
+
+	@|op, ptr, val, nop, combine| {
+		let active_lane = rv_ballot_u32(true) & (1u << self) != 0u;
+		let mut my_value = if active_lane { val } else { nop };
+
+		for mask in unroll_reduction_step(0x1, vec_width) {
+			let other_value = shuffle(my_value, self ^ mask as u32);
+			my_value = combine(other_value, my_value);
+		}
+
+		let result0 = rv_extract_u32(my_value, 0);
+		let result = atomic(op, ptr, result0, 7u, "");
+
+		result
+	}
+}
+
+fn @atomic_op_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32, fn(i32, i32)->i32) -> i32 {
+	@|op, ptr, val, nop, combine, extract| {
+		let mut aggregate = 0;
+		let mut intermediate:i32 = self as i32; // self is needed to make result marked as varying
+		let mut old:i32;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = if rv_ballot_u32(true) & (1u << l as u32) != 0u { rv_extract_i32(val, l) } else { nop };
+			intermediate = rv_insert_i32(intermediate, l, aggregate);
+			aggregate = combine(aggregate, lane_val);
+		}
+
+		old = atomic(op, ptr, aggregate, 7u, "");
+
+		extract(old, intermediate)
+	}
+}
+
+fn @atomic_op_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32, fn(u32, u32)->u32) -> u32 {
+	@|op, ptr, val, nop, combine, extract| {
+		let mut aggregate = 0u;
+		let mut intermediate:u32 = self; // self is needed to make result marked as varying
+		let mut old:u32;
+
+		for l in unroll(0, vec_width) {
+			let lane_val = if rv_ballot_u32(true) & (1u << l as u32) != 0u { rv_extract_u32(val, l) } else { nop };
+			intermediate = rv_insert_u32(intermediate, l, aggregate);
+			aggregate = combine(aggregate, lane_val);
+		}
+
+		old = atomic(op, ptr, aggregate, 7u, "");
+
+		extract(old, intermediate)
+	}
+}
+
+fn @cpu_thread(tid: fn (i32) -> u32, num_threads: fn() -> u32, idx: Index, body: fn (gpu_thread_context) -> ()) -> () {
+
+	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let atomic_i32 = atomic_op_i32(self, vec_width);
+	let atomic_u32 = atomic_op_u32(self, vec_width);
+
+	let reduction_i32 = atomic_red_i32(self, vec_width);
+	let reduction_u32 = atomic_red_u32(self, vec_width);
+
+	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
+
 	@@body(gpu_thread_context {
 		idx: tid,
 
@@ -79,68 +201,189 @@ fn @cpu_thread(tid: fn (i32) -> u32, idx: Index, body: fn (gpu_thread_context) -
 		atomic_store_global_u32: @|addr: &mut[1]u32, val: u32| atomic_store(bitcast[&mut u32](addr), val, 7u, ""),
 		atomic_store_global_u64: @|addr: &mut[1]u64, val: u64| atomic_store(bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_add_global_i32: @|addr: &mut[1] i32, val: i32| atomic(1u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_add_global_u32: @|addr: &mut[1] u32, val: u32| atomic(1u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_add_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(1u, bitcast[&mut i32](addr), val,  0, @|a, x| { a + x }, @|b, i| { b + i }),
+		atomic_add_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(1u, bitcast[&mut u32](addr), val, 0u, @|a, x| { a + x }, @|b, i| { b + i }),
 		atomic_add_global_u64: @|addr: &mut[1] u64, val: u64| atomic(1u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_sub_global_i32: @|addr: &mut[1] i32, val: i32| atomic(2u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_sub_global_u32: @|addr: &mut[1] u32, val: u32| atomic(2u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_sub_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(2u, bitcast[&mut i32](addr), val,  0, @|a, x| { a + x }, @|b, i| { b - i }),
+		atomic_sub_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(2u, bitcast[&mut u32](addr), val, 0u, @|a, x| { a + x }, @|b, i| { b - i }),
 		atomic_sub_global_u64: @|addr: &mut[1] u64, val: u64| atomic(2u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_and_global_i32: @|addr: &mut[1] i32, val: i32| atomic(3u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_and_global_u32: @|addr: &mut[1] u32, val: u32| atomic(3u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_and_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(3u, bitcast[&mut i32](addr), val,  0x7fffffff, @|a, x| { a & x }, @|b, i| { b & i }),
+		atomic_and_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(3u, bitcast[&mut u32](addr), val, 0xffffffffu, @|a, x| { a & x }, @|b, i| { b & i }),
 		atomic_and_global_u64: @|addr: &mut[1] u64, val: u64| atomic(3u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_or_global_i32: @|addr: &mut[1] i32, val: i32| atomic(5u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_or_global_u32: @|addr: &mut[1] u32, val: u32| atomic(5u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_or_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(5u, bitcast[&mut i32](addr), val,  0, @|a, x| { a | x }, @|b, i| { b | i }),
+		atomic_or_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(5u, bitcast[&mut u32](addr), val, 0u, @|a, x| { a | x }, @|b, i| { b | i }),
 		atomic_or_global_u64: @|addr: &mut[1] u64, val: u64| atomic(5u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_xor_global_i32: @|addr: &mut[1] i32, val: i32| atomic(6u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_xor_global_u32: @|addr: &mut[1] u32, val: u32| atomic(6u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_xor_global_i32: @|addr: &mut[1] i32, val: i32| atomic_i32(6u, bitcast[&mut i32](addr), val,  0, @|a, x| { a ^ x }, @|b, i| { b ^ i }),
+		atomic_xor_global_u32: @|addr: &mut[1] u32, val: u32| atomic_u32(6u, bitcast[&mut u32](addr), val, 0u, @|a, x| { a ^ x }, @|b, i| { b ^ i }),
 		atomic_xor_global_u64: @|addr: &mut[1] u64, val: u64| atomic(6u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_exch_global_i32: @|addr: &mut[1] i32, val: i32| atomic(0u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| atomic(0u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_exch_global_i32: @|addr: &mut[1] i32, val: i32| -> i32 {
+			/*
+			let mut result:i32 = self as i32; // mark result as varying for rv
+			let lane_mask = (vec_width as u32 - 1u);
+			if rv_ballot_u32(true) & lane_mask == lane_mask {
+				// first shuffle all lanes of warp (left shift) and then atomic_xchg once
+				result = warp_shuffle_i32(val, ((self + 1u) & lane_mask) as i32);
+				let new = rv_extract_i32(val, 0);
+				let old = atomic(0u, bitcast[&mut i32](addr), new, 7u, "");
+				result = rv_insert_i32(result, vec_width - 1, old);
+			} else {
+				for l in unroll(0, vec_width) {
+					if rv_ballot_u32(true) & (1u << l as u32) != 0u {
+						let lane_val = rv_extract_i32(val, l);
+						let old = atomic(0u, bitcast[&mut i32](addr), lane_val, 7u, "");
+						result = rv_insert_i32(result, l, old);
+					}
+				}
+			}
+			result
+			*/
+			let mut val_per_lane:i32 = self as i32; // mark new_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_val = rv_extract_i32(val, l);
+				val_per_lane = rv_insert_i32(val_per_lane, l, lane_val);
+			}
+
+			atomic(0u, bitcast[&mut i32](addr), val_per_lane, 7u, "")
+		},
+		atomic_exch_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
+			/*
+			let mut result:u32 = self; // mark result as varying for rv
+			let lane_mask = (vec_width as u32 - 1u);
+			if rv_ballot_u32(true) & lane_mask == lane_mask {
+				// first shuffle all lanes of warp (left shift) and then atomic_xchg once
+				result = warp_shuffle_u32(val, ((self + 1u) & lane_mask) as i32);
+				let new = rv_extract_u32(val, 0);
+				let old = atomic(0u, bitcast[&mut u32](addr), new, 7u, "");
+				result = rv_insert_u32(result, vec_width - 1, old);
+			} else {
+				for l in unroll(0, vec_width) {
+					if rv_ballot_u32(true) & (1u << l as u32) != 0u {
+						let lane_val = rv_extract_u32(val, l);
+						let old = atomic(0u, bitcast[&mut u32](addr), lane_val, 7u, "");
+						result = rv_insert_u32(result, l, old);
+					}
+				}
+			}
+			result
+			*/
+			let mut val_per_lane:u32 = self; // mark val_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_val = rv_extract_u32(val, l);
+				val_per_lane = rv_insert_u32(val_per_lane, l, lane_val);
+			}
+
+			atomic(0u, bitcast[&mut u32](addr), val_per_lane, 7u, "")
+		},
 		atomic_exch_global_u64: @|addr: &mut[1] u64, val: u64| atomic(0u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| atomic( 8u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| atomic(10u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_min_global_i32: @|addr: &mut[1] i32, val: i32| reduction_i32( 8u, bitcast[&mut i32](addr), val,  0x7fffffff, @|a, b| if a < b { a } else { b }),
+		atomic_min_global_u32: @|addr: &mut[1] u32, val: u32| reduction_u32(10u, bitcast[&mut u32](addr), val, 0xffffffffu, @|a, b| if a < b { a } else { b }),
 		atomic_min_global_u64: @|addr: &mut[1] u64, val: u64| atomic(10u, bitcast[&mut u64](addr), val, 7u, ""),
 
-		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| atomic(7u, bitcast[&mut i32](addr), val, 7u, ""),
-		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| atomic(9u, bitcast[&mut u32](addr), val, 7u, ""),
+		atomic_max_global_i32: @|addr: &mut[1] i32, val: i32| reduction_i32( 7u, bitcast[&mut i32](addr), val, -0x7fffffff, @|a, b| if a > b { a } else { b }),
+		atomic_max_global_u32: @|addr: &mut[1] u32, val: u32| reduction_u32( 9u, bitcast[&mut u32](addr), val,          0u, @|a, b| if a > b { a } else { b }),
 		atomic_max_global_u64: @|addr: &mut[1] u64, val: u64| atomic(9u, bitcast[&mut u64](addr), val, 7u, ""),
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
-		atomic_cas_global_i32: @|addr: &mut[1] i32, cmp: i32, new: i32| cmpxchg(bitcast[&mut i32](addr), cmp, new, 7u, "")(0),
-		atomic_cas_global_u32: @|addr: &mut[1] u32, cmp: u32, new: u32| cmpxchg(bitcast[&mut u32](addr), cmp, new, 7u, "")(0),
+		atomic_cas_global_i32: @|addr: &mut[1] i32, cmp: i32, new: i32| -> i32 {
+			/*
+			let mut result:i32 = self as i32; // mark result as varying for rv
+			for l in unroll(0, vec_width) {
+				if rv_ballot_u32(true) & (1u << l as u32) != 0u {
+					let lane_cmp = rv_extract_i32(cmp, l);
+					let lane_new = rv_extract_i32(new, l);
+					let old = cmpxchg(bitcast[&mut i32](addr), lane_cmp, lane_new, 7u, "");
+					result = rv_insert_i32(result, l, old(0));
+				}
+			}
+			result
+			*/
+			let mut new_per_lane:i32 = self as i32; // mark new_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_new = rv_extract_i32(new, l);
+				new_per_lane = rv_insert_i32(new_per_lane, l, lane_new);
+			}
+
+			let result = cmpxchg(bitcast[&mut i32](addr), cmp, new_per_lane, 7u, "");
+
+			result(0)
+		},
+		atomic_cas_global_u32: @|addr: &mut[1] u32, cmp: u32, new: u32| -> u32 {
+			/*
+			let mut result:u32 = self; // mark result as varying for rv
+			for l in unroll(0, vec_width) {
+				if rv_ballot_u32(true) & (1u << l as u32) != 0u {
+					let lane_cmp = rv_extract_u32(cmp, l);
+					let lane_new = rv_extract_u32(new, l);
+					let old = cmpxchg(bitcast[&mut u32](addr), lane_cmp, lane_new, 7u, "");
+					result = rv_insert_u32(result, l, old(0));
+				}
+			}
+			result
+			*/
+			let mut new_per_lane:u32 = self; // mark new_per_lane as varying for rv
+			for l in unroll(0, vec_width) {
+				let lane_new = rv_extract_u32(new, l);
+				new_per_lane = rv_insert_u32(new_per_lane, l, lane_new);
+			}
+
+			let result = cmpxchg(bitcast[&mut u32](addr), cmp, new_per_lane, 7u, "");
+
+			result(0)
+		},
 		atomic_cas_global_i64: @|addr: &mut[1] u64, cmp: u64, new: u64| cmpxchg(bitcast[&mut u64](addr), cmp, new, 7u, "")(0),
 
 		atomic_inc_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
+			let active_lanes = rv_ballot_u32(true);
+			let num_active_lanes = cpu_popcount_u32(active_lanes) as u32;
+
+			let wrap = val + 1u;
+
+			let mut result:u32 = self; // mark result as varying for rv
+			let mut active_lane = 0u;
 
 			// this is the generic version
+			/*
 			let mut old:u32 = atomic_load(ptr, 7u, "");
 			let mut cmp:bool = false;
+
 			while(!cmp) {
-				let new = if old >= val { 0u } else { old + 1u };
+				let new = if old >= val { num_active_lanes - 1u } else { old + num_active_lanes } % wrap;
 				let res = cmpxchg(ptr, old, new, 7u, "");
 				old = res(0);
 				cmp = res(1);
 			}
 
-			// this is optimized for val being 2**n-1
-			/*
+			for l in unroll(0, vec_width) {
+				if active_lanes & (1u << l as u32) != 0u {
+					result = rv_insert_u32(result, l, (old + active_lane++) % wrap);
+				}
+			}
+			*/
+
+			// this is optimized for wrap being 2**n
+
 			// atomic_add
-			let old:u32 = atomic(1u, ptr, 1u, 7u, "");
+			let old:u32 = atomic(1u, ptr, num_active_lanes, 7u, "");
 			if old >= val {
 				// atomic_and to mask overflow bits
 				// however, we must ensure that addr will not be read outside of this function
 				atomic(3u, ptr, val, 7u, "");
 			}
-			*/
 
-			old
+			for l in unroll(0, vec_width) {
+				if active_lanes & (1u << l as u32) != 0u {
+					result = rv_insert_u32(result, l, (old + active_lane++) & val);
+				}
+			}
+
+			result
 		},
 		atomic_dec_global_u32: @|addr: &mut[1] u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
@@ -175,27 +418,31 @@ fn @cpu_thread(tid: fn (i32) -> u32, idx: Index, body: fn (gpu_thread_context) -
 
 fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn (gpu_wave_context) -> ()) -> () {
 
-	fn @warp_shuffle_i32(value: i32, src_lane: i32) -> i32 {
-		let mut result:i32;
-		for i in unroll(0, num_threads() as i32) {
-			if i == src_lane {
-				result = rv_extract_i32(value, src_lane);
-			}
-		}
-		result
-	}
-
-	fn @warp_shuffle_u32(value: u32, src_lane: i32) -> u32 {
-		let mut result:u32;
-		for i in unroll(0, num_threads() as i32) {
-			if i == src_lane {
-				result = rv_extract_u32(value, src_lane);
-			}
-		}
-		result
-	}
-
 	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
+
+	fn @lanemask_eq() -> u64 {
+		1u64 << self as u64
+	}
+
+	fn @lanemask_lt() -> u64 {
+		let ballot = rv_ballot_u32(true) as u64;
+		let mask = (1u64 << self as u64) - 1u64;
+		mask & ballot
+	}
+
+	fn @lanemask_gt() -> u64 {
+		if (vec_width == 64 && self == 63u) || (vec_width == 32 && self == 31u) {
+			0u64
+		} else {
+			let ballot = rv_ballot_u32(true) as u64;
+			let mask = (!0u64) << (self as u64 + 1u64);
+			mask & ballot
+		}
+	}
 
 	@@body(gpu_wave_context{
 		idx: @|| idx.warp_id,
@@ -203,40 +450,41 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 		membermask: @|| membermask,
 
 		// TODO: return simd_lane
-		threads: @|body| cpu_thread(@|i:i32| idx.local_id, idx, body),
+		threads: @|body| cpu_thread(@|i:i32| self, num_threads, idx, body),
 
 		num_threads: num_threads,
 
 		barrier: @|| { },
 		barrier_all: @|predicate| { rv_all(predicate) },
 		barrier_any: @|predicate| { rv_any(predicate) },
-		barrier_count: @|predicate| { cpu_popcount32(rv_ballot(predicate)) },
-		barrier_vote: @|predicate| { rv_ballot(predicate) as u64 },
+		barrier_count: @|predicate| { cpu_popcount_u32(rv_ballot_u32(predicate)) },
+		barrier_vote: @|predicate| { rv_ballot_u32(predicate) as u64 },
 
-		/* TODO: assert width == num_threads == warp_size */
+		/* TODO: assert width <= num_threads == warp_size */
+		/* TODO: assert width 2^n */
 		shfl_i32: @|x:i32, src_lane:i32, width:u32| { warp_shuffle_i32(x, src_lane) },
 		shfl_u32: @|x:u32, src_lane:i32, width:u32| { warp_shuffle_u32(x, src_lane) },
 		//shfl_f32: @|x:f32, src_lane:i32, width:u32| { undef[f32]() },
 
 		//shfl_up_i32: @|x:i32, delta:u32, width:u32| { rv_shuffle_i32(x, -(delta as i32)) },
 		//shfl_up_u32: @|x:u32, delta:u32, width:u32| { rv_shuffle_u32(x, -(delta as i32)) },
-		shfl_up_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, ((self - delta) & (warp_size - 1u)) as i32) },
-		shfl_up_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, ((self - delta) & (warp_size - 1u)) as i32) },
+		shfl_up_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, if (self & (width - 1u)) < delta { self } else { self - delta } as i32) },
+		shfl_up_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, if (self & (width - 1u)) < delta { self } else { self - delta } as i32) },
 		//shfl_up_f32: @|x:f32, delta:u32, width:u32| { undef[f32]() },
 
-		shfl_down_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, (idx.local_id as i32 + delta as i32)) },
-		shfl_down_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, (idx.local_id as i32 + delta as i32)) },
+		shfl_down_i32: @|x:i32, delta:u32, width:u32| { warp_shuffle_i32(x, if (self & (width - 1u)) + delta >= width { self } else { self + delta } as i32) },
+		shfl_down_u32: @|x:u32, delta:u32, width:u32| { warp_shuffle_u32(x, if (self & (width - 1u)) + delta >= width { self } else { self + delta } as i32) },
 		//shfl_down_f32: @|x:f32, delta:u32, width:u32| { undef[f32]() },
 
-		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, (idx.local_id ^ lane_mask as u32) as i32) },
-		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, (idx.local_id ^ lane_mask as u32) as i32) },
+		shfl_bfly_i32: @|x:i32, lane_mask:i32, width:u32| { warp_shuffle_i32(x, (((self ^ lane_mask as u32) & (width - 1u)) | (self & !(width - 1u))) as i32) },
+		shfl_bfly_u32: @|x:u32, lane_mask:i32, width:u32| { warp_shuffle_u32(x, (((self ^ lane_mask as u32) & (width - 1u)) | (self & !(width - 1u))) as i32) },
 		//shfl_bfly_f32: @|x:f32, lane_mask:i32, width:u32| { undef[f32]() },
 
-		lanemask: @|| 1u64 << idx.local_id as u64,
-		lanemask_le: @|| undef[u64](),
-		lanemask_lt: @|| undef[u64](),
-		lanemask_ge: @|| undef[u64](),
-		lanemask_gt: @|| undef[u64]()
+		lanemask:    @|| { lanemask_eq() },
+		lanemask_le: @|| { lanemask_lt() | lanemask_eq() },
+		lanemask_lt: @|| { lanemask_lt() },
+		lanemask_ge: @|| { lanemask_gt() | lanemask_eq() },
+		lanemask_gt: @|| { lanemask_gt() }
 	});
 }
 
@@ -245,32 +493,32 @@ fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, ad
 		// TODO: dispatch ndim-block_id
 		idx: @|i:i32| idx.block_id,
 		waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
-		threads: @|body| cpu_thread(@|i:i32| idx.warp_id * warp_size + idx.local_id, idx, body),
+		threads: @|body| cpu_thread(@|i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 		num_waves: num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads: @|i:i32| num_threads(),
-		barrier: @|| -> () { fibers_sync_block(idx.block_id as i32); },
+		barrier: @|| -> () { if idx.local_id == 0u { fibers_sync_block(idx.block_id as i32); } },
 		barrier_all: @|predicate:bool| -> bool {
-			let warp_pred = rv_all(predicate) as i32;
+			let warp_pred = if rv_all(predicate) { 1 } else {0 };
 			// atomic_and_global_i32
 			atomic(3u, addr(1), warp_pred, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32); }
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any: @|predicate:bool| -> bool {
-			let warp_pred = rv_any(predicate) as i32;
+			let warp_pred = if rv_any(predicate) { 1 } else {0 };
 			// atomic_or_global_i32
 			atomic(5u, addr(2), warp_pred, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32); }
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count: @|predicate:bool| -> i32 {
-			let warp_count = cpu_popcount32(rv_ballot(predicate));
+			let warp_count = cpu_popcount_u32(rv_ballot_u32(predicate));
 			// atomic_add_global_i32
 			atomic(1u, addr(3), warp_count, 7u, "");
-			fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
+			if idx.local_id == 0u { fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32); }
 			let result = *(addr(0));
 			result
 		},
@@ -293,7 +541,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 	let num_threads = num_blocks * num_threads_per_block;
 
 	// TODO: assert(warp_size/l == vec_width)
-	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(vec_width as i32, body);
+	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(l as i32, body);
 	//let warp_loop = @|l:u32, body: fn(u32)->()| range(0, l as i32, @|i:i32| body(i as u32));
 
 	// we need a buffer to accumulate block level results of barriers
@@ -321,7 +569,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 				device: 0,
 				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
 				waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: idx.block_id, warp_id: idx.block_id * num_warps_per_block + idx.warp_id, local_id: idx.local_id }, body),
-				threads: @|body| cpu_thread(@|i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, idx, body),
+				threads: @|body| cpu_thread(@|i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 				num_groups: @|i:i32| num_blocks,
 				num_waves: @|| num_warps,
 				num_threads: @|i:i32| num_threads

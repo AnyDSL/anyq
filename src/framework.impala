@@ -79,6 +79,23 @@ fn @wrap_dim_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
+fn @print_binary(value: u32) -> () {
+	let group = 4;
+	let length = 16;
+	for j in range_step(1, length + 1, group) {
+		for i in range(j, j + group) {
+			let b = 1u << (length - i) as u32;
+			if value & b == b {
+				print_char('1');
+			} else {
+				print_char('0');
+			}
+		}
+		print_char(' ');
+	}
+}
+
+
 struct AccDevice {
 	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
 	synchronize: fn() -> (),
@@ -99,7 +116,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
 
-	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]() as i64));
+	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]()));
 	*gpu_result = 0u32;
 	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]());
 
@@ -123,7 +140,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]());
 
 			print_string("gpu_result ");
-			print_i32(*gpu_result as i32);
+			print_binary(*gpu_result);
 			print_char('\n');
 			print_string("cpu_result ");
 			print_i32((if cpu_result { 0 } else { 1 }));
@@ -135,6 +152,89 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 			release(device_test_state_alloc);
 
 			result
+		}
+	}
+}
+
+type ReadFn = fn(i32) -> i32;
+type WriteFn = fn(i32, i32) -> ();
+type GlobalFn = fn(i32) -> &mut[1]i32;
+type ValidateFn = fn (fn(i32,i32)->bool, fn(i32,i32)->bool, bool) -> bool;
+
+struct IntrinsicsTest {
+	run_test: fn (fn (ReadFn, WriteFn, GlobalFn, &mut[1]u32) -> bool) -> (),
+	globals: fn(i32) -> i32,
+	locals: fn(i32) -> i32,
+	validate: ValidateFn,
+	finish: fn () -> i32
+}
+
+fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32)->i32, num_locals: i32, init_local: fn(i32)->i32) -> IntrinsicsTest {
+	let additional_mem = ((num_globals + num_locals) * sizeof[i32]() as i32) as u32;
+	let test = createBaseTest(device, additional_mem);
+
+	let buffer = alloc_cpu(additional_mem as i64);
+	let data = bitcast[&mut[i32]](buffer.data);
+
+	let mut validation_result = true;
+
+	IntrinsicsTest {
+		run_test: @|body| {
+			for idx in range(0, num_globals) {
+				data(idx) = init_global(idx);
+			}
+			for idx in range(0, num_locals) {
+				data(num_globals + idx) = init_local(idx);
+			}
+
+			with device_memory, device_failed_flag in test.run_test() {
+				runtime_copy(0, buffer.data, 0i64, device.platform_device, device_memory as &mut[i8], 0i64, additional_mem as i64);
+
+				let read = @|idx:i32| -> i32 { let ptr = bitcast[&[1][i32]](device_memory); ptr(idx + num_globals) };
+				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut[1][i32]](device_memory); ptr(idx + num_globals) = value; };
+				let global = @|idx:i32| -> &mut[1] i32 { let ptr = bitcast[&mut[1][i32]](device_memory); &mut(ptr(idx)) };
+
+				let result = body(read, write, global, device_failed_flag);
+
+				runtime_copy(device.platform_device, device_memory as &mut[i8], 0i64, 0, buffer.data, 0i64, additional_mem as i64);
+
+				result
+			}
+		},
+
+		globals: @|idx| { data(idx) },
+		locals:  @|idx| { data(num_globals + idx) },
+
+		validate: @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| -> bool {
+			let mut result = true;
+
+			for idx in range(0, num_globals) {
+					let check = validate_global(idx, data(idx));
+					if !check {
+						print_string("validation failed! global("); print_i32(idx); print_string(") = "); print_i32(data(idx)); print_char('\n');
+						if stop_on_first_fail { return(false) }
+					}
+					result &= check;
+			}
+			for idx in range(0, num_locals) {
+					let check = validate_local(idx, data(num_globals + idx));
+					if !check {
+						print_string("validation failed! local("); print_i32(idx); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
+						if stop_on_first_fail { return(false) }
+					}
+					result &= check;
+			}
+
+			validation_result &= result;
+
+			result
+		},
+
+		finish: @|| {
+			release(buffer);
+
+			let test_result = test.finish();
+			if !validation_result { -2 } else { test_result }
 		}
 	}
 }

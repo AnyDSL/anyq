@@ -16,12 +16,12 @@ fn main() -> i32 {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_all(thread.idx(0) == i as u32) != false {
-							thread.atomic_exch_global_u32(device_failed_flag, 1u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 0u);
 						}
 					}
 
 					if wave.barrier_all(true) != true {
-						thread.atomic_exch_global_u32(device_failed_flag, 2u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 1u);
 					}
 				}
 			}
@@ -38,12 +38,12 @@ fn main() -> i32 {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_any(thread.idx(0) == i as u32) != true {
-							thread.atomic_exch_global_u32(device_failed_flag, 3u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 2u);
 						}
 					}
 
 					if wave.barrier_any(false) != false {
-						thread.atomic_exch_global_u32(device_failed_flag, 4u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 3u);
 					}
 				}
 			}
@@ -63,12 +63,12 @@ fn main() -> i32 {
 						let expected = (1u64 << i as u64);
 
 						if wave.barrier_vote(thread.idx(0) == i as u32) != expected {
-							thread.atomic_exch_global_u32(device_failed_flag, 5u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 4u);
 						}
 					}
 
 					if wave.barrier_vote(true) != wave.membermask() {
-						thread.atomic_exch_global_u32(device_failed_flag, 6u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 5u);
 					}
 				}
 			}
@@ -85,12 +85,12 @@ fn main() -> i32 {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_count(thread.idx(0) == i as u32) != 1 {
-							thread.atomic_exch_global_u32(device_failed_flag, 7u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 6u);
 						}
 					}
 
 					if wave.barrier_count(true) as u32 != wave.num_threads() {
-						thread.atomic_exch_global_u32(device_failed_flag, 8u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 7u);
 					}
 				}
 			}
@@ -98,7 +98,6 @@ fn main() -> i32 {
 
 		true
 	}
-
 
 	// verify that only all threads trigger group barrier_all
 	with device_memory, device_failed_flag in test.run_test() {
@@ -108,12 +107,12 @@ fn main() -> i32 {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_all(thread.idx(0) == i as u32) != false {
-							thread.atomic_exch_global_u32(device_failed_flag, 10u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 8u);
 						}
 					}
 
 					if group.barrier_all(true) != true {
-						thread.atomic_exch_global_u32(device_failed_flag, 11u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 9u);
 					}
 				}
 			}
@@ -130,12 +129,12 @@ fn main() -> i32 {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_any(thread.idx(0) == i as u32) != true {
-							thread.atomic_exch_global_u32(device_failed_flag, 12u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 10u);
 						}
 					}
 
 					if group.barrier_any(false) != false {
-						thread.atomic_exch_global_u32(device_failed_flag, 13u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 11u);
 					}
 				}
 			}
@@ -152,12 +151,12 @@ fn main() -> i32 {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_count(thread.idx(0) == i as u32) != 1 {
-							thread.atomic_exch_global_u32(device_failed_flag, 14u32);
+							thread.atomic_or_global_u32(device_failed_flag, 1u << 12u);
 						}
 					}
 
 					if group.barrier_count(true) as u32 != group.num_threads(0) {
-						thread.atomic_exch_global_u32(device_failed_flag, 15u32);
+						thread.atomic_or_global_u32(device_failed_flag, 1u << 13u);
 					}
 				}
 			}

@@ -5,6 +5,10 @@ import argparse
 from buildsystem import *
 
 
+def _git_apply_patch(dir, patch):
+	if cmd("git", "-C", dir, "apply", "--check", "--reverse", patch) != 0:
+		git("-C", dir, "apply", "-v", patch)
+
 @component()
 class AnyDSL(Build):
 	def __init__(self, dir, buildsystem):
@@ -22,14 +26,17 @@ class LLVM(Build):
 		self.rv_source_dir = self.source_dir/"rv"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-10.0.0")
-		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/10.x")
+		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-11.0.0-rc2")
+		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules")
 
 	def configure(self, anydsl):
-		patch = anydsl.source_dir/"nvptx_feature_ptx60.patch"
+		patches = [
+			anydsl.source_dir/"nvptx_feature_ptx60.patch",
+			# anydsl.source_dir/"is_trivially_copyable_workaround.patch"
+		]
 
-		if cmd("git", "-C", str(self.source_dir), "apply", "--check", "--reverse", str(patch)) != 0:
-			git("-C", str(self.source_dir), "apply", "-v", str(patch))
+		for patch in patches:
+			_git_apply_patch(self.source_dir, patch)
 
 		self.buildsystem.configure(self.build_dir, self.source_dir/"llvm",
 			 "-DCMAKE_BUILD_TYPE=Release",
@@ -62,7 +69,7 @@ class Thorin(Build):
 		self.half_source_dir = self.source_dir/"half"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="llvm/11.x")
 		pull_svn_dependency(self.half_source_dir, "https://svn.code.sf.net/p/half/code/tags/release-1.11.0")
 
 	def configure(self, llvm):
@@ -86,7 +93,7 @@ class Impala(Build):
 		self.source_dir = dir/"anydsl"/"impala"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/impala.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/impala.git", branch="llvm/11.x")
 
 	def configure(self, thorin):
 		self.buildsystem.configure(self.build_dir, self.source_dir,
@@ -166,16 +173,17 @@ class LPNG(MultiConfigBuild):
 	def build_config(self, build_dir, build_type):
 		ninja("-C", str(build_dir), "install")
 
-@component(depends_on=(ZLIB, LPNG, AnyDSLRuntime))
+@component(depends_on=(ZLIB, LPNG, Thorin, AnyDSLRuntime))
 class AnyQ(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"build")
 		self.source_dir = dir
 
-	def configure(self, zlib, libpng, runtime):
+	def configure(self, zlib, libpng, thorin, runtime):
 		self.buildsystem.configure(self.build_dir, self.source_dir,
 			f"-DZLIB_ROOT={zlib.install_dir}",
 			f"-DPNG_ROOT={libpng.install_dir}",
+			f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
 			f"-DAnyDSL_runtime_DIR={runtime.build_dir/'share'/'anydsl'/'cmake'}"
 		)
 

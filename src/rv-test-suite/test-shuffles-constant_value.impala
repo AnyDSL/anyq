@@ -1,0 +1,20 @@
+
+fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+	let mydata = read(lane);
+
+	let shuffle = shuffle_i32(lane, vec_width);
+
+	let value = shuffle(42, lane ^ 3);
+	let new_data = value + mydata;
+
+	write(lane, new_data);
+}
+
+fn expected_result(data: fn(i32)->i32, global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
+
+	let values = [42, 43, 44, 45, 46, 47, 48, 49];
+	let result = 10;
+
+	(|i| values(i), result)
+}
