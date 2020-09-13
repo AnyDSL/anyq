@@ -31,8 +31,7 @@ class LLVM(Build):
 
 	def configure(self, anydsl):
 		patches = [
-			anydsl.source_dir/"nvptx_feature_ptx60.patch",
-			# anydsl.source_dir/"is_trivially_copyable_workaround.patch"
+			anydsl.source_dir/"nvptx_feature_ptx60.patch"
 		]
 
 		for patch in patches:
