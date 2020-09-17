@@ -68,7 +68,7 @@ class Thorin(Build):
 		self.half_source_dir = self.source_dir/"half"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="llvm/11.x")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="artic+llvm/11.x")
 		pull_svn_dependency(self.half_source_dir, "https://svn.code.sf.net/p/half/code/tags/release-1.11.0")
 
 	def configure(self, llvm):
@@ -86,13 +86,13 @@ class Thorin(Build):
 		ninja("-C", str(self.build_dir), "thorin")
 
 @component(depends_on=(Thorin,))
-class Impala(Build):
+class Artic(Build):
 	def __init__(self, dir, buildsystem):
-		super().__init__(buildsystem, dir/"anydsl"/"build"/"impala")
-		self.source_dir = dir/"anydsl"/"impala"
+		super().__init__(buildsystem, dir/"anydsl"/"build"/"artic")
+		self.source_dir = dir/"anydsl"/"artic"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/impala.git", branch="llvm/11.x")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/artic.git")
 
 	def configure(self, thorin):
 		self.buildsystem.configure(self.build_dir, self.source_dir,
@@ -102,9 +102,9 @@ class Impala(Build):
 		)
 
 	def build(self):
-		ninja("-C", str(self.build_dir), "impala")
+		ninja("-C", str(self.build_dir), "artic")
 
-@component(depends_on=(LLVM, Thorin, Impala))
+@component(depends_on=(LLVM, Thorin, Artic))
 class AnyDSLRuntime(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"anydsl"/"build"/"runtime")
@@ -113,13 +113,13 @@ class AnyDSLRuntime(Build):
 		self.release_dlls = [self.build_dir/'bin'/'runtime.dll']
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git", branch="artic")
 
-	def configure(self, llvm, thorin, impala):
+	def configure(self, llvm, thorin, artic):
 		self.buildsystem.configure(self.build_dir, self.source_dir,
 			 "-DCMAKE_BUILD_TYPE=Release",
 			f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
-			f"-DImpala_DIR:PATH={impala.build_dir/'share'/'anydsl'/'cmake'}",
+			f"-DImpala_DIR:PATH={artic.build_dir/'share'/'anydsl'/'cmake'}",
 			 "-DRUNTIME_JIT=ON",
 			 "-DAnyDSL_runtime_BUILD_SHARED=ON"
 		)
@@ -172,22 +172,23 @@ class LPNG(MultiConfigBuild):
 	def build_config(self, build_dir, build_type):
 		ninja("-C", str(build_dir), "install")
 
-@component(depends_on=(ZLIB, LPNG, Thorin, AnyDSLRuntime))
+@component(depends_on=(ZLIB, LPNG, Thorin, Artic, AnyDSLRuntime))
 class AnyQ(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"build")
 		self.source_dir = dir
 
-	def configure(self, zlib, libpng, thorin, runtime):
+	def configure(self, zlib, libpng, thorin, artic, runtime):
 		self.buildsystem.configure(self.build_dir, self.source_dir,
 			f"-DZLIB_ROOT={zlib.install_dir}",
 			f"-DPNG_ROOT={libpng.install_dir}",
-			f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
+			# f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
+			f"-DArtic_BINARY_DIR:PATH={artic.build_dir/'bin'}",
 			f"-DAnyDSL_runtime_DIR={runtime.build_dir/'share'/'anydsl'/'cmake'}"
 		)
 
 
-dependency_name_map = { "zlib": ZLIB, "libpng": LPNG, "llvm": LLVM, "thorin": Thorin, "impala": Impala, "runtime": AnyDSLRuntime, "anydsl": AnyDSL }
+dependency_name_map = { "zlib": ZLIB, "libpng": LPNG, "llvm": LLVM, "thorin": Thorin, "artic": Artic, "runtime": AnyDSLRuntime, "anydsl": AnyDSL }
 
 def lookup_dependency(name):
 	d = dependency_name_map.get(name)
