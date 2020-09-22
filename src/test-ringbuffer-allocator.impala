@@ -5,12 +5,12 @@ fn main() -> i32 {
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(device, 0u32);
+	let test = createBaseTest(device, 0);
 
 	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
+		with grid, _intrinsics in device.launch_1d(num_groups, group_size) {
 			with thread in grid.threads() {
-				let mut rand_state = xorshift32(((wave.idx() + 23u32) * 42u32) as u32);
+				let mut rand_state = xorshift32(((wave.idx() + 23) * 42) as u32);
 
 				let should_alloc = if rand_state as i32 < 0 { 1 } else { 0 };
 

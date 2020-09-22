@@ -1,22 +1,22 @@
 fn @get_member_mask_u32(size: u32) -> u32 {
-	if size == 32u32 { -1u32 } else { (1u32 << size as u32) - 1u32 }
+	if size == 32 { -1 } else { (1 << size) - 1 }
 }
 
 fn @get_member_mask_u64(size: u32) -> u64 {
-	if size == 64u32 { -1u64 } else { (1u64 << size as u64) - 1u64 }
+	if size == 64 { -1 } else { (1 << size as u64) - 1 }
 }
 
 fn @div_up(a: i32, b: i32) -> i32 {
 	(a + b - 1) / b
 }
 
-type index_wrapper = fn (fn (i32) -> u32) -> fn (i32) -> u32;
-type dim_wrapper = fn (fn (i32) -> u32) -> fn (i32) -> u32;
+type index_wrapper = fn(fn(i32) -> u32) -> fn(i32) -> u32;
+type dim_wrapper = fn(fn(i32) -> u32) -> fn(i32) -> u32;
 
-fn @wrap_index_1d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_index_1d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), _ => 0u32 }
+			match i { 0 => idx(0), _ => 0 }
 		}
 		else {
 			idx(i)
@@ -24,10 +24,10 @@ fn @wrap_index_1d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
-fn @wrap_index_2d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_index_2d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), 1 => idx(1), _ => 0u32 }
+			match i { 0 => idx(0), 1 => idx(1), _ => 0 }
 		}
 		else {
 			idx(i)
@@ -35,10 +35,10 @@ fn @wrap_index_2d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
-fn @wrap_index_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_index_3d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), 1 => idx(1), 2 => idx(2), _ => 0u32 }
+			match i { 0 => idx(0), 1 => idx(1), 2 => idx(2), _ => 0 }
 		}
 		else {
 			idx(i)
@@ -46,10 +46,10 @@ fn @wrap_index_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
-fn @wrap_dim_1d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_dim_1d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), _ => 1u32 }
+			match i { 0 => idx(0), _ => 1 }
 		}
 		else {
 			idx(i)
@@ -57,10 +57,10 @@ fn @wrap_dim_1d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
-fn @wrap_dim_2d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_dim_2d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), 1 => idx(1), _ => 1u32 }
+			match i { 0 => idx(0), 1 => idx(1), _ => 1 }
 		}
 		else {
 			idx(i)
@@ -68,10 +68,10 @@ fn @wrap_dim_2d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
 	}
 }
 
-fn @wrap_dim_3d(idx: fn (i32) -> u32) -> fn (i32) -> u32 {
+fn @wrap_dim_3d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	@|i: i32| -> u32 {
 		if ?i {
-			match i { 0 => idx(0), 1 => idx(1), 2 => idx(2), _ => 1u32 }
+			match i { 0 => idx(0), 1 => idx(1), 2 => idx(2), _ => 1 }
 		}
 		else {
 			idx(i)
@@ -84,7 +84,7 @@ fn @print_binary(value: u32) -> () {
 	let length = 16;
 	for j in range_step(1, length + 1, group) {
 		for i in range(j, j + group) {
-			let b = 1u << (length - i) as u32;
+			let b = 1 << (length - i) as u32;
 			if value & b == b {
 				print_char('1');
 			} else {
@@ -97,7 +97,7 @@ fn @print_binary(value: u32) -> () {
 
 
 struct AccDevice {
-	launch_1d: fn(i32, i32, fn (gpu_grid_context, Intrinsics) -> ()) -> (),
+	launch_1d: fn(fn(gpu_grid_context, Intrinsics) -> ()) -> fn(i32, i32) -> (),
 	synchronize: fn() -> (),
 	alloc: fn(i64) -> Buffer,
 	platform_device: i32,
@@ -106,38 +106,32 @@ struct AccDevice {
 }
 
 struct BaseTest {
-	run_test: fn (fn (&mut[1][i8], &mut[1]u32) -> bool) -> (),
-	finish: fn () -> i32
+	run_test: fn(fn(&mut addrspace(1) [i8], &mut addrspace(1) u32) -> bool) -> fn() -> (),
+	finish: fn() -> i32
 }
 
 fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 	let memory_size = round_up_i64(additional_mem as i64 + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
-	let device_memory = bitcast[&mut[1][i8]](device_test_state_alloc.data);
-	let device_failed_flag = bitcast[&mut[1]u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
+	let device_memory = bitcast[&mut addrspace(1) [i8]](device_test_state_alloc.data);
+	let device_failed_flag = bitcast[&mut addrspace(1) u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
 
 	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]()));
-	*gpu_result = 0u32;
-	runtime_copy(0, gpu_result as &[i8], 0i64, device.platform_device, device_failed_flag as &mut[i8], 0i64, sizeof[u32]());
+	*gpu_result = 0;
+	runtime_copy(0, gpu_result as &[i8], 0, device.platform_device, device_failed_flag as &mut[i8], 0, sizeof[u32]());
 
 
 	let mut cpu_result: bool = true;
 
 	BaseTest {
-		run_test: @|body| {
+		run_test = @|body|@|| {
 			cpu_result = cpu_result & body(device_memory, device_failed_flag);
 		},
 
-		finish: @|| {
+		finish = @|| {
 			device.synchronize();
 
-
-			print_string("gpu_result ");
-			print_i32(*gpu_result as i32);
-			print_string("\ncpu_result ");
-			print_i32((if cpu_result { 0 } else { 1 }));
-
-			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0i64, 0, gpu_result as &mut[i8], 0i64, sizeof[u32]());
+			runtime_copy(device.platform_device, device_failed_flag as &[i8], 0, 0, gpu_result as &mut[i8], 0, sizeof[u32]());
 
 			print_string("gpu_result ");
 			print_binary(*gpu_result);
@@ -146,7 +140,7 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 			print_i32((if cpu_result { 0 } else { 1 }));
 			print_char('\n');
 
-			let result = if cpu_result && *gpu_result == 0u32 { 0 } else { -1 };
+			let result = if cpu_result && *gpu_result == 0 { 0 } else { -1 };
 
 			runtime_release(0, gpu_result as &[i8]);
 			release(device_test_state_alloc);
@@ -158,15 +152,15 @@ fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
 
 type ReadFn = fn(i32) -> i32;
 type WriteFn = fn(i32, i32) -> ();
-type GlobalFn = fn(i32) -> &mut[1]i32;
-type ValidateFn = fn (fn(i32,i32)->bool, fn(i32,i32)->bool, bool) -> bool;
+type GlobalFn = fn(i32) -> &mut addrspace(1) i32;
+type ValidateFn = fn(fn(i32,i32)->bool, fn(i32,i32)->bool, bool) -> bool;
 
 struct IntrinsicsTest {
-	run_test: fn (fn (ReadFn, WriteFn, GlobalFn, &mut[1]u32) -> bool) -> (),
+	run_test: fn(fn(ReadFn, WriteFn, GlobalFn, &mut addrspace(1) u32) -> bool) -> fn() -> (),
 	globals: fn(i32) -> i32,
 	locals: fn(i32) -> i32,
 	validate: ValidateFn,
-	finish: fn () -> i32
+	finish: fn() -> i32
 }
 
 fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32)->i32, num_locals: i32, init_local: fn(i32)->i32) -> IntrinsicsTest {
@@ -179,7 +173,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 	let mut validation_result = true;
 
 	IntrinsicsTest {
-		run_test: @|body| {
+		run_test = @|body|@|| {
 			for idx in range(0, num_globals) {
 				data(idx) = init_global(idx);
 			}
@@ -187,25 +181,25 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 				data(num_globals + idx) = init_local(idx);
 			}
 
-			with device_memory, device_failed_flag in test.run_test() {
-				runtime_copy(0, buffer.data, 0i64, device.platform_device, device_memory as &mut[i8], 0i64, additional_mem as i64);
+			for device_memory, device_failed_flag in test.run_test() {
+				runtime_copy(0, buffer.data, 0, device.platform_device, device_memory as &mut[i8], 0, additional_mem as i64);
 
-				let read = @|idx:i32| -> i32 { let ptr = bitcast[&[1][i32]](device_memory); ptr(idx + num_globals) };
-				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut[1][i32]](device_memory); ptr(idx + num_globals) = value; };
-				let global = @|idx:i32| -> &mut[1] i32 { let ptr = bitcast[&mut[1][i32]](device_memory); &mut(ptr(idx)) };
+				let read = @|idx:i32| -> i32 { let ptr = bitcast[& addrspace(1) [i32]](device_memory); ptr(idx + num_globals) };
+				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut addrspace(1) [i32]](device_memory); ptr(idx + num_globals) = value; };
+				let global = @|idx:i32| -> &mut addrspace(1)  i32 { let ptr = bitcast[&mut addrspace(1) [i32]](device_memory); &mut(ptr(idx)) };
 
 				let result = body(read, write, global, device_failed_flag);
 
-				runtime_copy(device.platform_device, device_memory as &mut[i8], 0i64, 0, buffer.data, 0i64, additional_mem as i64);
+				runtime_copy(device.platform_device, device_memory as &mut[i8], 0, 0, buffer.data, 0, additional_mem as i64);
 
 				result
 			}
 		},
 
-		globals: @|idx| { data(idx) },
-		locals:  @|idx| { data(num_globals + idx) },
+		globals = @|idx| { data(idx) },
+		locals =  @|idx| { data(num_globals + idx) },
 
-		validate: @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| -> bool {
+		validate = @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| -> bool {
 			let mut result = true;
 
 			for idx in range(0, num_globals) {
@@ -230,7 +224,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 			result
 		},
 
-		finish: @|| {
+		finish = @|| {
 			release(buffer);
 
 			let test_result = test.finish();
@@ -241,8 +235,8 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 
 
 struct QueueTest {
-	run_test: fn (i32, fn (ProducerConsumerQueue, &mut[1][i8], &mut[1]u32) -> bool) -> (),
-	finish: fn () -> i32
+	run_test: fn(fn(ProducerConsumerQueue, &mut addrspace(1) [i8], &mut addrspace(1) u32) -> bool) -> fn(i32) -> (),
+	finish: fn() -> i32
 }
 
 fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
@@ -252,27 +246,20 @@ fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
 	// device is a struct from createAccDevice()
 
 	QueueTest {
-		run_test: @|queue_size, body| {
-			with device_memory, device_failed_flag in test.run_test() {
+		run_test = @|body|@|queue_size| {
+			for device_memory, device_failed_flag in test.run_test() {
 				let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 
 				let block_dim = 256;
 				let num_blocks = (queue_size + block_dim - 1) / block_dim;
 
-				with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
+				for grid, _ in device.launch_1d(num_blocks, block_dim) {
 					queue.reset(grid);
 				}
 
-				let mut cpu_result: bool = true;
+				let cpu_result = body(queue, device_memory, device_failed_flag);
 
-				// TODO: properly refactor benchmark
-				//with benchmark_cuda(cuda_device, 32) {
-					if !body(queue, device_memory, device_failed_flag) {
-						cpu_result = false;
-					}
-				//}
-
-				with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
+				for grid, _ in device.launch_1d(num_blocks, block_dim) {
 					queue.validate(device_failed_flag, grid);
 				}
 
@@ -282,7 +269,7 @@ fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
 			}
 		},
 
-		finish: @|| {
+		finish = @|| {
 			test.finish()
 		}
 	}

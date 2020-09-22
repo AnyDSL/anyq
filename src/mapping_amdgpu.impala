@@ -1,17 +1,16 @@
 static amdgpu_device = 1;
 
-extern "device" {
-    fn "llvm.trap" trap() -> ();
-}
+#[import(cc = "device", name = "llvm.trap")]
+fn trap() -> ();
 
 fn @createAccDevice() -> AccDevice {
     AccDevice {
-        launch_1d: @|num_groups, group_size, body| { amdgpu_launch_1d(amdgpu_device, num_groups, group_size, body) },
-        synchronize: || synchronize_hsa(amdgpu_device),
-        alloc: |size| alloc_hsa(amdgpu_device, size),
-        platform_device: runtime_device(3, amdgpu_device),
-        print_i32: @|format: &[u8], arg: i32| { /*trap()*/ },
-        print_i32a: @|format: &[u8], args: &[i32]| { /*trap()*/ }
+        launch_1d = @|num_groups, group_size, body| { amdgpu_launch_1d(amdgpu_device, num_groups, group_size, body) },
+        synchronize = || synchronize_hsa(amdgpu_device),
+        alloc = |size| alloc_hsa(amdgpu_device, size),
+        platform_device = runtime_device(3, amdgpu_device),
+        print_i32 = @|format: &[u8], arg: i32| { /*trap()*/ },
+        print_i32a = @|format: &[u8], args: &[i32]| { /*trap()*/ }
     }
 }
 
@@ -22,97 +21,97 @@ fn @amdgpu_pred(b: bool) -> i32 {
 
 fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {
-        idx: idx,
+        idx = idx,
 
-        atomic_load_global_i32: amdgcn_atomic_load_global_i32,
-        atomic_load_global_u32: amdgcn_atomic_load_global_u32,
-        atomic_load_global_u64: amdgcn_atomic_load_global_u64,
+        atomic_load_global_i32 = amdgcn_atomic_load_global_i32,
+        atomic_load_global_u32 = amdgcn_atomic_load_global_u32,
+        atomic_load_global_u64 = amdgcn_atomic_load_global_u64,
 
-        atomic_store_global_i32: amdgcn_atomic_store_global_i32,
-        atomic_store_global_u32: amdgcn_atomic_store_global_u32,
-        atomic_store_global_u64: amdgcn_atomic_store_global_u64,
+        atomic_store_global_i32 = amdgcn_atomic_store_global_i32,
+        atomic_store_global_u32 = amdgcn_atomic_store_global_u32,
+        atomic_store_global_u64 = amdgcn_atomic_store_global_u64,
 
-        atomic_add_global_i32: amdgcn_atomic_add_global_i32,
-        atomic_add_global_u32: amdgcn_atomic_add_global_u32,
-        atomic_add_global_u64: amdgcn_atomic_add_global_u64,
+        atomic_add_global_i32 = amdgcn_atomic_add_global_i32,
+        atomic_add_global_u32 = amdgcn_atomic_add_global_u32,
+        atomic_add_global_u64 = amdgcn_atomic_add_global_u64,
 
-        atomic_sub_global_i32: amdgcn_atomic_sub_global_i32,
-        atomic_sub_global_u32: amdgcn_atomic_sub_global_u32,
-        atomic_sub_global_u64: amdgcn_atomic_sub_global_u64,
+        atomic_sub_global_i32 = amdgcn_atomic_sub_global_i32,
+        atomic_sub_global_u32 = amdgcn_atomic_sub_global_u32,
+        atomic_sub_global_u64 = amdgcn_atomic_sub_global_u64,
 
-        atomic_and_global_i32: amdgcn_atomic_and_global_i32,
-        atomic_and_global_u32: amdgcn_atomic_and_global_u32,
-        atomic_and_global_u64: amdgcn_atomic_and_global_u64,
+        atomic_and_global_i32 = amdgcn_atomic_and_global_i32,
+        atomic_and_global_u32 = amdgcn_atomic_and_global_u32,
+        atomic_and_global_u64 = amdgcn_atomic_and_global_u64,
 
-        atomic_or_global_i32: amdgcn_atomic_or_global_i32,
-        atomic_or_global_u32: amdgcn_atomic_or_global_u32,
-        atomic_or_global_u64: amdgcn_atomic_or_global_u64,
+        atomic_or_global_i32 = amdgcn_atomic_or_global_i32,
+        atomic_or_global_u32 = amdgcn_atomic_or_global_u32,
+        atomic_or_global_u64 = amdgcn_atomic_or_global_u64,
 
-        atomic_xor_global_i32: amdgcn_atomic_xor_global_i32,
-        atomic_xor_global_u32: amdgcn_atomic_xor_global_u32,
-        atomic_xor_global_u64: amdgcn_atomic_xor_global_u64,
+        atomic_xor_global_i32 = amdgcn_atomic_xor_global_i32,
+        atomic_xor_global_u32 = amdgcn_atomic_xor_global_u32,
+        atomic_xor_global_u64 = amdgcn_atomic_xor_global_u64,
 
-        atomic_exch_global_i32: amdgcn_atomic_exch_global_i32,
-        atomic_exch_global_u32: amdgcn_atomic_exch_global_u32,
-        atomic_exch_global_u64: amdgcn_atomic_exch_global_u64,
+        atomic_exch_global_i32 = amdgcn_atomic_exch_global_i32,
+        atomic_exch_global_u32 = amdgcn_atomic_exch_global_u32,
+        atomic_exch_global_u64 = amdgcn_atomic_exch_global_u64,
 
-        atomic_min_global_i32: amdgcn_atomic_min_global_i32,
-        atomic_min_global_u32: amdgcn_atomic_min_global_u32,
-        atomic_min_global_u64: amdgcn_atomic_min_global_u64,
+        atomic_min_global_i32 = amdgcn_atomic_min_global_i32,
+        atomic_min_global_u32 = amdgcn_atomic_min_global_u32,
+        atomic_min_global_u64 = amdgcn_atomic_min_global_u64,
 
-        atomic_max_global_i32: amdgcn_atomic_max_global_i32,
-        atomic_max_global_u32: amdgcn_atomic_max_global_u32,
-        atomic_max_global_u64: amdgcn_atomic_max_global_u64,
+        atomic_max_global_i32 = amdgcn_atomic_max_global_i32,
+        atomic_max_global_u32 = amdgcn_atomic_max_global_u32,
+        atomic_max_global_u64 = amdgcn_atomic_max_global_u64,
 
-        // atomic_cas_global_u16: amdgcn_atomic_cas_global_u16,
-        atomic_cas_global_i32: amdgcn_atomic_cas_global_i32,
-        atomic_cas_global_u32: amdgcn_atomic_cas_global_u32,
-        atomic_cas_global_i64: amdgcn_atomic_cas_global_u64,
+        // atomic_cas_global_u16 = amdgcn_atomic_cas_global_u16,
+        atomic_cas_global_i32 = amdgcn_atomic_cas_global_i32,
+        atomic_cas_global_u32 = amdgcn_atomic_cas_global_u32,
+        atomic_cas_global_i64 = amdgcn_atomic_cas_global_u64,
 
-        atomic_inc_global_u32: @|addr, val| amdgcn_atomic_inc_global_u32(addr, val, 0u32, 0u32, false),
-        atomic_dec_global_u32: @|addr, val| amdgcn_atomic_dec_global_u32(addr, val, 0u32, 0u32, false),
+        atomic_inc_global_u32 = @|addr, val| amdgcn_atomic_inc_global_u32(addr, val, 0, 0, false),
+        atomic_dec_global_u32 = @|addr, val| amdgcn_atomic_dec_global_u32(addr, val, 0, 0, false),
 
-        yield: @|| amdgcn_s_sleep(0)
+        yield = @|| amdgcn_s_sleep(0)
     });
 }
 
 fn @amdgpu_subwarp(idx: fn()->u32, membermask: u64, num_threads: u32, body: fn(gpu_wave_context)->()) -> () {
     body(gpu_wave_context{
-        idx: idx,
+        idx = idx,
 
-        membermask: @|| membermask,
+        membermask = @|| membermask,
 
-        threads: @|body| amdgpu_thread(@|i| match i { 0 => amdgcn_lane_id() as u32, _ => 0u32 }, body),
+        threads = @|body| amdgpu_thread(@|i| match i { 0 => amdgcn_lane_id() as u32, _ => 0 }, body),
 
-        num_threads: @|| num_threads,
+        num_threads = @|| num_threads,
 
-        barrier:       amdgcn_wave_barrier,
-        barrier_all:   @|predicate| amdgcn_sync_all(amdgpu_pred(predicate)) != 0,
-        barrier_any:   @|predicate| amdgcn_sync_any(amdgpu_pred(predicate)) != 0,
-        barrier_count: @|predicate| amdgcn_sync_count(amdgpu_pred(predicate)),
-        barrier_vote:  @|predicate| amdgcn_sync_vote(amdgpu_pred(predicate)),
+        barrier =       amdgcn_wave_barrier,
+        barrier_all =   @|predicate| amdgcn_sync_all(amdgpu_pred(predicate)) != 0,
+        barrier_any =   @|predicate| amdgcn_sync_any(amdgpu_pred(predicate)) != 0,
+        barrier_count = @|predicate| amdgcn_sync_count(amdgpu_pred(predicate)),
+        barrier_vote =  @|predicate| amdgcn_sync_vote(amdgpu_pred(predicate)),
 
-        shfl_i32: @|var:i32, src_lane:i32, width:u32| amdgcn_shfl_i32(var, src_lane, width as i32),
-        shfl_u32: @|var:u32, src_lane:i32, width:u32| amdgcn_shfl_u32(var, src_lane, width as i32),
-        // shfl_f32: @|var:f32, src_lane:i32, width:u32| amdgcn_shfl_f32(var, src_lane, width as i32),
+        shfl_i32 = @|var:i32, src_lane:i32, width:u32| amdgcn_shfl_i32(var, src_lane, width as i32),
+        shfl_u32 = @|var:u32, src_lane:i32, width:u32| amdgcn_shfl_u32(var, src_lane, width as i32),
+        // shfl_f32 = @|var:f32, src_lane:i32, width:u32| amdgcn_shfl_f32(var, src_lane, width as i32),
 
-        shfl_up_i32: @|var:i32, delta:u32, width:u32| amdgcn_shfl_up_i32(var, delta, width as i32),
-        shfl_up_u32: @|var:u32, delta:u32, width:u32| amdgcn_shfl_up_u32(var, delta, width as i32),
-        // shfl_up_f32: @|var:f32, delta:u32, width:u32| amdgcn_shfl_up_f32(var, delta, width as i32),
+        shfl_up_i32 = @|var:i32, delta:u32, width:u32| amdgcn_shfl_up_i32(var, delta, width as i32),
+        shfl_up_u32 = @|var:u32, delta:u32, width:u32| amdgcn_shfl_up_u32(var, delta, width as i32),
+        // shfl_up_f32 = @|var:f32, delta:u32, width:u32| amdgcn_shfl_up_f32(var, delta, width as i32),
 
-        shfl_down_i32: @|var:i32, delta:u32, width:u32| amdgcn_shfl_down_i32(var, delta, width as i32),
-        shfl_down_u32: @|var:u32, delta:u32, width:u32| amdgcn_shfl_down_u32(var, delta, width as i32),
-        // shfl_down_f32: @|var:f32, delta:u32, width:u32| amdgcn_shfl_down_f32(var, delta, width as i32),
+        shfl_down_i32 = @|var:i32, delta:u32, width:u32| amdgcn_shfl_down_i32(var, delta, width as i32),
+        shfl_down_u32 = @|var:u32, delta:u32, width:u32| amdgcn_shfl_down_u32(var, delta, width as i32),
+        // shfl_down_f32 = @|var:f32, delta:u32, width:u32| amdgcn_shfl_down_f32(var, delta, width as i32),
 
-        shfl_bfly_i32: @|var:i32, lane_mask:i32, width:u32| amdgcn_shfl_xor_i32(var, lane_mask, width as i32),
-        shfl_bfly_u32: @|var:u32, lane_mask:i32, width:u32| amdgcn_shfl_xor_u32(var, lane_mask, width as i32),
-        // shfl_bfly_f32: @|var:f32, lane_mask:i32, width:u32| amdgcn_shfl_xor_f32(var, lane_mask, width as i32),
+        shfl_bfly_i32 = @|var:i32, lane_mask:i32, width:u32| amdgcn_shfl_xor_i32(var, lane_mask, width as i32),
+        shfl_bfly_u32 = @|var:u32, lane_mask:i32, width:u32| amdgcn_shfl_xor_u32(var, lane_mask, width as i32),
+        // shfl_bfly_f32 = @|var:f32, lane_mask:i32, width:u32| amdgcn_shfl_xor_f32(var, lane_mask, width as i32),
 
-        lanemask: amdgcn_lanemask_eq,
-        lanemask_le: amdgcn_lanemask_le,
-        lanemask_lt: amdgcn_lanemask_lt,
-        lanemask_ge: amdgcn_lanemask_ge,
-        lanemask_gt: amdgcn_lanemask_gt
+        lanemask = amdgcn_lanemask_eq,
+        lanemask_le = amdgcn_lanemask_le,
+        lanemask_lt = amdgcn_lanemask_lt,
+        lanemask_ge = amdgcn_lanemask_ge,
+        lanemask_gt = amdgcn_lanemask_gt
     });
 }
 
@@ -125,7 +124,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
         linear_thread_idx() / warp_size
     };
 
-    let num_warps = @|| ((num_threads(0) * num_threads(1) * num_threads(2)) + warp_size - 1u32) / warp_size;
+    let num_warps = @|| ((num_threads(0) * num_threads(1) * num_threads(2)) + warp_size - 1) / warp_size;
 
     fn @amdgcn_barrier_all(p: i32) -> i32 {
         let lds = reserve_shared[i32](num_warps() as i32);
@@ -173,38 +172,38 @@ fn @amdgpu_block(idx: fn(i32)->u32, thread_idx: fn(i32)->u32, num_threads: fn(i3
     }
 
     body(gpu_group_context {
-        idx: idx,
-        waves: @|body| amdgpu_subwarp(warp_idx, get_member_mask_u64(warp_size), warp_size, body),
-        threads: @|body| amdgpu_thread(thread_idx, body),
-        num_waves: num_warps,
-        num_threads: num_threads,
-        barrier: amdgcn_s_barrier,
-        barrier_all: @|predicate| amdgcn_barrier_all(amdgpu_pred(predicate)) != 0,
-        barrier_any: @|predicate| amdgcn_barrier_any(amdgpu_pred(predicate)) != 0,
-        barrier_count: @|predicate| amdgcn_barrier_count(amdgpu_pred(predicate))
+        idx = idx,
+        waves = @|body| amdgpu_subwarp(warp_idx, get_member_mask_u64(warp_size), warp_size, body),
+        threads = @|body| amdgpu_thread(thread_idx, body),
+        num_waves = num_warps,
+        num_threads = num_threads,
+        barrier = amdgcn_s_barrier,
+        barrier_all = @|predicate| amdgcn_barrier_all(amdgpu_pred(predicate)) != 0,
+        barrier_any = @|predicate| amdgcn_barrier_any(amdgpu_pred(predicate)) != 0,
+        barrier_count = @|predicate| amdgcn_barrier_count(amdgpu_pred(predicate))
     })
 }
 
-fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics)->()) -> () {
-    let wavefront_size = 32u32;
+fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, block_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics)->()) -> () {
+    let wavefront_size: u32 = 32;
 
     let num_threads_per_block = wrap_dim(@|i| {
         match i {
-            0 => if ?block_dim(0) { block_dim(0) as u32 } else { bitcast[&[4][u16]](amdgcn_dispatch_ptr())(2) as u32 },
-            1 => if ?block_dim(1) { block_dim(1) as u32 } else { bitcast[&[4][u16]](amdgcn_dispatch_ptr())(3) as u32 },
-            2 => if ?block_dim(2) { block_dim(2) as u32 } else { bitcast[&[4][u16]](amdgcn_dispatch_ptr())(4) as u32 },
-            _ => 1u32
+            0 => if ?block_dim_x { block_dim_x as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(2) as u32 },
+            1 => if ?block_dim_y { block_dim_y as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(3) as u32 },
+            2 => if ?block_dim_z { block_dim_z as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(4) as u32 },
+            _ => 1
         }
     });
 
-    let num_warps_per_block = @|| ((num_threads_per_block(0) * num_threads_per_block(1) * num_threads_per_block(2)) + wavefront_size - 1u32) / wavefront_size;
+    let num_warps_per_block = @|| ((num_threads_per_block(0) * num_threads_per_block(1) * num_threads_per_block(2)) + wavefront_size - 1) / wavefront_size;
 
     let num_blocks = wrap_dim(@|i| {
         match i {
-            0 => if ?grid_dim(0) { grid_dim(0) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(3) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(2) as i32) as u32 },
-            1 => if ?grid_dim(1) { grid_dim(1) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(4) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(3) as i32) as u32 },
-            2 => if ?grid_dim(1) { grid_dim(2) as u32 } else { div_up(bitcast[&[4][u32]](amdgcn_dispatch_ptr())(5) as i32, bitcast[&[4][u16]](amdgcn_dispatch_ptr())(4) as i32) as u32 },
-            _ => 1u32
+            0 => if ?grid_dim_x { grid_dim_x as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(3) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(2) as i32) as u32 },
+            1 => if ?grid_dim_y { grid_dim_y as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(4) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(3) as i32) as u32 },
+            2 => if ?grid_dim_y { grid_dim_z as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(5) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(4) as i32) as u32 },
+            _ => 1
         }
     });
 
@@ -213,13 +212,13 @@ fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, 
     let num_threads = @|i| num_blocks(i) * num_threads_per_block(i);
 
     let block_idx = wrap_index(@|i| {
-        match i { 0 => amdgcn_workgroup_id_x() as u32, 1 => amdgcn_workgroup_id_y() as u32, 2 => amdgcn_workgroup_id_z() as u32, _ => 0u32 }
+        match i { 0 => amdgcn_workgroup_id_x() as u32, 1 => amdgcn_workgroup_id_y() as u32, 2 => amdgcn_workgroup_id_z() as u32, _ => 0 }
     });
 
     let linear_block_idx = @|| (block_idx(2) * num_blocks(1) + block_idx(1)) * num_blocks(0) + block_idx(0);
 
     let thread_idx = wrap_index(@|i| {
-        match i { 0 => amdgcn_workitem_id_x() as u32, 1 => amdgcn_workitem_id_y() as u32, 2 => amdgcn_workitem_id_z() as u32, _ => 0u32 }
+        match i { 0 => amdgcn_workitem_id_x() as u32, 1 => amdgcn_workitem_id_y() as u32, 2 => amdgcn_workitem_id_z() as u32, _ => 0 }
     });
 
     let global_thread_idx = @|i| block_idx(i) * num_threads_per_block(i) + thread_idx(i);
@@ -228,14 +227,14 @@ fn @amdgpu_launch(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, 
 
     let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / wavefront_size;
 
-    amdgpu(device, (grid_dim(0) * block_dim(0), grid_dim(1) * block_dim(1), grid_dim(2) * block_dim(2)), (block_dim(0), block_dim(1), block_dim(2)), @|| body(gpu_grid_context {
-        device:  device,
-        groups:  @|body| amdgpu_block(block_idx, thread_idx, num_threads_per_block, wavefront_size, body),
-        waves:   @|body| amdgpu_subwarp(global_warp_idx, get_member_mask_u64(wavefront_size), wavefront_size, body),
-        threads: @|body| amdgpu_thread(global_thread_idx, body),
-        num_groups:  num_blocks,
-        num_waves:   num_warps,
-        num_threads: num_threads
+    amdgpu(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| body(gpu_grid_context {
+        device =  device,
+        groups =  @|body| amdgpu_block(block_idx, thread_idx, num_threads_per_block, wavefront_size, body),
+        waves =   @|body| amdgpu_subwarp(global_warp_idx, get_member_mask_u64(wavefront_size), wavefront_size, body),
+        threads = @|body| amdgpu_thread(global_thread_idx, body),
+        num_groups =  num_blocks,
+        num_waves =   num_warps,
+        num_threads = num_threads
     }, amdgpu_intrinsics));
 }
 
@@ -244,8 +243,8 @@ fn @amdgpu_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_gr
     synchronize_hsa(amdgpu_device);
 }
 
-fn @amdgpu_launch_2d(device: i32, grid_dim: (i32, i32), block_dim: (i32, i32), body: fn(gpu_grid_context, Intrinsics)->()) -> () {
-    amdgpu_launch(device, (grid_dim(0), grid_dim(1), 1), (block_dim(0), block_dim(1), 1), wrap_index_2d, wrap_dim_2d, body)
+fn @amdgpu_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics)->()) -> () {
+    amdgpu_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
 }
 
 fn @amdgpu_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics)->()) -> () {

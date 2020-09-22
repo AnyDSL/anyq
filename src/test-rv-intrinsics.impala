@@ -124,7 +124,7 @@ fn atomics() -> i32 {
 
 	// broken: constants are uniform resulting in a single atomic with the same constant
 	fn atomic_add_i32_v0(self: i32, ptr: &mut i32, val: i32) -> i32 {
-		atomic(1u, ptr, val, 7u, "")
+		atomic(1, ptr, val, 7, "")
 	}
 
 	// works: vec_width atomics
@@ -133,7 +133,7 @@ fn atomics() -> i32 {
 
 		for l in unroll(0, vec_width) {
 			let lane_val = rv_extract_i32(val, l);
-			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			let lane_res = atomic(1, ptr, lane_val, 7, "");
 			if l == self { result = lane_res; }
 		}
 
@@ -146,7 +146,7 @@ fn atomics() -> i32 {
 
 		for l in unroll(0, vec_width) {
 			let lane_val = if rv_ballot(true) & (1 << l) != 0 { rv_extract_i32(val, l) } else { 0 };
-			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			let lane_res = atomic(1, ptr, lane_val, 7, "");
 			result = rv_insert_i32(result, l, lane_res);
 		}
 
@@ -162,7 +162,7 @@ fn atomics() -> i32 {
 
 		for l in unroll(0, vec_width) {
 			let lane_val = rv_extract_i32(val, l);
-			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			let lane_res = atomic(1, ptr, lane_val, 7, "");
 			intermediate(l) = lane_res;
 			//rv_store_i32(ptr_result, l, lane_res);
 			result = rv_insert_i32(result, l, lane_res);
@@ -182,7 +182,7 @@ fn atomics() -> i32 {
 
 		for l in unroll(0, vec_width) {
 			let lane_val = rv_extract_i32(val, l);
-			let lane_res = atomic(1u, ptr, lane_val, 7u, "");
+			let lane_res = atomic(1, ptr, lane_val, 7, "");
 			//intermediate(l) = lane_res;
 			//rv_store_i32(ptr_result, l, lane_res);
 			if self == l {
@@ -204,7 +204,7 @@ fn atomics() -> i32 {
 			aggregate += lane_val;
 		}
 
-		let old = atomic(1u, ptr, aggregate, 7u, "");
+		let old = atomic(1, ptr, aggregate, 7, "");
 
 		old + intermediate(self)
 	}
@@ -220,7 +220,7 @@ fn atomics() -> i32 {
 			aggregate += lane_val;
 		}
 
-		let old = atomic(1u, ptr, aggregate, 7u, "");
+		let old = atomic(1, ptr, aggregate, 7, "");
 
 		old + intermediate
 	}
@@ -237,7 +237,7 @@ fn atomics() -> i32 {
 			aggregate += lane_val;
 		}
 
-		old = atomic(1u, ptr, aggregate, 7u, "");
+		old = atomic(1, ptr, aggregate, 7, "");
 
 		old + intermediate
 	}
@@ -253,7 +253,7 @@ fn atomics() -> i32 {
 			aggregate += lane_val;
 		}
 
-		old = atomic(1u, ptr, aggregate, 7u, "");
+		old = atomic(1, ptr, aggregate, 7, "");
 
 		old + intermediate
 	}

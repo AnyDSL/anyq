@@ -18,7 +18,7 @@ fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, writ
 fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
 
 	let values = |l| l;
-	let result = |g| if g == 0 { 0xffff0080u as i32 } else { 0 };
+	let result = |g| if g == 0 { 0xffff0080 as i32 } else { 0 };
 
 	(result, values)
 }

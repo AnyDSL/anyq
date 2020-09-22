@@ -18,8 +18,8 @@ fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, writ
 
 			let ptr = bitcast[&mut[1]u32](global(bidx));
 
-			if (thread.idx(0) & 1u) == 0u {
-				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1u) as i32;
+			if (thread.idx(0) & 1) == 0 {
+				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1) as i32;
 
 				write(bidx * block.num_threads(0) as i32 + newdata, -(1 << bidx));
 			}

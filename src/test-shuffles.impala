@@ -1,18 +1,18 @@
 
-
+#[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(device, 0u32);
+	let test = createBaseTest(device, 0);
 
 	// verify that each lane can read from each other lane
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						let iami = if thread.idx(0) == i as u32 {1} else {0};
@@ -20,7 +20,7 @@ fn main() -> i32 {
 						let passed = (x == 1);
 
 						if !passed {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 0u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
 						}
 					}
 				}
@@ -31,17 +31,17 @@ fn main() -> i32 {
 	}
 
 	// verify shuffle up for all possible lane deltas
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						let x = wave.shfl_up_u32(thread.idx(0), i as u32, wave.num_threads());
 						let passed = if thread.idx(0) as i32 - i < 0 { x == thread.idx(0) } else { x == (thread.idx(0) - i as u32) };
 
 						if !passed {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 1u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
 						}
 					}
 				}
@@ -52,17 +52,17 @@ fn main() -> i32 {
 	}
 
 	// verify shuffle down for all possible lane deltas
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						let x = wave.shfl_down_u32(thread.idx(0), i as u32, wave.num_threads());
 						let passed = if thread.idx(0) + i as u32 >= wave.num_threads() { x == thread.idx(0) } else { x == (thread.idx(0) + i as u32) };
 
 						if !passed {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 2u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 2);
 						}
 					}
 				}
@@ -73,17 +73,17 @@ fn main() -> i32 {
 	}
 
 	// verify butterfly shuffle for all possible lane deltas
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						let x = wave.shfl_bfly_u32(thread.idx(0), i, wave.num_threads());
 						let passed = if thread.idx(0) ^ i as u32 >= wave.num_threads() { x == thread.idx(0) } else { x == (thread.idx(0) ^ i as u32) };
 
 						if !passed {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 3u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
 						}
 					}
 				}

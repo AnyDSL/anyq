@@ -6,24 +6,24 @@
 
 struct RingbufferAllocator {
 	acquire: fn(gpu_thread_context, i32) -> ()
-};
+}
 
-fn @createRingbufferAllocator(device: AccDevice, element_size: i32, element_alignment: i32, num_elements: i32) -> RingbufferAllocator {
+fn @createRingbufferAllocator(_device: AccDevice, _element_size: i32, _element_alignment: i32, _num_elements: i32) -> RingbufferAllocator {
 	// let element_stride = max(element_size, element_alignment);
 
 	// let buffer_data_offset = round_up((4 + num_elements) * sizeof[u32](), element_alignment);
 
 	// let queue_device_state_alloc = device.alloc(buffer_data_offset + num_elements * element_stride);
 	// let queue_device_memory = queue_device_state_alloc.data;
-	// let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
+	// let queue_counters = bitcast[&mut addrspace(1) [u32]](queue_device_memory);
 
-	// let next = bitcast[&mut[1]u32](&mut queue_counters(0));
-	// let ref_count = bitcast[&mut[1][u32]](&mut queue_counters(4));
-	// let buffer = bitcast[&mut[1][u8]](&mut queue_counters(buffer_data_offset));
+	// let next = bitcast[&mut addrspace(1) u32](&mut queue_counters(0));
+	// let ref_count = bitcast[&mut addrspace(1) [u32]](&mut queue_counters(4));
+	// let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_counters(buffer_data_offset));
 
 
 	RingbufferAllocator {
-		acquire: @|thread, i| {
+		acquire = @|_thread, _i| {
 
 		},
 
@@ -70,21 +70,21 @@ fn @createRingbufferAllocator(device: AccDevice, element_size: i32, element_alig
 	// 			let idx = thread.idx(0) as i32;
 
 	// 			if idx == 0 {
-	// 				*next = 0u32;
+	// 				*next = 0;
 	// 			}
 
 	// 			for i in range_step(idx, num_elements, grid.num_threads()) {
-	// 				ref_count(i) = 0u32;
+	// 				ref_count(i) = 0;
 	// 			}
 	// 		}
 	// 	},
 
-	// 	validate: @|corrupted: &mut[1]u32, grid| {
-	// 		with thread in grid.threads() {
+	// 	validate: @|corrupted: &mut addrspace(1) u32, grid| {
+	// 		for thread in grid.threads() {
 	// 			let idx = thread.idx(0) as i32;
 	// 			if idx < num_elements {
-	// 				if ref_count(idx) != 0u32 {
-	// 					thread.atomic_or_global_u32(corrupted, 1u32);
+	// 				if ref_count(idx) != 0 {
+	// 					thread.atomic_or_global_u32(corrupted, 1);
 	// 					device.print_i32a("inconsistent ringbuffer allocator state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
 	// 				}
 	// 			}
