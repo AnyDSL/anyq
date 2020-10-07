@@ -1,17 +1,12 @@
-
 static cuda_device = 0;
 
-fn @createAccDevice() -> AccDevice {
-	AccDevice {
-		launch_1d = @|body|@|num_groups, group_size| {
-			cuda_launch_1d(cuda_device, num_groups, group_size, body)
-		},
-		synchronize = || synchronize_cuda(cuda_device),
-		alloc = |size| alloc_cuda(cuda_device, size),
-		platform_device = runtime_device(1, cuda_device),
-		print_i32 = @|format: &[u8], arg: i32| { cuda_vprintf(format, bitcast[&[u8]](&arg)); },
-		print_i32a = @|format: &[u8], args: &[i32]| { cuda_vprintf(format, bitcast[&[u8]](&args(0))); }
-	}
+fn @createAccDevice() = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| cuda_launch_1d(cuda_device, num_groups, group_size, body),
+	synchronize = || synchronize_cuda(cuda_device),
+	alloc = |size| alloc_cuda(cuda_device, size),
+	platform_device = runtime_device(1, cuda_device),
+	print_i32 = @|format: &[u8], arg: i32| { cuda_vprintf(format, bitcast[&[u8]](&arg)); },
+	print_i32a = @|format: &[u8], args: &[i32]| { cuda_vprintf(format, bitcast[&[u8]](&args(0))); }
 }
 
 fn @cuda_pred(b: bool) -> i32 {
@@ -167,7 +162,7 @@ fn @cuda_block(idx: fn(i32) -> u32, thread_idx: fn(i32) -> u32, num_threads: fn(
 	});
 }
 
-fn cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
+fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
@@ -222,14 +217,6 @@ fn cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32),
 	}, cuda_intrinsics));
 }
 
-fn cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@cuda_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
-}
-
-fn cuda_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@cuda_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
-}
-
-fn cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
-}
+fn @cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
+fn @cuda_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
+fn @cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)

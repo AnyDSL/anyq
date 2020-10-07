@@ -1,17 +1,12 @@
-
 static nvvm_device = 0;
 
-fn @createAccDevice() -> AccDevice {
-	AccDevice {
-		launch_1d = @|body|@|num_groups, group_size| {
-			nvvm_launch_1d(nvvm_device, num_groups, group_size, body)
-		},
-		synchronize = || synchronize_cuda(nvvm_device),
-		alloc = |size| alloc_cuda(nvvm_device, size),
-		platform_device = runtime_device(1, nvvm_device),
-		print_i32 = @|format: &[u8], arg: i32| { nvvm_vprintf(format, bitcast[&[u8]](&arg)); },
-		print_i32a = @|format: &[u8], args: &[i32]| { nvvm_vprintf(format, bitcast[&[u8]](&args(0))); }
-	}
+fn @createAccDevice() = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| nvvm_launch_1d(nvvm_device, num_groups, group_size, body),
+	synchronize = || synchronize_cuda(nvvm_device),
+	alloc = |size| alloc_cuda(nvvm_device, size),
+	platform_device = runtime_device(1, nvvm_device),
+	print_i32 = @|format: &[u8], arg: i32| { nvvm_vprintf(format, bitcast[&[u8]](&arg)); },
+	print_i32a = @|format: &[u8], args: &[i32]| { nvvm_vprintf(format, bitcast[&[u8]](&args(0))); }
 }
 
 fn @nvvm_pred(b: bool) -> i32 {
@@ -185,7 +180,7 @@ fn @nvvm_block(idx: fn(i32) -> u32, thread_idx: fn(i32) -> u32, num_threads: fn(
 	});
 }
 
-fn nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
+fn @nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
@@ -240,14 +235,6 @@ fn nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32),
 	}, nvvm_intrinsics));
 }
 
-fn nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@nvvm_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
-}
-
-fn nvvm_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@nvvm_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
-}
-
-fn nvvm_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
-	@nvvm_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
-}
+fn @nvvm_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) = nvvm_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
+fn @nvvm_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = nvvm_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
+fn @nvvm_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = nvvm_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)

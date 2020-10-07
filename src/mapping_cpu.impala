@@ -2,43 +2,41 @@ static cpu_threads = 0;
 //static vec_width = 8;
 static warp_size: u32 = 32;
 
-fn @createAccDevice() -> AccDevice {
-	AccDevice {
-		launch_1d = @|body|@|num_groups, group_size| {
-			cpu_launch_1d(num_groups, group_size, body)
-		},
-		synchronize = @|| { },
-		alloc = @|size| alloc_cpu(size),
-		platform_device = runtime_device(0, 0),
+fn @createAccDevice() = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| {
+		cpu_launch_1d(num_groups, group_size, body)
+	},
+	synchronize = @|| { },
+	alloc = @|size| alloc_cpu(size),
+	platform_device = runtime_device(0, 0),
 
-		print_i32 = @|msg: &[u8], i: i32| {
-			anyq_print_i32a(msg, i, 0);
+	print_i32 = @|msg: &[u8], i: i32| {
+		anyq_print_i32a(msg, i, 0);
 
-			//let active_lanes = rv_ballot(rv_mask());
-			//for j in unroll(0, vec_width as i32) {
-			//	let lane_mask = (1 << j);
-			//	if (active_lanes & lane_mask) == lane_mask {
-			//		let i0 = rv_extract_i32(i, j);
-			//		print_string(msg); print_i32(i0); print_char('\n');
-			//	}
-			//}
-		},
+		//let active_lanes = rv_ballot(rv_mask());
+		//for j in unroll(0, vec_width as i32) {
+		//	let lane_mask = (1 << j);
+		//	if (active_lanes & lane_mask) == lane_mask {
+		//		let i0 = rv_extract_i32(i, j);
+		//		print_string(msg); print_i32(i0); print_char('\n');
+		//	}
+		//}
+	},
 
-		print_i32a = @|format: &[u8], args: &[i32]| {
-			anyq_print_i32a(format, args(0), args(1));
+	print_i32a = @|format: &[u8], args: &[i32]| {
+		anyq_print_i32a(format, args(0), args(1));
 
-			//let active_lanes = rv_ballot(rv_mask());
-			//let num_active_lanes = cpu_popcount32(active_lanes);
-			//print_string("num_active_lanes: "); print_i32(num_active_lanes); print_char('\n');
-			//for j in unroll(0, vec_width as i32) {
-			//	let lane_mask = (1 << j);
-			//	if (active_lanes & lane_mask) == lane_mask {
-			//		let arg0 = rv_extract_i32(args(0), j);
-			//		let arg1 = rv_extract_i32(args(1), j);
-			//		print_string(format); print_i32(arg0); print_char('\n'); print_i32(arg1); print_char('\n');
-			//	}
-			//}
-		}
+		//let active_lanes = rv_ballot(rv_mask());
+		//let num_active_lanes = cpu_popcount32(active_lanes);
+		//print_string("num_active_lanes: "); print_i32(num_active_lanes); print_char('\n');
+		//for j in unroll(0, vec_width as i32) {
+		//	let lane_mask = (1 << j);
+		//	if (active_lanes & lane_mask) == lane_mask {
+		//		let arg0 = rv_extract_i32(args(0), j);
+		//		let arg1 = rv_extract_i32(args(1), j);
+		//		print_string(format); print_i32(arg0); print_char('\n'); print_i32(arg1); print_char('\n');
+		//	}
+		//}
 	}
 }
 
