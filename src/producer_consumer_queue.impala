@@ -1,5 +1,3 @@
-
-
 struct QueueElement {
 	clear: fn() -> (),
 	is_free: fn() -> bool,
@@ -141,7 +139,7 @@ fn indexQueueElementType() -> QueueElementType {
 			let element = &mut bitcast[&mut addrspace(1) [u32]](buffer)(i);
 
 			QueueElement {
-				clear = @|| { *element = FREE; },
+				clear = @|| *element = FREE,
 				is_free = @|| *element == FREE,
 				load = @|sink, thread| {
 					let tryDequeue = @|sink: fn(u32) -> ()| {
@@ -166,7 +164,7 @@ fn indexQueueElementType() -> QueueElementType {
 					}
 				},
 				debug_print = @|device| {
-					device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, element as i32]);
+					device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, *element as i32]);
 				}
 			}
 		}

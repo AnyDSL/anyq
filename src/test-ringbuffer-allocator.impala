@@ -1,4 +1,4 @@
-
+#[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 
@@ -7,18 +7,17 @@ fn main() -> i32 {
 
 	let test = createBaseTest(device, 0);
 
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, _intrinsics in device.launch_1d(num_groups, group_size) {
-			with thread in grid.threads() {
+	for device_memory, device_failed_flag in test.run_test() {
+		for grid, _intrinsics in device.launch_1d(num_groups, group_size) {
+			for thread in grid.threads() {
 				let mut rand_state = xorshift32(((wave.idx() + 23) * 42) as u32);
 
 				let should_alloc = if rand_state as i32 < 0 { 1 } else { 0 };
-
-
 			}
 		}
 
 		true
 	}
 
+	0
 }

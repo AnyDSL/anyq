@@ -1,4 +1,4 @@
-
+#[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 

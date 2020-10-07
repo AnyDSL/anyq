@@ -1,7 +1,5 @@
-
-
 type Sink = fn(u32) -> ();
-type source = fn(Sink) -> bool;
+type Source = fn(Sink) -> bool;
 
 struct Stage {
 	produce: fn(Sink) -> ()
@@ -74,7 +72,7 @@ fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
 	}
 }
 
-// fn pipeline(source: WorkDistribution) -> {
+// fn pipeline(Source: WorkDistribution) -> {
 
 // }
 

@@ -1,15 +1,11 @@
+#[import(cc = "C", name = "rv_load")]    fn rv_load_i32(&[i32], i32) -> i32;
+#[import(cc = "C", name = "rv_store")]   fn rv_store_i32(&[i32], i32, i32) -> ();
+#[import(cc = "C", name = "rv_align")]   fn rv_align_i8(&[i8], i32)-> &[i8];
+#[import(cc = "C", name = "rv_insert")]  fn rv_insert_i32(i32, i32, i32) -> i32;
+#[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;
 
-extern "C" {
-	fn "rv_load" rv_load_i32(&[i32], i32) -> i32;
-	fn "rv_store" rv_store_i32(&[i32], i32, i32) -> ();
-	fn "rv_align" rv_align_i8(&[i8], i32)-> &[i8];
-	fn "rv_insert" rv_insert_i32(i32, i32, i32) -> i32;
-	fn "rv_extract" rv_extract_i32(i32, i32) -> i32;
-}
-
-
+#[export]
 fn main() -> i32 {
-
 	let warp_size = 8;
 	// works for values atleast up to 128
 	let vec_width = warp_size;
@@ -27,21 +23,19 @@ fn main() -> i32 {
 
 	let read = @|i:i32| data(i);
 	let write = @|i:i32, val:i32| data(i) = val;
-	let global = @|i:i32| ptr;
+	let global = @|_i:i32| ptr;
 
-	for j in vectorize(vec_width) {
-		loop_body(j, vec_width, read, write, global);
-	}
+	vectorize(vec_width, |j| loop_body(j, vec_width, read, write, global));
 
-	let expected = expected_result(read, global);
+	let (expected_global, expected_local) = expected_result(read, global);
 	let mut passed = true;
 
 	print_string("value: "); print_i32(value); print_char('\n');
-	passed &= (value == expected(1));
+	passed &= (value == expected_local);
 
 	for i in range(0, warp_size) {
 		print_i32(i); print_string(": "); print_i32(data(i)); print_string("\n");
-		let expected_value = expected(0);
+		let expected_value = expected_global;
 		passed &= (expected_value(i) == data(i));
 	}
 

@@ -1,6 +1,4 @@
-
-fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
-
+fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), _global: fn(i32)->&mut i32) -> () {
 	let mydata = read(lane);
 
 	let shuffle = shuffle_i32(lane, vec_width);
@@ -10,8 +8,7 @@ fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)
 	write(lane, new_data);
 }
 
-fn expected_result(data: fn(i32)->i32, global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
-
+fn expected_result(_data: fn(i32)->i32, _global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
 	let values = [7, 6, 5, 4, 3, 2, 1, 0];
 	let result = 10;
 

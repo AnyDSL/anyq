@@ -1,13 +1,11 @@
-
-fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
-	let global = @|g| { 0 };
-	let local  = @|l| { l };
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| l;
 	(global, local)
 }
 
-fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
-
-	with thread in grid.threads() {
+fn @test_body(grid: gpu_grid_context, _intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for thread in grid.threads() {
 		let mydata = read(thread.idx(0) as i32);
 
 		let i = (mydata >> 7) & 0x3;
@@ -19,13 +17,11 @@ fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, writ
 
 		write(thread.idx(0) as i32, mydata + 1);
 	}
-
 }
 
-fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-
-	let values = |l| l + 1;
-	let result = |g| match g { 0 => 0x7e, 1 => 0xfe, 2 => 0x017e, 3 => 0x01fe, _ => 0 };
+fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let values = |l: i32| l + 1;
+	let result = |g: i32| match g { 0 => 0x7e, 1 => 0xfe, 2 => 0x017e, 3 => 0x01fe, _ => 0 };
 
 	(result, values)
 }

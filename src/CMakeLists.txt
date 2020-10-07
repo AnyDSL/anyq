@@ -5,7 +5,7 @@ function(offline_graph _target)
 	list(FILTER _infiles INCLUDE REGEX "[.]impala$")
 	anydsl_runtime_wrap(_${_target}_PROGRAM
 		CLANG_FLAGS -march=native
-		IMPALA_FLAGS --log-level info
+		IMPALA_FLAGS --log-level info --max-errors 5
 		NAME ${_target}
 		FILES ${_infiles})
 
@@ -69,10 +69,10 @@ set(TEST_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	list(APPEND TEST_PLATFORMS cuda nvvm)
-	add_schedule_test(test-ringbuffer-allocator.impala cuda)
-	add_schedule_test(test-ringbuffer-allocator.impala nvvm)
-	add_schedule_test(test-pipeline.impala cuda)
-	add_schedule_test(test-pipeline.impala nvvm)
+    add_schedule_test(test-ringbuffer-allocator.impala cuda)
+    add_schedule_test(test-ringbuffer-allocator.impala nvvm)
+    add_schedule_test(test-pipeline.impala cuda)
+    add_schedule_test(test-pipeline.impala nvvm)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
