@@ -9,7 +9,7 @@ fn @createAccDevice() = AccDevice {
     platform_device = runtime_device(3, amdgpu_device),
     print_i32 = @|_format: &[u8], _arg: i32| { /*trap()*/ },
     print_i32a = @|_format: &[u8], _args: &[i32]| { /*trap()*/ }
-}
+};
 
 
 fn @amdgpu_pred(b: bool) -> i32 {
@@ -229,6 +229,6 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
     }, amdgpu_intrinsics));
 }
 
-fn @amdgpu_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body)
-fn @amdgpu_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body)
-fn @amdgpu_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body)
+fn @amdgpu_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body);
+fn @amdgpu_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body);
+fn @amdgpu_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics)->()) = amdgpu_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body);
