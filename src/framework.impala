@@ -263,6 +263,7 @@ fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
 					queue.validate(device_failed_flag, grid);
 				}
 
+				device.synchronize();
 				queue.release();
 
 				cpu_result
