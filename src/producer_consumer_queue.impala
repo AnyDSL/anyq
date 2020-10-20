@@ -129,48 +129,43 @@ fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: Queue
 	}
 }
 
-fn indexQueueElementType() -> QueueElementType {
-	let FREE: u32 = -1;
+fn @indexQueueElementType() = QueueElementType {
+	buffer_size = @|num_elements| num_elements as i64 * sizeof[u32](),
+	buffer_alignment = @|| alignof[u32](),
+	buffer_element = @|buffer, i| {
+		let element = &mut bitcast[&mut addrspace(1) [u32]](buffer)(i);
+		let FREE: u32 = -1;
 
-	QueueElementType {
-		buffer_size = @|num_elements| num_elements as i64 * sizeof[u32](),
-		buffer_alignment = @|| alignof[u32](),
-		buffer_element = @|buffer, i| {
-			let element = &mut bitcast[&mut addrspace(1) [u32]](buffer)(i);
-
-			QueueElement {
-				clear = @|| *element = FREE,
-				is_free = @|| *element == FREE,
-				load = @|sink, thread| {
-					let tryDequeue = @|sink: fn(u32) -> ()| {
-						let el = thread.atomic_exch_global_u32(element, FREE);
-						if el != FREE {
-							sink(el);
-							true
-						}
-						else {
-							false
-						}
-					};
-
-					while !tryDequeue(@|el| sink(el, i)) {
-						thread.yield();
+		QueueElement {
+			clear = @|| *element = FREE,
+			is_free = @|| *element == FREE,
+			load = @|sink, thread| {
+				let tryDequeue = @|sink: fn(u32) -> ()| {
+					let el = thread.atomic_exch_global_u32(element, FREE);
+					if el != FREE {
+						sink(el);
+						true
 					}
-				},
-				store = @|source, thread| {
-					let value = source(i);
-					while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
-						thread.yield();
+					else {
+						false
 					}
-				},
-				debug_print = @|device| {
-					device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, *element as i32]);
+				};
+
+				while !tryDequeue(@|el| sink(el, i)) {
+					thread.yield();
 				}
+			},
+			store = @|source, thread| {
+				let value = source(i);
+				while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
+					thread.yield();
+				}
+			},
+			debug_print = @|device| {
+				device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, *element as i32]);
 			}
 		}
 	}
-}
+};
 
-fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) -> ProducerConsumerQueue {
-	createConcurrentProducerConsumerQueue(device, indexQueueElementType(), num_elements)
-}
+fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue(device, indexQueueElementType(), num_elements);
