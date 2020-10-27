@@ -1,0 +1,8 @@
+// works: various atomics depending on RV
+fn @atomic_add_i32(self: i32, vec_width: i32) -> fn(&mut i32, i32) -> i32 {
+	|ptr, val| {
+		let old = atomic(1u, ptr, val, 7u, "");
+
+		old
+	}
+}
