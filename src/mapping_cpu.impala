@@ -2,6 +2,7 @@
 static cpu_threads = 0;
 //static vec_width = 8u;
 static warp_size = 8u;
+static num_blocks_in_flight = 256;
 
 fn @createAccDevice() -> AccDevice {
 	AccDevice {
@@ -510,10 +511,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn () -> u32, idx: Index, body: fn
 	});
 }
 
-fn @cpu_block(num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn (gpu_group_context) -> ()) -> () {
+fn @cpu_block(logical_block_id: u32, num_warps: fn () -> u32, num_threads: fn () -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn (gpu_group_context) -> ()) -> () {
 	@@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
-		idx: @|i:i32| idx.block_id,
+		idx: @|i:i32| logical_block_id,
 		waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
 		threads: @|body| cpu_thread(@|i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 		num_waves: num_warps,
@@ -561,6 +562,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 	let num_blocks = grid_dim as u32;
 	let num_warps = num_blocks * num_warps_per_block;
 	let num_threads = num_blocks * num_threads_per_block;
+	let num_blocks_in_flight = min(grid_dim, num_blocks_in_flight);
 
 	// TODO: assert(warp_size/l == vec_width)
 	let warp_loop = @|l:u32, body: fn(i32)->()| vectorize(l as i32, body);
@@ -568,35 +570,39 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn (gpu_grid_context, Int
 
 	// we need a buffer to accumulate block level results of barriers
 	let num_block_variables = 4; // output, all, any, count
-	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks as i64 * sizeof[i32]());
+	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks_in_flight as i64 * sizeof[i32]());
 	let addr = bitcast[&mut[i32]](block_pred_buffer.data);
 
 	// reset all variables
-	for i in range(0, num_blocks as i32) {
+	for i in range(0, num_blocks_in_flight) {
 		addr(num_block_variables*i + 1) = 1;
 		addr(num_block_variables*i + 2) = 0;
 		addr(num_block_variables*i + 3) = 0;
 	}
 
-	for block_id, warp_id in fibers(cpu_threads, num_blocks as i32, num_warps_per_block as i32) {
+	for block_id, warp_id in fibers(cpu_threads, num_blocks_in_flight, num_warps_per_block as i32) {
 
-		for local_id in warp_loop(warp_size) {
-			let idx = Index {
-				block_id: block_id as u32,
-				 warp_id:  warp_id as u32,
-				local_id: local_id as u32,
-			};
+		for logical_block_id in range_step(block_id, num_blocks as i32, num_blocks_in_flight) {
 
-			let context = gpu_grid_context {
-				device: 0,
-				groups: @|body| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
-				waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: idx.block_id, warp_id: idx.block_id * num_warps_per_block + idx.warp_id, local_id: idx.local_id }, body),
-				threads: @|body| cpu_thread(@|i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
-				num_groups: @|i:i32| num_blocks,
-				num_waves: @|| num_warps,
-				num_threads: @|i:i32| num_threads
-			};
-			@@body(context, cpu_intrinsics)
+			for local_id in warp_loop(warp_size) {
+				let idx = Index {
+					block_id: block_id as u32,
+					 warp_id:  warp_id as u32,
+					local_id: local_id as u32,
+				};
+
+				let context = gpu_grid_context {
+					device: 0,
+					groups: @|body| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
+					waves: @|body| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id: logical_block_id as u32, warp_id: logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id: idx.local_id }, body),
+					threads: @|body| cpu_thread(@|i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
+					num_groups: @|i:i32| num_blocks,
+					num_waves: @|| num_warps,
+					num_threads: @|i:i32| num_threads
+				};
+				@@body(context, cpu_intrinsics)
+			}
+
 		}
 
 	}
