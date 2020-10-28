@@ -1,5 +1,5 @@
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
-	let mydata = read(lane);
+	let _mydata = read(lane);
 
 	let atomic_add = atomic_add_i32(lane, vec_width);
 

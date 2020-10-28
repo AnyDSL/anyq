@@ -1,6 +1,7 @@
 static cpu_threads = 0;
-//static vec_width = 8;
-static warp_size: u32 = 32;
+//static vec_width = 8u;
+static warp_size:u32 = 8;
+static num_blocks_in_flight:i32 = 256;
 
 fn @createAccDevice() = AccDevice {
 	launch_1d = @|body|@|num_groups, group_size| {
@@ -171,14 +172,14 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
-	let atomic_i32 = atomic_op_i32(self, vec_width);
-	let atomic_u32 = atomic_op_u32(self, vec_width);
+	let _atomic_i32 = atomic_op_i32(self, vec_width);
+	let _atomic_u32 = atomic_op_u32(self, vec_width);
 
-	let reduction_i32 = atomic_red_i32(self, vec_width);
-	let reduction_u32 = atomic_red_u32(self, vec_width);
+	let _reduction_i32 = atomic_red_i32(self, vec_width);
+	let _reduction_u32 = atomic_red_u32(self, vec_width);
 
-	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
-	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
+	let _warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	let _warp_shuffle_u32 = shuffle_u32(self, vec_width);
 
 	@body(gpu_thread_context {
 		idx = tid,
@@ -191,24 +192,24 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 		atomic_store_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_store[u32](bitcast[&mut u32](addr), val, 7, ""),
 		atomic_store_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic_store[u64](bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_add_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_i32 (1, bitcast[&mut i32](addr), val, 0, @|a, x| a + x, @|b, i| b + i),
-		atomic_add_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_u32 (1, bitcast[&mut u32](addr), val, 0, @|a, x| a + x, @|b, i| b + i),
+		atomic_add_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](1, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_add_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](1, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_add_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](1, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_sub_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_i32 (2, bitcast[&mut i32](addr), val, 0, @|a, x| a + x, @|b, i| b - i),
-		atomic_sub_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_u32 (2, bitcast[&mut u32](addr), val, 0, @|a, x| a + x, @|b, i| b - i),
+		atomic_sub_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](2, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_sub_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](2, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_sub_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](2, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_and_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_i32 (3, bitcast[&mut i32](addr), val, 0x7fffffff, @|a, x| a & x, @|b, i| b & i),
-		atomic_and_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_u32 (3, bitcast[&mut u32](addr), val, 0xffffffff, @|a, x| a & x, @|b, i| b & i),
+		atomic_and_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](3, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_and_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](3, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_and_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](3, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_or_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_i32 (5, bitcast[&mut i32](addr), val, 0, @|a, x| a | x, @|b, i| b | i),
-		atomic_or_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_u32 (5, bitcast[&mut u32](addr), val, 0, @|a, x| a | x, @|b, i| b | i),
+		atomic_or_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](5, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_or_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](5, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_or_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](5, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_xor_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_i32 (6, bitcast[&mut i32](addr), val, 0, @|a, x| a ^ x, @|b, i| b ^ i),
-		atomic_xor_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_u32 (6, bitcast[&mut u32](addr), val, 0, @|a, x| a ^ x, @|b, i| b ^ i),
+		atomic_xor_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](6, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_xor_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](6, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_xor_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](6, bitcast[&mut u64](addr), val, 7, ""),
 
 		atomic_exch_global_i32 = @|addr: &mut addrspace(1)  i32, val: i32| -> i32 {
@@ -232,6 +233,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 			result
 			*/
+			/*
 			let mut val_per_lane:i32 = self as i32; // mark new_per_lane as varying for rv
 			for l in unroll(0, vec_width) {
 				let lane_val = rv_extract_i32(val, l);
@@ -239,6 +241,8 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			atomic[i32](0, bitcast[&mut i32](addr), val_per_lane, 7, "")
+			*/
+			atomic[i32](0, bitcast[&mut i32](addr), val, 7, "")
 		},
 		atomic_exch_global_u32 = @|addr: &mut addrspace(1)  u32, val: u32| -> u32 {
 			/*
@@ -261,6 +265,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 			result
 			*/
+			/*
 			let mut val_per_lane:u32 = self; // mark val_per_lane as varying for rv
 			for l in unroll(0, vec_width) {
 				let lane_val = rv_extract_u32(val, l);
@@ -268,19 +273,21 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			atomic[u32](0, bitcast[&mut u32](addr), val_per_lane, 7, "")
+			*/
+			atomic[u32](0, bitcast[&mut u32](addr), val, 7, "")
 		},
 		atomic_exch_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](0, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_min_global_i32 = @|addr: &mut addrspace(1)  i32, val: i32| reduction_i32( 8, bitcast[&mut i32](addr), val, 0x7fffffff, @|a, b| if a < b { a } else { b }),
-		atomic_min_global_u32 = @|addr: &mut addrspace(1)  u32, val: u32| reduction_u32(10, bitcast[&mut u32](addr), val, 0xffffffff, @|a, b| if a < b { a } else { b }),
-		atomic_min_global_u64 = @|addr: &mut addrspace(1)  u64, val: u64| atomic[u64](10, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_min_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32]( 8, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_min_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](10, bitcast[&mut u32](addr), val, 7, ""),
+		atomic_min_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](10, bitcast[&mut u64](addr), val, 7, ""),
 
-		atomic_max_global_i32 = @|addr: &mut addrspace(1)  i32, val: i32| reduction_i32( 7, bitcast[&mut i32](addr), val, -0x7fffffff, @|a, b| if a > b { a } else { b }),
-		atomic_max_global_u32 = @|addr: &mut addrspace(1)  u32, val: u32| reduction_u32( 9, bitcast[&mut u32](addr), val,           0, @|a, b| if a > b { a } else { b }),
-		atomic_max_global_u64 = @|addr: &mut addrspace(1)  u64, val: u64| atomic[u64](9, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_max_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32]( 7, bitcast[&mut i32](addr), val, 7, ""),
+		atomic_max_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32]( 9, bitcast[&mut u32](addr), val, 7, ""),
+		atomic_max_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64]( 9, bitcast[&mut u64](addr), val, 7, ""),
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
-		atomic_cas_global_i32 = @|addr: &mut addrspace(1)  i32, cmp: i32, new: i32| -> i32 {
+		atomic_cas_global_i32 = @|addr: &mut addrspace(1) i32, cmp: i32, new: i32| -> i32 {
 			/*
 			let mut result:i32 = self as i32; // mark result as varying for rv
 			for l in unroll(0, vec_width) {
@@ -293,6 +300,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 			result
 			*/
+			/*
 			let mut new_per_lane:i32 = self as i32; // mark new_per_lane as varying for rv
 			for l in unroll(0, vec_width) {
 				let lane_new = rv_extract_i32(new, l);
@@ -300,6 +308,8 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			match cmpxchg[i32](bitcast[&mut i32](addr), cmp, new_per_lane, 7, "") { (old, _success) => old }
+			*/
+			match cmpxchg[i32](bitcast[&mut i32](addr), cmp, new, 7, "") { (old, _success) => old }
 		},
 		atomic_cas_global_u32 = @|addr: &mut addrspace(1) u32, cmp: u32, new: u32| -> u32 {
 			/*
@@ -314,6 +324,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 			result
 			*/
+			/*
 			let mut new_per_lane:u32 = self; // mark new_per_lane as varying for rv
 			for l in unroll(0, vec_width) {
 				let lane_new = rv_extract_u32(new, l);
@@ -321,17 +332,19 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			match cmpxchg[u32](bitcast[&mut u32](addr), cmp, new_per_lane, 7, "") { (old, _success) => old }
+			*/
+			match cmpxchg[u32](bitcast[&mut u32](addr), cmp, new, 7, "") { (old, _success) => old }
 		},
 		atomic_cas_global_i64 = @|addr: &mut addrspace(1) u64, cmp: u64, new: u64| match cmpxchg[u64](bitcast[&mut u64](addr), cmp, new, 7, "") { (old, _success) => old },
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
 			let active_lanes = rv_ballot_u32(true);
-			let num_active_lanes = cpu_popcount_u32(active_lanes) as u32;
+			let _num_active_lanes = cpu_popcount_u32(active_lanes) as u32;
 
-			let wrap = val + 1;
+			let _wrap = val + 1;
 
 			let mut result:u32 = self; // mark result as varying for rv
-			let mut active_lane:u32 = 0;
+			//let mut active_lane:u32 = 0;
 
 			// this is the generic version
 			/*
@@ -353,7 +366,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			*/
 
 			// this is optimized for wrap being 2**n
-
+			/*
 			// atomic_add
 			let old:u32 = atomic[u32](1, ptr, num_active_lanes, 7, "");
 			if old >= val {
@@ -367,6 +380,14 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 					result = rv_insert_u32(result, l, (old + active_lane++) & val);
 				}
 			}
+			*/
+			let old:u32 = atomic[u32](1, ptr, 1, 7, "");
+			if old >= val {
+				// atomic_and to mask overflow bits
+				// however, we must ensure that addr will not be read outside of this function
+				atomic[u32](3, ptr, val, 7, "");
+			}
+			result = old & val;
 
 			result
 		},
@@ -473,10 +494,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(
 	});
 }
 
-fn @cpu_block(num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
+fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
 	@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
-		idx = @|_i:i32| idx.block_id,
+		idx = @|_i:i32| logical_block_id,
 		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
 		threads = @|body| @|| cpu_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 		num_waves = num_warps,
@@ -485,25 +506,31 @@ fn @cpu_block(num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr
 		barrier = @|| -> () { if idx.local_id == 0 { fibers_sync_block(idx.block_id as i32); } },
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if rv_all(predicate) { 1 } else {0 };
-			// atomic_and_global_i32
-			atomic[i32](3, addr(1), warp_pred, 7, "");
-			if idx.local_id == 0 { fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32); }
+			if idx.local_id == 0 {
+				// atomic_and_global_i32
+				atomic[i32](3, addr(1), warp_pred, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
+			}
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any = @|predicate:bool| -> bool {
 			let warp_pred = if rv_any(predicate) { 1 } else {0 };
-			// atomic_or_global_i32
-			atomic[i32](5, addr(2), warp_pred, 7, "");
-			if idx.local_id == 0 { fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32); }
+			if idx.local_id == 0 {
+				// atomic_or_global_i32
+				atomic[i32](5, addr(2), warp_pred, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
+			}
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count = @|predicate:bool| -> i32 {
 			let warp_count = cpu_popcount_u32(rv_ballot_u32(predicate));
-			// atomic_add_global_i32
-			atomic[i32](1, addr(3), warp_count, 7, "");
-			if idx.local_id == 0 { fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32); }
+			if idx.local_id == 0 {
+				// atomic_add_global_i32
+				atomic[i32](1, addr(3), warp_count, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
+			}
 			let result = *(addr(0));
 			result
 		},
@@ -524,6 +551,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intr
 	let num_blocks = grid_dim as u32;
 	let num_warps = num_blocks * num_warps_per_block;
 	let num_threads = num_blocks * num_threads_per_block;
+	let num_blocks_in_flight = min(grid_dim, num_blocks_in_flight);
 
 	// TODO: assert(warp_size/l == vec_width)
 	fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
@@ -531,34 +559,38 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intr
 
 	// we need a buffer to accumulate block level results of barriers
 	let num_block_variables = 4; // output, all, any, count
-	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks as i64 * sizeof[i32]());
+	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks_in_flight as i64 * sizeof[i32]());
 	let addr = bitcast[&mut[i32]](block_pred_buffer.data);
 
 	// reset all variables
-	for i in range(0, num_blocks as i32) {
+	for i in range(0, num_blocks_in_flight) {
 		addr(num_block_variables*i + 1) = 1;
 		addr(num_block_variables*i + 2) = 0;
 		addr(num_block_variables*i + 3) = 0;
 	}
 
-	for block_id, warp_id in fibers(cpu_threads, num_blocks as i32, num_warps_per_block as i32) {
-		for local_id in warp_loop(warp_size) {
-			let idx = Index {
-				block_id = block_id as u32,
-				 warp_id =  warp_id as u32,
-				local_id = local_id as u32,
-			};
+	for block_id, warp_id in fibers(cpu_threads, num_blocks_in_flight, num_warps_per_block as i32) {
+		for logical_block_id in range_step(block_id, num_blocks as i32, num_blocks_in_flight) {
 
-			let context = gpu_grid_context {
-				device = 0,
-				groups = @|body| @|| cpu_block(@|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
-				waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id = idx.block_id, warp_id = idx.block_id * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
-				threads = @|body| @|| cpu_thread(@|_i:i32| idx.block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
-				num_groups = @|_i:i32| num_blocks,
-				num_waves = @|| num_warps,
-				num_threads = @|_i:i32| num_threads
-			};
-			@body(context, cpu_intrinsics)
+			for local_id in warp_loop(warp_size) {
+				let idx = Index {
+					block_id = block_id as u32,
+					 warp_id =  warp_id as u32,
+					local_id = local_id as u32,
+				};
+
+				let context = gpu_grid_context {
+					device = 0,
+					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
+					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id = logical_block_id as u32, warp_id = idx.block_id * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
+					num_groups = @|_i:i32| num_blocks,
+					num_waves = @|| num_warps,
+					num_threads = @|_i:i32| num_threads
+				};
+				@body(context, cpu_intrinsics)
+			}
+
 		}
 	}
 
