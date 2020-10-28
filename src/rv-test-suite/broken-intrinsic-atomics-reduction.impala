@@ -11,7 +11,7 @@ fn @atomic_add_i32(self: i32, vec_width: i32) -> fn(&mut i32, i32) -> i32 {
 			aggregate += lane_val;
 		}
 
-		old = atomic(1u, ptr, aggregate, 7u, "");
+		old = atomic[i32](1, ptr, aggregate, 7, "");
 
 		old + intermediate
 	}

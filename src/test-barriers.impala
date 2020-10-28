@@ -1,27 +1,27 @@
 
-
+#[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(device, 0u32);
+	let test = createBaseTest(device, 0);
 
 	// verify that only all lanes trigger wave barrier_all
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_all(thread.idx(0) == i as u32) != false {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 0u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
 						}
 					}
 
 					if wave.barrier_all(true) != true {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 1u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
 					}
 				}
 			}
@@ -31,19 +31,19 @@ fn main() -> i32 {
 	}
 
 	// verify that any lane can trigger wave barrier_any
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_any(thread.idx(0) == i as u32) != true {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 2u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 2);
 						}
 					}
 
 					if wave.barrier_any(false) != false {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 3u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
 					}
 				}
 			}
@@ -53,22 +53,22 @@ fn main() -> i32 {
 	}
 
 	// verify that every vote counts in wave barrier_vote
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					// FIXME: nvcc / nvrtc generates incorrect code on Linux when range is used
 					for i in unroll(0, wave.num_threads() as i32) {
 
-						let expected = (1u64 << i as u64);
+						let expected = (1 << i as u64);
 
 						if wave.barrier_vote(thread.idx(0) == i as u32) != expected {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 4u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
 						}
 					}
 
 					if wave.barrier_vote(true) != wave.membermask() {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 5u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 5);
 					}
 				}
 			}
@@ -78,19 +78,19 @@ fn main() -> i32 {
 	}
 
 	// verify that every lane counts in wave barrier_count
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
 						if wave.barrier_count(thread.idx(0) == i as u32) != 1 {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 6u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 6);
 						}
 					}
 
 					if wave.barrier_count(true) as u32 != wave.num_threads() {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 7u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 7);
 					}
 				}
 			}
@@ -100,19 +100,19 @@ fn main() -> i32 {
 	}
 
 	// verify that only all threads trigger group barrier_all
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with group in grid.groups() {
-				with thread in group.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_all(thread.idx(0) == i as u32) != false {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 8u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 8);
 						}
 					}
 
 					if group.barrier_all(true) != true {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 9u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 9);
 					}
 				}
 			}
@@ -122,19 +122,19 @@ fn main() -> i32 {
 	}
 
 	// verify that any threads can trigger group barrier_any
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with group in grid.groups() {
-				with thread in group.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_any(thread.idx(0) == i as u32) != true {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 10u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 10);
 						}
 					}
 
 					if group.barrier_any(false) != false {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 11u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 11);
 					}
 				}
 			}
@@ -144,19 +144,19 @@ fn main() -> i32 {
 	}
 
 	// verify that every thread counts in group barrier_count
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with group in grid.groups() {
-				with thread in group.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for thread in group.threads() {
 					for i in range(0, group.num_threads(0) as i32) {
 
 						if group.barrier_count(thread.idx(0) == i as u32) != 1 {
-							thread.atomic_or_global_u32(device_failed_flag, 1u << 12u);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 12);
 						}
 					}
 
 					if group.barrier_count(true) as u32 != group.num_threads(0) {
-						thread.atomic_or_global_u32(device_failed_flag, 1u << 13u);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 13);
 					}
 				}
 			}

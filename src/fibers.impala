@@ -1,15 +1,10 @@
+#[import(cc = "thorin", name = "fibers")] fn thorin_fibers(_num_threads: i32, _num_blocks: i32, _num_warps: i32, _body: fn(i32, i32) -> ()) -> ();
+fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_warps: i32| thorin_fibers(num_threads, num_blocks, num_warps, body);
+#[import(cc = "C", name = "anydsl_fibers_sync_block")] fn fibers_sync_block(i32) -> ();
+#[import(cc = "C", name = "anydsl_fibers_yield")]      fn fibers_yield() -> ();
 
-extern "thorin" {
-	fn fibers(num_threads: i32, num_blocks: i32, num_warps: i32, body: fn(i32, i32) -> ()) -> ();
-}
-
-extern "C" {
-	fn "anydsl_fibers_sync_block" fibers_sync_block(i32) -> ();
-	fn "anydsl_fibers_yield"      fibers_yield() -> ();
-}
-
-
-fn main() -> int {
+#[export]
+fn main() -> i32 {
 	print_string("start ...\n");
 
 	let num_threads = 1; // number of (hardware) worker threads

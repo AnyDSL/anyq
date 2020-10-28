@@ -1,7 +1,6 @@
-
-fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
-	let global = @|g| { 0 };
-	let local  = @|l| { l };
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| l;
 	(global, local)
 }
 
@@ -9,28 +8,23 @@ fn @wrap_around_value(value: i32) -> u32 {
 	(1 << (4 + value)) as u32
 }
 
-fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
-
-	with block in grid.groups() {
-		with thread in block.threads() {
-
+fn @test_body(grid: gpu_grid_context, _intrinsics: Intrinsics, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for block in grid.groups() {
+		for thread in block.threads() {
 			let bidx = block.idx(0) as i32;
+			let ptr = bitcast[&mut addrspace(1)u32](global(bidx));
 
-			let ptr = bitcast[&mut[1]u32](global(bidx));
-
-			if (thread.idx(0) & 1u) == 0u {
-				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1u) as i32;
+			if (thread.idx(0) & 1) == 0 {
+				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1) as i32;
 
 				write(bidx * block.num_threads(0) as i32 + newdata, -(1 << bidx));
 			}
 		}
 	}
-
 }
 
-fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-
-	let values = |l| {
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let values = |l: i32| {
 		let bidx = (l >> 7) & 0x3;
 		let tidx = l & 0x7f;
 		let wrap = wrap_around_value(bidx) as i32;
@@ -42,7 +36,7 @@ fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32,
 	};
 
 	// atmost the wrap around bit shall be set
-	let result = |g| match g { 3 => 64, _ => global(g) & wrap_around_value(g) as i32 };
+	let result = |g: i32| match g { 3 => 64, _ => global(g) & wrap_around_value(g) as i32 };
 
 	(result, values)
 }

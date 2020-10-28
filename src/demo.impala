@@ -2,9 +2,9 @@
 
 fn @xorshift32(state: u32) -> u32 {
 	let mut x = state;
-	x ^= x << 13u32;
-	x ^= x >> 17u32;
-	x ^= x << 5u32;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
 	x
 }
 
@@ -30,28 +30,28 @@ fn @float3_dot(a: float3, b: float3) -> f32 {
 	a(0) * b(0) + a(1) * b(1) + a(2) * b(2)
 }
 
-fn @randf(x: u32, intrinsics: Intrinsics) -> f32 {
-	bitcast[f32]((127u32 << 23u32) | (xorshift32(x) >> 9u32)) * 2.0f32 - 3.0f32
+fn @randf(x: u32, _intrinsics: Intrinsics) -> f32 {
+	bitcast[f32]((127:u32 << 23:u32) | (xorshift32(x) >> 9:u32)) * 2.0 - 3.0
 }
 
 fn @noiseGradient(p: float3, intrinsics: Intrinsics) -> float3 {
-	let seed1 = xorshift32(bitcast[u32](p(0)) ^ (bitcast[u32](p(2)) << 16u32));
-	let seed2 = xorshift32(bitcast[u32](p(1)) ^ (bitcast[u32](p(2)) << 16u32));
+	let seed1 = xorshift32(bitcast[u32](p(0)) ^ (bitcast[u32](p(2)) << 16));
+	let seed2 = xorshift32(bitcast[u32](p(1)) ^ (bitcast[u32](p(2)) << 16));
 	let u = randf(seed1, intrinsics);
-	let theta = randf(seed2, intrinsics) * 3.14159265358979f32;
+	let theta = randf(seed2, intrinsics) * 3.14159265358979;
 
-	let s = intrinsics.sqrtf(1.0f32 - u * u);
+	let s = intrinsics.sqrtf(1.0 - u * u);
 
 	[s * intrinsics.cosf(theta), s * intrinsics.sinf(theta), u]
 }
 
 fn @skew(p: float3) -> float3 {
-	let s = (p(0) + p(1) + p(2)) / 3.0f32;
+	let s = (p(0) + p(1) + p(2)) / 3.0;
 	[p(0) + s, p(1) + s, p(2) + s]
 }
 
 fn @unskew(p: float3) -> float3 {
-	let s = (p(0) + p(1) + p(2)) / 6.0f32;
+	let s = (p(0) + p(1) + p(2)) / 6.0;
 	[p(0) - s, p(1) - s, p(2) - s]
 }
 
@@ -67,19 +67,19 @@ fn @simplex(p: float3, intrinsics: Intrinsics) -> simplex_t {
 	let b2 = v(1) < v(2);
 	let b3 = v(2) < v(0);
 
-	let e_1 = [ if !b1 &  b3 { 1.0f32 } else { 0.0f32 }, if !b2 &  b1 { 1.0f32 } else { 0.0f32 }, if !b3 &  b2 { 1.0f32 } else { 0.0f32 } ];
-	let e_2 = [ if  b1 ^  b3 { 0.0f32 } else { 1.0f32 }, if  b2 ^  b1 { 0.0f32 } else { 1.0f32 }, if  b3 ^  b2 { 0.0f32 } else { 1.0f32 } ];
-	let e_3 = [ if  b1 & !b3 { 1.0f32 } else { 0.0f32 }, if  b2 & !b1 { 1.0f32 } else { 0.0f32 }, if  b3 & !b2 { 1.0f32 } else { 0.0f32 } ];
+	let e_1: [f32 * 3] = [ if !b1 &  b3 { 1 } else { 0 }, if !b2 &  b1 { 1 } else { 0 }, if !b3 &  b2 { 1 } else { 0 } ];
+	let e_2: [f32 * 3] = [ if  b1 ^  b3 { 0 } else { 1 }, if  b2 ^  b1 { 0 } else { 1 }, if  b3 ^  b2 { 0 } else { 1 } ];
+	let e_3: [f32 * 3] = [ if  b1 & !b3 { 1 } else { 0 }, if  b2 & !b1 { 1 } else { 0 }, if  b3 & !b2 { 1 } else { 0 } ];
 
 	[ v_0, float3_add(v_0, unskew(e_1)), float3_add(v_0, unskew(float3_add(e_1, e_2))), float3_add(v_0, unskew(float3_add(e_1, float3_add(e_2, e_3)))) ]
 }
 
 fn @simplexContribution(d: float3, gradient: float3) -> f32 {
-	let t = 0.5f32 - float3_dot(d, d);
+	let t = 0.5 - float3_dot(d, d);
 	let t2 = t * t;
 	let t4 = t2 * t2;
 
-	if t > 0.0f { 8.0f * t4 * float3_dot(gradient, d) } else { 0.0f32 }
+	if t > 0.0 { 8.0 * t4 * float3_dot(gradient, d) } else { 0.0 }
 }
 
 fn @simplexNoise(p: float3, intrinsics: Intrinsics) -> f32 {
@@ -93,12 +93,37 @@ fn @simplexNoise(p: float3, intrinsics: Intrinsics) -> f32 {
 
 fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
 {
-	let mut r = 0.0f32;
+	let mut r: f32 = 0.0;
 
 	for i in range(0, N) {
-		r += (1.0f32 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32), intrinsics);
+		r += (1.0 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32), intrinsics);
 	}
 
-	1.0f32 / (2.0f32 - 1.0f32 / (1 << (N - 1)) as f32) * r
+	1.0 / (2.0 - 1.0 / (1 << (N - 1)) as f32) * r
+}
+
+
+type stage_factory = fn (AccDevice, Intrinsics) -> Stage;
+
+fn demoStage1() -> Stage {
+	Stage {
+		produce = |_sink| {
+			// let rand_state = xorshift32(i);
+			// let elements = (rand_state % 8) as i32;
+			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2, intrinsics), randf(i * 3, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+			// for i in range(0, elements) {
+			// 	sink(i);
+			// }
+		}
+	}
+}
+
+
+fn demoStage2() -> Stage {
+	Stage {
+		produce = |_sink| {
+
+		}
+	}
 }
 

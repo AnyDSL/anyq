@@ -1,0 +1,16 @@
+#[export]
+fn main() -> i32 {
+	let device = createAccDevice();
+
+	let num_elements = (100 * 1024 * 1024) as u32;
+	let queue_size = 1024 * 1024;
+
+	let stage1 = demoStage1();
+	let stage2 = demoStage2();
+
+	let pipeline = pipeline(
+		persistentRedistributor(stage2, 
+			inputDistributor(stage1, num_elements), queue_size));
+
+	0
+}

@@ -1,58 +1,73 @@
+struct QueueElement {
+	clear: fn() -> (),
+	is_free: fn() -> bool,
+	store: fn(fn(u32) -> u32, gpu_thread_context) -> (),
+	load: fn(fn(u32, u32) -> (), gpu_thread_context) -> (),
+	debug_print: fn(AccDevice) -> ()
+}
 
-struct ProducerConsumerQueue
-{
-	push: fn(gpu_thread_context, fn (u32) -> u32) -> i32,
-	pop: fn(gpu_thread_context, fn (u32, u32) -> ()) -> i32,
-	// pop_wave: fn(gpu_wave_context, i32, fn (i32, u32) -> ()) -> i32,
+// enum LockedQueueElement {
+// 	Result(QueueElement),
+// 	None
+// }
+
+struct QueueElementType {
+	buffer_size: fn(i32) -> i64,
+	buffer_alignment: fn() -> i64,
+	buffer_element: fn(&mut addrspace(1) [u8], u32) -> QueueElement
+}
+
+struct ProducerConsumerQueue {
+	push: fn(fn(u32) -> u32) -> fn(gpu_thread_context) -> i32,
+	pop: fn(fn(u32, u32) -> ()) -> fn(gpu_thread_context) -> i32,
+	// pop_wave: fn(gpu_wave_context, i32, fn(i32, u32) -> ()) -> i32,
 	size: fn(gpu_thread_context) -> i32,
-	reset: fn() -> (),
-	validate: fn(&mut[1]u32) -> (),
+	reset: fn(gpu_grid_context) -> (),
+	validate: fn(&mut addrspace(1) u32, gpu_grid_context) -> (),
 	release: fn() -> ()
-};
+}
 
 // note (cc < 7.0): threads within the same warp must only ever either enqueue or dequeue stuff concurrently
 //                  this is fine as long as a warp only ever acts as either a producer or consumer at a time
-fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> ProducerConsumerQueue {
-	let buffer_data_offset = 4;
+fn @createConcurrentProducerConsumerQueue(device: AccDevice, element_type: QueueElementType, num_elements: i32) -> ProducerConsumerQueue {
+	let buffer_size = element_type.buffer_size(num_elements);
+	let buffer_alignment = element_type.buffer_alignment();
 
-	let queue_device_state_alloc = device.alloc((buffer_data_offset + buffer_size) as i64 * sizeof[u32]());
-	let queue_device_memory = queue_device_state_alloc.data;
-	let queue_counters = bitcast[&mut[1][u32]](queue_device_memory);
+	let buffer_data_offset = round_up_i64(sizeof[i32]() + 3 * sizeof[u32](), buffer_alignment);
 
-	let size = bitcast[&mut[1]i32](&mut queue_counters(0));
-	let head = &mut queue_counters(1);
-	let tail = &mut queue_counters(2);
-	let buffer = bitcast[&mut[1][u32]](&mut queue_counters(buffer_data_offset));
+	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
+	let queue_device_memory = bitcast[&mut addrspace(1) [u8]](queue_device_state_alloc.data);
 
-	let FREE = !0u32;
+	let size =   bitcast[&mut addrspace(1) i32](&mut queue_device_memory(0));
+	let head =   bitcast[&mut addrspace(1) u32](&mut queue_device_memory(sizeof[i32]()));
+	let tail =   bitcast[&mut addrspace(1) u32](&mut queue_device_memory(sizeof[i32]() + sizeof[u32]()));
+	let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_device_memory(buffer_data_offset));
+
 
 	ProducerConsumerQueue {
-		push: @|thread, source| -> i32 {
-			if thread.atomic_load_global_i32(size) >= buffer_size {
+		push = @|source|@|thread| -> i32 {
+			if thread.atomic_load_global_i32(size) >= num_elements {
 				0
 			}
 			else {
 				let new_size = thread.atomic_add_global_i32(size, 1);
 
-				if new_size >= buffer_size {
+				if new_size >= num_elements {
 					thread.atomic_sub_global_i32(size, 1);
 					0
 				}
 				else {
-					let i = thread.atomic_inc_global_u32(tail, (buffer_size - 1) as u32);
+					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
-					let value = source(i);
-
-					while thread.atomic_cas_global_u32(&mut buffer(i), FREE, value) != FREE {
-						thread.yield();
-					}
+					let element = element_type.buffer_element(buffer, i);
+					element.store(source, thread);
 
 					1
 				}
 			}
 		},
 
-		pop: @|thread, sink| -> i32 {
+		pop = @|sink|@|thread| -> i32 {
 			if thread.atomic_load_global_i32(size) <= 0 {
 				0
 			}
@@ -64,72 +79,93 @@ fn @createProducerConsumerQueue(device: AccDevice, buffer_size: i32) -> Producer
 					0
 				}
 				else {
-					let i = thread.atomic_inc_global_u32(head, (buffer_size - 1) as u32);
+					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
-					let tryDequeue = @|sink, i| {
-						let el = thread.atomic_exch_global_u32(&mut buffer(i), FREE);
-						if el != FREE {
-							sink(i, el);
-							true
-						}
-						else {
-							false
-						}
-					};
-
-					while !tryDequeue(sink, i) {
-						thread.yield();
-					}
+					let element = element_type.buffer_element(buffer, i);
+					element.load(sink, thread);
 
 					1
 				}
 			}
 		},
 
-		size: @|thread| {
+		size = @|thread| {
 			thread.atomic_load_global_i32(size)
 		},
 
-		reset: @|| {
-			let block_dim = 256;
-			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
+		reset = @|grid| {
+			for thread in grid.threads() {
+				let idx = thread.idx(0) as i32;
 
-			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
-				with thread in grid.threads() {
-					let idx = thread.idx(0) as i32;
+				if idx == 0 {
+					*size = 0;
+					*head = 0;
+					*tail = 0;
+				}
 
-					if idx == 0 {
-						*size = 0;
-						*head = 0u32;
-						*tail = 0u32;
-					}
+				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
+					let element = element_type.buffer_element(buffer, i as u32);
+					element.clear();
+				}
+			}
+		},
 
-					if idx < buffer_size {
-						buffer(idx) = FREE;
+		validate = @|corrupted: &mut addrspace(1) u32, grid| {
+			for thread in grid.threads() {
+				let idx = thread.idx(0);
+				if idx < num_elements as u32 {
+					let element = element_type.buffer_element(buffer, idx);
+					if !element.is_free() {
+						thread.atomic_or_global_u32(corrupted, 1);
+						element.debug_print(device);
 					}
 				}
 			}
 		},
 
-		validate: @|corrupted: &mut[1]u32| {
-			let block_dim = 256;
-			let num_blocks = (buffer_size + block_dim - 1) / block_dim;
-
-			with grid, intrinsics in device.launch_1d(num_blocks, block_dim) {
-				with thread in grid.threads() {
-					let idx = thread.idx(0) as i32;
-					if idx < buffer_size {
-						if buffer(idx) != FREE {
-							thread.atomic_or_global_u32(corrupted, 1u32);
-							device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
-						}
-					}
-				}
-			}
-		},
-
-		release: @|| {
+		release = @|| {
 			release(queue_device_state_alloc);
 		}
 	}
 }
+
+fn @indexQueueElementType() = QueueElementType {
+	buffer_size = @|num_elements| num_elements as i64 * sizeof[u32](),
+	buffer_alignment = @|| alignof[u32](),
+	buffer_element = @|buffer, i| {
+		let element = &mut bitcast[&mut addrspace(1) [u32]](buffer)(i);
+		let FREE: u32 = -1;
+
+		QueueElement {
+			clear = @|| *element = FREE,
+			is_free = @|| *element == FREE,
+			load = @|sink, thread| {
+				let tryDequeue = @|sink: fn(u32) -> ()| {
+					let el = thread.atomic_exch_global_u32(element, FREE);
+					if el != FREE {
+						sink(el);
+						true
+					}
+					else {
+						false
+					}
+				};
+
+				while !tryDequeue(@|el| sink(el, i)) {
+					thread.yield();
+				}
+			},
+			store = @|source, thread| {
+				let value = source(i);
+				while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
+					thread.yield();
+				}
+			},
+			debug_print = @|device| {
+				device.print_i32a("inconsistent queue state: buffer[%d] = %d\n", [i as i32, *element as i32]);
+			}
+		}
+	}
+};
+
+fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue(device, indexQueueElementType(), num_elements);

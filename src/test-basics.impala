@@ -1,16 +1,16 @@
 
-
+#[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 
 	let group_size = 256;
 	let num_groups = 42;
 
-	let test = createBaseTest(device, 0u32);
+	let test = createBaseTest(device, 0);
 
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with thread in grid.threads() {
+	for _device_memory, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for thread in grid.threads() {
 				thread.atomic_add_global_u32(device_failed_flag, thread.idx(0));
 			}
 		}
@@ -18,11 +18,11 @@ fn main() -> i32 {
 		true
 	}
 
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with group in grid.groups() {
-				with wave in group.waves() {
-					with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for wave in group.waves() {
+					for thread in wave.threads() {
 						thread.atomic_sub_global_u32(device_failed_flag, (group.idx(0) * group.num_waves() + wave.idx()) * wave.num_threads() + thread.idx(0));
 					}
 				}
@@ -32,10 +32,10 @@ fn main() -> i32 {
 		true
 	}
 
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with group in grid.groups() {
-				with thread in group.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for thread in group.threads() {
 					thread.atomic_add_global_u32(device_failed_flag, group.idx(0) * group.num_threads(0) + thread.idx(0));
 				}
 			}
@@ -44,10 +44,10 @@ fn main() -> i32 {
 		true
 	}
 
-	with device_memory, device_failed_flag in test.run_test() {
-		with grid, intrinsics in device.launch_1d(num_groups, group_size) {
-			with wave in grid.waves() {
-				with thread in wave.threads() {
+	for _, device_failed_flag in test.run_test() {
+		for grid, _ in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
 					thread.atomic_sub_global_u32(device_failed_flag, wave.idx() * wave.num_threads() + thread.idx(0));
 				}
 			}

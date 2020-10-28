@@ -1,17 +1,15 @@
-
 // width must be less or equal to wave.num_threads() and match the num of calls to shfl_bfly()
 static width = 8;
 
-fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
-	let global = @|g| { 0 };
-	let local  = @|l| { l };
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| l;
 	(global, local)
 }
 
-fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
-
-	with wave in grid.waves() {
-		with thread in wave.threads() {
+fn @test_body(grid: gpu_grid_context, _intrinsics: Intrinsics, read: ReadFn, write: WriteFn, _global: GlobalFn) -> () {
+	for wave in grid.waves() {
+		for thread in wave.threads() {
 			let idx = (wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
 
 			let mydata = read(idx);
@@ -25,12 +23,10 @@ fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, writ
 			write(idx, new_data);
 		}
 	}
-
 }
 
-fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-
-	let values = |l| {
+fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let values = |l: i32| {
 		let i = l / width;
 		let o = i * width;
 		let mut sum = 0;
@@ -39,7 +35,7 @@ fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32,
 		}
 		sum
 	};
-	let result = |g| 0;
+	let result = |_: i32| 0;
 
 	(result, values)
 }

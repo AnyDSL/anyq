@@ -1,24 +1,20 @@
-
-fn @setup_input(num_globals: i32, num_locals: i32) -> (fn(i32)->i32,fn(i32)->i32) {
-	let global = @|g| { if g == 0 { 65408 } else if g == 1 { 130816 } else { 0 } };
-	let local  = @|l| { l };
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|g: i32| if g == 0 { 65408 } else if g == 1 { 130816 } else { 0 };
+	let local  = @|l: i32| l;
 	(global, local)
 }
 
-fn @test_body(grid: gpu_grid_context, intrinsics: Intrinsics, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
-
-	with thread in grid.threads() {
+fn @test_body(grid: gpu_grid_context, _intrinsics: Intrinsics, read: ReadFn, _write: WriteFn, global: GlobalFn) -> () {
+	for thread in grid.threads() {
 		let mydata = read(thread.idx(0) as i32) as u32;
-		thread.atomic_sub_global_u32(global(0) as &mut[1] u32, mydata);
-		thread.atomic_sub_global_u32(global(1) as &mut[1] u32, mydata);
+		thread.atomic_sub_global_u32(bitcast[&mut addrspace(1)u32](global(0)), mydata);
+		thread.atomic_sub_global_u32(bitcast[&mut addrspace(1)u32](global(1)), mydata);
 	}
-
 }
 
-fn @expected_result(global: fn(i32)->i32, local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-
-	let values = |l| l;
-	let result = |g| if g == 0 { 0xffff0080u as i32 } else { 0 };
+fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let values = |l: i32| l;
+	let result = |g: i32| if g == 0 { 0xffff0080 } else { 0 };
 
 	(result, values)
 }
