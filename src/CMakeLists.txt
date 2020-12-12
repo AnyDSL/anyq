@@ -4,6 +4,7 @@ function(offline_graph _target)
 	set(_infiles ${ARGN})
 	list(FILTER _infiles INCLUDE REGEX "[.]impala$")
 	anydsl_runtime_wrap(_${_target}_PROGRAM
+		FRONTEND artic
 		CLANG_FLAGS -march=native
 		IMPALA_FLAGS --log-level info --max-errors 5
 		NAME ${_target}
