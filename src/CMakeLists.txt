@@ -1,4 +1,4 @@
-source_group("Impala Files" REGULAR_EXPRESSION "[.]impala$")
+source_group("Artic Files" REGULAR_EXPRESSION "[.]impala$")
 
 function(offline_graph _target)
 	set(_infiles ${ARGN})
@@ -6,17 +6,20 @@ function(offline_graph _target)
 	anydsl_runtime_wrap(_${_target}_PROGRAM
 		FRONTEND artic
 		CLANG_FLAGS -march=native
-		IMPALA_FLAGS --log-level info --max-errors 5
+		FRONTEND artic
+		ARTIC_FLAGS --log-level info --max-errors 5
 		NAME ${_target}
 		FILES ${_infiles})
 
 	add_executable(${_target} ${ARGN} ${_${_target}_PROGRAM})
-	target_link_libraries(${_target} PRIVATE ${AnyDSL_runtime_LIBRARIES})
-	set_target_properties(${_target} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-	# addanydslruntimedllcopy(${_target})
+	add_anydsl_runtime(${_target})
+	set_target_properties(${_target} PROPERTIES
+		LINKER_LANGUAGE CXX
+		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+	)
 endfunction()
 
-set(COMMON_IMPALA_FILES
+set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.impala
 	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.impala
@@ -54,7 +57,7 @@ endif()
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
-	offline_graph(${_target} ${COMMON_IMPALA_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile} ${ARGN})
+	offline_graph(${_target} ${COMMON_ARTIC_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.impala" ${_testfile} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
 	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")

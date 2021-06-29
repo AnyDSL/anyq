@@ -1,95 +1,101 @@
-type Sink = fn(u32) -> ();
-type Source = fn(Sink) -> bool;
+type Sink[T, Context] = fn(T, Context) -> ();
+type Source[T, Context] = fn(Sink[T, Context], Context) -> bool;
 
-struct Stage {
-	produce: fn(Sink) -> ()
-}
+// enum StageContext {
+// 	threads,
+// 	waves,
+// 	blocks,
+// }
 
-struct WorkDistribution {
-	schedule: fn(Sink, gpu_grid_context) -> bool,
-	init: fn(gpu_grid_context) -> (),
-	release: fn() -> ()
-}
+// struct Stage[Context] {
+// 	produce: fn(Sink[]) -> ()
+// }
 
-type work_dist = fn(AccDevice) -> WorkDistribution;
+// struct WorkDistribution {
+// 	schedule: fn(Sink, gpu_grid_context) -> bool,
+// 	init: fn(gpu_grid_context) -> (),
+// 	release: fn() -> ()
+// }
 
-fn @inputDistributor(_stage: Stage) -> work_dist {
-	@|device| {
-		let device_state_alloc = device.alloc(sizeof[u32]());
-		let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
-		let _next_input = &mut device_memory(0);
+// type work_dist = fn(AccDevice) -> WorkDistribution;
 
-		// fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
-		// 	let el = thread.atomic_add_global_u32(next_input, 1);
+// fn @inputDistributor(_stage: Stage) -> work_dist {
+// 	@|device| {
+// 		let device_state_alloc = device.alloc(sizeof[u32]());
+// 		let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+// 		let _next_input = &mut device_memory(0);
 
-		// 	if el < num_elements {
-		// 		sink(element(intrinsics, el));
-		// 		true
-		// 	}
-		// 	else {
-		// 		thread.atomic_exch_global_u32(next_input, num_elements);
-		// 		false
-		// 	}
-		// }
+// 		// fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
+// 		// 	let el = thread.atomic_add_global_u32(next_input, 1);
 
-		WorkDistribution {
-			schedule = @|_sink, _grid| {
-				false
-			},
+// 		// 	if el < num_elements {
+// 		// 		sink(element(intrinsics, el));
+// 		// 		true
+// 		// 	}
+// 		// 	else {
+// 		// 		thread.atomic_exch_global_u32(next_input, num_elements);
+// 		// 		false
+// 		// 	}
+// 		// }
 
-			init = @|_grid| {
+// 		WorkDistribution {
+// 			schedule = @|_sink, _grid| {
+// 				false
+// 			},
 
-			},
+// 			init = @|_grid| {
 
-			release = @|| {
-				release(device_state_alloc);
-			}
-		}
-	}
-}
+// 			},
 
-fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
-	@|device| {
-		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
-		// let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+// 			release = @|| {
+// 				release(device_state_alloc);
+// 			}
+// 		}
+// 	}
+// }
 
-		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
+// fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
+// 	@|device| {
+// 		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
+// 		// let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
 
-		WorkDistribution {
-			schedule = @|_sink, _grid| {
-				false
-			},
+// 		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 
-			init = @|grid| {
-				queue.reset(grid)
-			},
+// 		WorkDistribution {
+// 			schedule = @|_sink, _grid| {
+// 				false
+// 			},
 
-			release = @|| {
-				queue.release();
-				// release(device_state_alloc);
-			}
-		}
-	}
-}
+// 			init = @|grid| {
+// 				queue.reset(grid)
+// 			},
+
+// 			release = @|| {
+// 				queue.release();
+// 				// release(device_state_alloc);
+// 			}
+// 		}
+// 	}
+// }
 
 // fn pipeline(Source: WorkDistribution) -> {
 
 // }
 
 
-fn producer_consumer_loop_wave(wave: gpu_wave_context, producer: fn(gpu_thread_context, Sink) -> bool, consumer: fn(gpu_thread_context, u32) -> (), queue: ProducerConsumerQueue, should_flush: fn(gpu_thread_context) -> bool) -> () {
+fn producer_consumer_loop_wave[T](wave: gpu_wave_context, producer: Source[T, gpu_thread_context], consumer: Sink[T, gpu_thread_context], queue: ProducerConsumerQueue[T], should_flush: fn(gpu_thread_context) -> bool) -> () {
 	for thread in wave.threads() {
 		fn push() -> bool {
 			// TODO: reserve for entire wave
-			producer(thread, @|el| {
+			producer(@|el, _ctx| {
 				while (for _i in queue.push(thread) { el }) <= 0 {}
-			})
+			}, thread)
 		}
 
 		fn pop() -> bool {
 			// TODO: pop for entire wave
 			let num_dequeued = for el, _i in queue.pop(thread) {
-				consumer(thread, el)
+				consumer(el, thread)
 			};
 
 			num_dequeued > 0

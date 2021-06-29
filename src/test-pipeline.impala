@@ -1,3 +1,4 @@
+
 #[export]
 fn main() -> i32 {
 	let device = createAccDevice();
@@ -5,12 +6,49 @@ fn main() -> i32 {
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;
 
-	let stage1 = demoStage1();
-	let stage2 = demoStage2();
+	// let stage1 = demoStage1();
+	// let stage2 = demoStage2();
 
-	let pipeline = pipeline(
-		persistentRedistributor(stage2, 
-			inputDistributor(stage1, num_elements), queue_size));
+	// let pipeline = pipeline(
+	// 	persistentRedistributor(stage2, 
+	// 		inputDistributor(stage1, num_elements), queue_size));
+
+	type A = u32;
+
+	struct B {
+		x:f32
+	};
+
+	struct C {
+		y:f32
+	};
+
+	let stage1 = Stage[B, gpu_thread_context] {
+		produce = |_sink| {
+			// let rand_state = xorshift32(i);
+			// let elements = (rand_state % 8) as i32;
+			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2, intrinsics), randf(i * 3, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+			// for i in range(0, elements) {
+			// 	sink(i);
+			// }
+		}
+	}
+
+	let stage2 = Stage[C, gpu_thread_context] {
+			produce = |_sink| {
+				
+			}
+		}
+	}
+
+	let output_storage = |element: C, ctx:gpu_thread_context| {
+		// …
+	}
+
+	let pipeline = 
+		inputDistributor[A, B](stage1,
+			persistentRedistributor[B, C](stage2, 1024 * 1024)
+		);
 
 	0
 }

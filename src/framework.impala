@@ -234,21 +234,22 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 }
 
 
-struct QueueTest {
-	run_test: fn(fn(ProducerConsumerQueue, &mut addrspace(1) [i8], &mut addrspace(1) u32) -> bool) -> fn(i32) -> (),
+struct QueueTest[T] {
+	run_test: fn(fn(ProducerConsumerQueue[T], &mut addrspace(1) [i8], &mut addrspace(1) u32) -> bool) -> fn(i32) -> (),
 	finish: fn() -> i32
 }
 
-fn createQueueTest(device: AccDevice, additional_mem: u32) -> QueueTest {
+fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], additional_mem: u32) -> QueueTest[T] {
 	let test = createBaseTest(device, additional_mem);
 
 	// cuda_device is a static in cuda_mapping
 	// device is a struct from createAccDevice()
 
-	QueueTest {
+	QueueTest[T] {
 		run_test = @|body|@|queue_size| {
 			for device_memory, device_failed_flag in test.run_test() {
-				let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
+				// let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
+				let queue = createConcurrentProducerConsumerQueue[T](device, element_type, queue_size);
 
 				let block_dim = 256;
 				let num_blocks = (queue_size + block_dim - 1) / block_dim;

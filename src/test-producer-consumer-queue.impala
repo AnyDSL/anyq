@@ -5,7 +5,8 @@ fn main() -> i32 {
 
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;
-	let queue_test = createQueueTest(device, (num_elements + 2) * sizeof[u32]() as u32);
+	// let queue_test = createQueueTest[u32](device, genericQueueElementType[u32](), (num_elements + 2) * sizeof[u32]() as u32);
+	let queue_test = createQueueTest[u32](device, indexQueueElementType(), (num_elements + 2) * sizeof[u32]() as u32);
 	let block_dim = 256;
 
 	let ref_test = createBaseTest(device, (num_elements + 0) * sizeof[u32]() as u32);
@@ -35,12 +36,12 @@ fn main() -> i32 {
 				for wave in grid.waves() {
 						// let mut rand_state = xorshift32(((wave.idx() + 23) * 42) as u32);
 
-						fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
+						fn producer(sink: Sink[u32, gpu_thread_context], thread: gpu_thread_context) -> bool {
 							let el = thread.atomic_add_global_u32(next_input, 1);
 
 							if el < num_elements {
 								//device.print_i32("produce - el: %d\n", el as i32);
-								sink(element(intrinsics, el));
+								sink(element(intrinsics, el), thread);
 								true
 							}
 							else {
@@ -49,7 +50,7 @@ fn main() -> i32 {
 							}
 						}
 
-						fn consumer(thread: gpu_thread_context, el: u32) -> () {
+						fn consumer(el: u32, thread: gpu_thread_context) -> () {
 							let i = thread.atomic_add_global_u32(next_output, 1);
 							output(i) = el;
 						}
@@ -61,7 +62,7 @@ fn main() -> i32 {
 							queue.size(thread) >= wave.num_threads() as i32
 						}
 
-						producer_consumer_loop_wave(wave, producer, consumer, queue, should_flush);
+						producer_consumer_loop_wave[u32](wave, producer, consumer, queue, should_flush);
 				}
 			}
 

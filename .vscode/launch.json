@@ -8,7 +8,7 @@
 			"name": "debug nvvm",
 			"type": "cppvsdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/build/bin/Release/${fileBasenameNoExtension}-nvvm.exe",
+			"program": "${workspaceFolder}/build/bin/Debug/${fileBasenameNoExtension}-nvvm.exe",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
@@ -26,7 +26,7 @@
 					"value": "1"
 				}
 			],
-			"externalConsole": false
+			"console": "internalConsole"
 		},
 		{
 			"name": "debug cuda",
@@ -46,7 +46,7 @@
 					"value": "1"
 				}
 			],
-			"externalConsole": false
+			"console": "internalConsole"
 		},
 		{
 			"name": "Python: Current File",

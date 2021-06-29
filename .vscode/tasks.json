@@ -2,11 +2,23 @@
 	// See https://go.microsoft.com/fwlink/?LinkId=733558
 	// for the documentation about the tasks.json format
 	"version": "2.0.0",
+	"windows": {
+		"options": {
+			"shell": {
+				"executable": "cmd.exe",
+				"args": [
+					"/c",
+					"\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Preview\\VC\\Auxiliary\\Build\\vcvars64.bat\"",
+					"&"
+				]
+			}
+		}
+	},
 	"tasks": [
 		{
 			"label": "build nvvm",
 			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-nvvm --config Release",
+			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-nvvm --config Debug",
 			"group": {
 				"kind": "build",
 				"isDefault": true
@@ -18,7 +30,7 @@
 		{
 			"label": "build cuda",
 			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-cuda --config Release",
+			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-cuda --config Release",
 			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
@@ -27,10 +39,8 @@
 		{
 			"label": "build opencl",
 			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-opencl --config Release",
-			"group": {
-				"kind": "build"
-			},
+			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-opencl --config Release",
+			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
 			]
@@ -38,10 +48,8 @@
 		{
 			"label": "build amdgpu",
 			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target src/${fileBasenameNoExtension}-amdgpu --config Release",
-			"group": {
-				"kind": "build"
-			},
+			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-amdgpu --config Release",
+			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
 			]

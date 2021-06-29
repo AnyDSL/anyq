@@ -17,13 +17,13 @@ struct gpu_group_context {
 	waves: fn(fn(gpu_wave_context) -> ()) -> fn() -> (),
 	threads: fn(fn(gpu_thread_context) -> ()) -> fn() -> (),
 
+	num_waves: fn() -> u32,
+	num_threads: fn(i32) -> u32,
+
 	barrier: fn() -> (),
 	barrier_all: fn(bool) -> bool,
 	barrier_any: fn(bool) -> bool,
 	barrier_count: fn(bool) -> i32,
-
-	num_waves: fn() -> u32,
-	num_threads: fn(i32) -> u32,
 }
 
 struct gpu_wave_context {
@@ -141,6 +141,8 @@ struct gpu_thread_context {
 
 	atomic_inc_global_u32: fn(&mut addrspace(1) u32, u32) -> u32,
 	atomic_dec_global_u32: fn(&mut addrspace(1) u32, u32) -> u32,
+
+	memory_barrier: fn() -> (),
 
 	yield: fn() -> ()
 }

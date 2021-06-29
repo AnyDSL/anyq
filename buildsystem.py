@@ -24,22 +24,27 @@ def rmtree(path):
 		shutil.rmtree(path, ignore_errors=True)
 
 
+def git_apply_patch(dir, patch):
+	if cmd("git", "-C", dir, "apply", "--check", "--reverse", patch) != 0:
+		git("-C", dir, "apply", "-v", patch)
+
+
 class CMakeBuild:
-	def remove(self, build_dir):
-		rmtree(build_dir)
-	
-	def configure(self, build_dir, src_dir, *args):
+	def configure(self, build_dir, configs, src_dir, *args):
 		build_dir.mkdir(parents=True, exist_ok=True)
-		if cmd("cmake", *args, str(src_dir), cwd=build_dir) != 0:
+		if cmd("cmake", f"-DCMAKE_CONFIGURATION_TYPES={';'.join(configs)}", *args, str(src_dir), cwd=build_dir) != 0:
 			raise Exception(f"CMake failed for {build_dir}")
 
-class NinjaBuild(CMakeBuild):
-	def configure(self, build_dir, src_dir, *args):
-		super().configure(build_dir, src_dir, "-G", "Ninja", *args)
+	def build(self, build_dir, config, *targets):
+		if cmd("cmake", "--build", ".", "--config", config, *[v for pair in zip(["-t"] * len(targets), targets) for v in pair], cwd=build_dir) != 0:
+			raise Exception(f"build failed for {build_dir}")
 
-class VS2019Build(CMakeBuild):
-	def configure(self, build_dir, src_dir, *args):
-		super().configure(build_dir, src_dir, "-G", "Visual Studio 16 2019", "-A", "x64", "-T", "host=x64", *args)
+	def remove_build(self, build_dir):
+		rmtree(build_dir)
+
+class NinjaBuild(CMakeBuild):
+	def configure(self, build_dir, configs, src_dir, *args):
+		super().configure(build_dir, configs, src_dir, "-G", "Ninja Multi-Config", *args)
 
 
 def pull_git_dependency(dir, url, *args, branch = "master"):
@@ -56,43 +61,38 @@ def pull_svn_dependency(dir, url, *args):
 
 
 class Build:
-	def __init__(self, buildsystem, build_dir = None):
+	def __init__(self, buildsystem, build_dir):
 		self.buildsystem = buildsystem
 		self.build_dir = build_dir
 
 	def pull(self):
 		pass
 
-	def configure(self):
+	def configure(self, configs, *deps):
 		pass
 
-	def remove(self):
+	def build(self, config):
+		pass
+
+	def remove_build(self):
 		if self.build_dir:
-			self.buildsystem.remove(self.build_dir)
+			self.buildsystem.remove_build(self.build_dir)
 
-	def build(self):
+class PhonyBuild:
+	def __init__(self, buildsystem, build_dir):
 		pass
 
-class MultiConfigBuild(Build):
-	def __init__(self, buildsystem, build_dir, configs = ["Debug", "Release"]):
-		super().__init__(buildsystem, build_dir)
-		self.configs = configs
+	def pull(self):
+		pass
 
-	def builds(self):
-		for c in self.configs:
-			yield self.build_dir/c, c
+	def configure(self, configs, *deps):
+		pass
 
-	def configure(self, *deps):
-		for build_dir, build_type in self.builds():
-			self.configure_config(build_dir, build_type, *deps)
+	def build(self, config):
+		pass
 
-	def remove(self):
-		for build_dir, build_type in self.builds():
-			rmtree(build_dir)
-
-	def build(self):
-		for build_dir, build_type in self.builds():
-			self.build_config(build_dir, build_type)
+	def remove_build(self):
+		pass
 
 
 def component(*, depends_on = ()):
@@ -115,14 +115,6 @@ def instantiate_dependencies(creator, components, visited = dict()):
 
 def select_buildsystem():
 	if os.name == "nt":
+		return NinjaBuild()
 		return VS2019Build()
 	raise Exception("non-windows build not there yet")
-
-
-def copy_dlls(dir, components, attr_name):
-	dir.mkdir(parents=True, exist_ok=True)
-
-	for c in components:
-		for d in getattr(c, attr_name, []):
-			print(f"copying {d} to {dir}")
-			shutil.copy(d, dir)

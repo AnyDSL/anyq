@@ -418,6 +418,8 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			old
 		},
 
+		memory_barrier = @|| {},  // TODO
+
 		yield = @|| { if idx.local_id == 0 { fibers_yield(); } }
 	});
 }

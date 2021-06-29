@@ -64,6 +64,8 @@ fn @nvvm_thread(idx: fn(i32) -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 		atomic_inc_global_u32 = nvvm_atomic_inc_global_u32,
 		atomic_dec_global_u32 = nvvm_atomic_dec_global_u32,
 
+		memory_barrier = nvvm_threadfence,
+
 		// yield = @|| nvvm_nanosleep(0)
 		yield = @|| nvvm_threadfence()
 	});

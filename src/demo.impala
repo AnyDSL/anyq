@@ -103,27 +103,27 @@ fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
 }
 
 
-type stage_factory = fn (AccDevice, Intrinsics) -> Stage;
+// type stage_factory = fn (AccDevice, Intrinsics) -> Stage;
 
-fn demoStage1() -> Stage {
-	Stage {
-		produce = |_sink| {
-			// let rand_state = xorshift32(i);
-			// let elements = (rand_state % 8) as i32;
-			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2, intrinsics), randf(i * 3, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
-			// for i in range(0, elements) {
-			// 	sink(i);
-			// }
-		}
-	}
-}
+// fn demoStage1() -> Stage {
+// 	Stage {
+// 		produce = |_sink| {
+// 			// let rand_state = xorshift32(i);
+// 			// let elements = (rand_state % 8) as i32;
+// 			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2, intrinsics), randf(i * 3, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+// 			// for i in range(0, elements) {
+// 			// 	sink(i);
+// 			// }
+// 		}
+// 	}
+// }
 
 
-fn demoStage2() -> Stage {
-	Stage {
-		produce = |_sink| {
+// fn demoStage2() -> Stage {
+// 	Stage {
+// 		produce = |_sink| {
 
-		}
-	}
-}
+// 		}
+// 	}
+// }
 

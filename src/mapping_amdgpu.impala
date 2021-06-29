@@ -68,6 +68,8 @@ fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
         atomic_inc_global_u32 = @|addr, val| amdgcn_atomic_inc_global_u32(addr, val, 0, 0, false),
         atomic_dec_global_u32 = @|addr, val| amdgcn_atomic_dec_global_u32(addr, val, 0, 0, false),
 
+        memory_barrier = @|| {},  // TODO
+
         yield = @|| amdgcn_s_sleep(0)
     });
 }
