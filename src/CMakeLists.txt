@@ -6,7 +6,6 @@ function(offline_graph _target)
 	anydsl_runtime_wrap(_${_target}_PROGRAM
 		FRONTEND artic
 		CLANG_FLAGS -march=native
-		FRONTEND artic
 		ARTIC_FLAGS --log-level info --max-errors 5
 		NAME ${_target}
 		FILES ${_infiles})
