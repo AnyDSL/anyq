@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.9
 
 from pathlib import Path
 import argparse
@@ -37,11 +37,16 @@ class Boost:
 			"libs/filesystem"
 		)
 
+	def __bootstrap(self):
+		if windows:
+			return cmd("cmd", "/C", "bootstrap.bat", cwd=self.source_dir)
+		return cmd("./bootstrap.sh", shell=True, cwd=self.source_dir)
+
 	def configure(self, configs):
-		if (self.source_dir/"b2.exe").exists():
+		if (self.source_dir/"b2").exists() or (self.source_dir/"b2.exe").exists():
 			return
 
-		if cmd("cmd", "/C", "bootstrap.bat", cwd=self.source_dir) != 0:
+		if self.__bootstrap() != 0:
 			raise Exception("failed to bootstrap boost")
 
 	def remove_build(self):
@@ -78,24 +83,25 @@ class LLVM(Build):
 			git_apply_patch(self.source_dir, patch)
 
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir/"llvm",
-			 "-DLLVM_OPTIMIZED_TABLEGEN=ON",
-			 "-DLLVM_TARGETS_TO_BUILD=X86;NVPTX",
-			 "-DLLVM_ENABLE_RTTI=ON",
-			 "-DLLVM_INCLUDE_UTILS=OFF",
-			 "-DLLVM_INCLUDE_TESTS=OFF",
-			 "-DLLVM_INCLUDE_EXAMPLES=OFF",
-			 "-DLLVM_INCLUDE_BENCHMARKS=OFF",
-			 "-DLLVM_INCLUDE_DOCS=OFF",
-			 "-DLLVM_ENABLE_BINDINGS=OFF",
-			 "-DLLVM_ENABLE_PROJECTS=clang;lld",
-			 "-DLLVM_EXTERNAL_PROJECTS=RV",
-			f"-DLLVM_EXTERNAL_RV_SOURCE_DIR:PATH={self.rv_source_dir}",
-			 "-DLLVM_TOOL_CLANG_BUILD=ON",
-			 "-DLLVM_TOOL_LLD_BUILD=ON",
-			 "-DLLVM_TOOL_RV_BUILD=ON",
-			 "-DCLANG_INCLUDE_DOCS=OFF",
-			 "-DCLANG_INCLUDE_TESTS=OFF",
-			 "-DLLVM_RVPLUG_LINK_INTO_TOOLS:BOOL=OFF"
+			LLVM_OPTIMIZED_TABLEGEN=True,
+			LLVM_TARGETS_TO_BUILD="X86;NVPTX",
+			LLVM_ENABLE_RTTI=True,
+			LLVM_INCLUDE_UTILS=False,
+			LLVM_INCLUDE_TESTS=False,
+			LLVM_INCLUDE_EXAMPLES=False,
+			LLVM_INCLUDE_BENCHMARKS=False,
+			LLVM_INCLUDE_DOCS=False,
+			LLVM_ENABLE_BINDINGS=False,
+			LLVM_ENABLE_PROJECTS="clang;lld",
+			LLVM_EXTERNAL_PROJECTS="RV",
+			LLVM_EXTERNAL_RV_SOURCE_DIR=self.rv_source_dir,
+			LLVM_TOOL_CLANG_BUILD=True,
+			LLVM_TOOL_LLD_BUILD=True,
+			LLVM_TOOL_RV_BUILD=True,
+			CLANG_INCLUDE_DOCS=False,
+			CLANG_INCLUDE_TESTS=False,
+			LLVM_RVPLUG_LINK_INTO_TOOLS=False,
+			LLVM_BUILD_LLVM_DYLIB=False if windows else True
 		)
 
 	def build(self, config):
@@ -115,9 +121,8 @@ class Thorin(Build):
 
 	def configure(self, configs, llvm):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DLLVM_DIR:PATH={llvm.build_dir/'lib'/'cmake'/'llvm'}",
-			f"-DHalf_INCLUDE_DIR:PATH={self.half_source_dir/'include'}",
-			 "-DBUILD_SHARED_LIBS=OFF"
+			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
+			Half_INCLUDE_DIR=self.half_source_dir/"include"
 		)
 
 	def build(self, config):
@@ -134,14 +139,13 @@ class Artic(Build):
 
 	def configure(self, configs, thorin):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
-			 "-DBUILD_SHARED_LIBS=OFF"
+			Thorin_DIR=thorin.build_dir/"share"/"anydsl"/"cmake"
 		)
 
 	def build(self, config):
 		self.buildsystem.build(self.build_dir, config, "artic")
 
-@component(depends_on=(LLVM, Thorin, Artic))
+@component(depends_on=(AnyDSL, LLVM, Thorin, Artic))
 class AnyDSLRuntime(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"dependencies"/"anydsl"/"build"/"runtime")
@@ -150,13 +154,17 @@ class AnyDSLRuntime(Build):
 	def pull(self):
 		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git")
 
-	def configure(self, configs, llvm, thorin, artic):
+	def configure(self, configs, anydsl, llvm, thorin, artic):
+		for patch in [
+			anydsl.source_dir/"anydsl_runtime_cmake_multiconfig.patch"
+		]:
+			git_apply_patch(self.source_dir, patch)
+
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DLLVM_DIR:PATH={llvm.build_dir/'lib'/'cmake'/'llvm'}",
-			f"-DThorin_DIR:PATH={thorin.build_dir/'share'/'anydsl'/'cmake'}",
-			f"-DArtic_DIR:PATH={artic.build_dir/'share'/'anydsl'/'cmake'}",
-			 "-DRUNTIME_JIT=ON",
-			 "-DAnyDSL_runtime_BUILD_SHARED=ON"
+			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
+			Thorin_DIR=thorin.build_dir/"share"/"anydsl"/"cmake",
+			Artic_DIR=artic.build_dir/"share"/"anydsl"/"cmake",
+			RUNTIME_JIT=True
 		)
 
 	def build(self, config):
@@ -178,10 +186,10 @@ class ZLIB(Build):
 
 	def configure(self, configs):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DCMAKE_INSTALL_PREFIX:PATH={self.install_dir}"
+			CMAKE_INSTALL_PREFIX=self.install_dir
 		)
 
-	def build_config(self, config):
+	def build(self, config):
 		self.buildsystem.build(self.build_dir, config, "install")
 
 @component(depends_on=(ZLIB,))
@@ -196,8 +204,8 @@ class LPNG(Build):
 
 	def configure(self, configs, zlib):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DCMAKE_INSTALL_PREFIX:PATH={self.install_dir}",
-			f"-DZLIB_ROOT:PATH={zlib.install_dir}"
+			CMAKE_INSTALL_PREFIX=self.install_dir,
+			ZLIB_ROOT=zlib.install_dir
 		)
 
 	def build(self, config):
@@ -211,11 +219,11 @@ class AnyQ(Build):
 
 	def configure(self, configs, zlib, libpng, boost, artic, runtime):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			f"-DZLIB_ROOT={zlib.install_dir}",
-			f"-DPNG_ROOT={libpng.install_dir}",
-			f"-DBoost_ROOT={boost.build_dir}",
-			f"-DArtic_BINARY_DIR:PATH={artic.build_dir/'bin'}",
-			f"-DAnyDSL_runtime_DIR={runtime.build_dir/'share'/'anydsl'/'cmake'}"
+			ZLIB_ROOT=zlib.install_dir,
+			PNG_ROOT=libpng.install_dir,
+			Boost_ROOT=boost.build_dir,
+			Artic_BINARY_DIR=artic.build_dir/"bin",
+			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake"
 		)
 
 @component(depends_on=(AnyQ,))
