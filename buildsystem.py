@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import pathlib
 import subprocess
 import shutil
 from pathlib import Path
@@ -33,9 +34,17 @@ def git_apply_patch(dir, patch):
 
 
 class CMakeBuild:
+	@staticmethod
+	def __definition_args(**options):
+		for key, value in options.items():
+			if isinstance(value, pathlib.PurePath):
+				yield f"-D{key}:PATH={value}"
+			else:
+				yield f"-D{key}={value}"
+
 	def configure(self, build_dir, configs, src_dir, *args, **options):
 		build_dir.mkdir(parents=True, exist_ok=True)
-		if cmd("cmake", f"-DCMAKE_CONFIGURATION_TYPES={';'.join(configs)}", *args, *[f"-D{key}={value}" for key, value in options.items()], str(src_dir), cwd=build_dir) != 0:
+		if cmd("cmake", f"-DCMAKE_CONFIGURATION_TYPES={';'.join(configs)}", *args, *list(CMakeBuild.__definition_args(**options)), str(src_dir), cwd=build_dir) != 0:
 			raise Exception(f"CMake failed for {build_dir}")
 
 	def build(self, build_dir, config, *targets):
