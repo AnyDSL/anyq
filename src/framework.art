@@ -97,7 +97,7 @@ fn @print_binary(value: u32) -> () {
 
 
 struct AccDevice {
-	launch_1d: fn(fn(gpu_grid_context, Intrinsics) -> ()) -> fn(i32, i32) -> (),
+	launch_1d: fn(fn(gpu_grid_context) -> ()) -> fn(i32, i32) -> (),
 	synchronize: fn() -> (),
 	alloc: fn(i64) -> Buffer,
 	platform_device: i32,
@@ -254,13 +254,13 @@ fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], addi
 				let block_dim = 256;
 				let num_blocks = (queue_size + block_dim - 1) / block_dim;
 
-				for grid, _ in device.launch_1d(num_blocks, block_dim) {
+				for grid in device.launch_1d(num_blocks, block_dim) {
 					queue.reset(grid);
 				}
 
 				let cpu_result = body(queue, device_memory, device_failed_flag);
 
-				for grid, _ in device.launch_1d(num_blocks, block_dim) {
+				for grid in device.launch_1d(num_blocks, block_dim) {
 					queue.validate(device_failed_flag, grid);
 				}
 

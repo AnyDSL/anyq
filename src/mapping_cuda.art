@@ -164,7 +164,7 @@ fn @cuda_block(idx: fn(i32) -> u32, thread_idx: fn(i32) -> u32, num_threads: fn(
 	});
 }
 
-fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
+fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
@@ -216,9 +216,9 @@ fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 		num_groups = num_blocks,
 		num_waves = num_warps,
 		num_threads = num_threads
-	}, cuda_intrinsics));
+	}));
 }
 
-fn @cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body);
-fn @cuda_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body);
-fn @cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context, Intrinsics) -> ()) = cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body);
+fn @cuda_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> ()) = cuda_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body);
+fn @cuda_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(gpu_grid_context) -> ()) = cuda_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body);
+fn @cuda_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(gpu_grid_context) -> ()) = cuda_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body);

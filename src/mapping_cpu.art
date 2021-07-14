@@ -545,7 +545,7 @@ struct Index {
 	local_id: u32
 }
 
-fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intrinsics) -> ()) -> () {
+fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 
 	let num_threads_per_block = block_dim as u32;
@@ -590,7 +590,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context, Intr
 					num_waves = @|| num_warps,
 					num_threads = @|_i:i32| num_threads
 				};
-				@body(context, cpu_intrinsics)
+				@body(context)
 			}
 
 		}

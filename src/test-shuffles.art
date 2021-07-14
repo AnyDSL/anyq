@@ -10,7 +10,7 @@ fn main() -> i32 {
 
 	// verify that each lane can read from each other lane
 	for _, device_failed_flag in test.run_test() {
-		for grid, _ in device.launch_1d(num_groups, group_size) {
+		for grid in device.launch_1d(num_groups, group_size) {
 			for wave in grid.waves() {
 				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
@@ -32,7 +32,7 @@ fn main() -> i32 {
 
 	// verify shuffle up for all possible lane deltas
 	for _, device_failed_flag in test.run_test() {
-		for grid, _ in device.launch_1d(num_groups, group_size) {
+		for grid in device.launch_1d(num_groups, group_size) {
 			for wave in grid.waves() {
 				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
@@ -53,7 +53,7 @@ fn main() -> i32 {
 
 	// verify shuffle down for all possible lane deltas
 	for _, device_failed_flag in test.run_test() {
-		for grid, _ in device.launch_1d(num_groups, group_size) {
+		for grid in device.launch_1d(num_groups, group_size) {
 			for wave in grid.waves() {
 				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
@@ -74,7 +74,7 @@ fn main() -> i32 {
 
 	// verify butterfly shuffle for all possible lane deltas
 	for _, device_failed_flag in test.run_test() {
-		for grid, _ in device.launch_1d(num_groups, group_size) {
+		for grid in device.launch_1d(num_groups, group_size) {
 			for wave in grid.waves() {
 				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {

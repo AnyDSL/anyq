@@ -8,7 +8,7 @@ fn main() -> i32 {
 	let test = createBaseTest(device, 0);
 
 	for device_memory, device_failed_flag in test.run_test() {
-		for grid, _intrinsics in device.launch_1d(num_groups, group_size) {
+		for grid in device.launch_1d(num_groups, group_size) {
 			for thread in grid.threads() {
 				let mut rand_state = xorshift32(((wave.idx() + 23) * 42) as u32);
 

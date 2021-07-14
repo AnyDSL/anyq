@@ -29,7 +29,7 @@ type Source[T, Context] = fn(Sink[T, Context], Context) -> bool;
 // 		// 	let el = thread.atomic_add_global_u32(next_input, 1);
 
 // 		// 	if el < num_elements {
-// 		// 		sink(element(intrinsics, el));
+// 		// 		sink(element(el));
 // 		// 		true
 // 		// 	}
 // 		// 	else {

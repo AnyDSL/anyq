@@ -30,19 +30,19 @@ fn @float3_dot(a: float3, b: float3) -> f32 {
 	a(0) * b(0) + a(1) * b(1) + a(2) * b(2)
 }
 
-fn @randf(x: u32, _intrinsics: Intrinsics) -> f32 {
+fn @randf(x: u32) -> f32 {
 	bitcast[f32]((127:u32 << 23:u32) | (xorshift32(x) >> 9:u32)) * 2.0 - 3.0
 }
 
-fn @noiseGradient(p: float3, intrinsics: Intrinsics) -> float3 {
+fn @noiseGradient(p: float3) -> float3 {
 	let seed1 = xorshift32(bitcast[u32](p(0)) ^ (bitcast[u32](p(2)) << 16));
 	let seed2 = xorshift32(bitcast[u32](p(1)) ^ (bitcast[u32](p(2)) << 16));
-	let u = randf(seed1, intrinsics);
-	let theta = randf(seed2, intrinsics) * 3.14159265358979;
+	let u = randf(seed1);
+	let theta = randf(seed2) * 3.14159265358979;
 
-	let s = intrinsics.sqrtf(1.0 - u * u);
+	let s = math_builtins::sqrt(1.0 - u * u);
 
-	[s * intrinsics.cosf(theta), s * intrinsics.sinf(theta), u]
+	[s * math_builtins::cos(theta), s * math_builtins::sin(theta), u]
 }
 
 fn @skew(p: float3) -> float3 {
@@ -57,9 +57,9 @@ fn @unskew(p: float3) -> float3 {
 
 type simplex_t = [float3 * 4];
 
-fn @simplex(p: float3, intrinsics: Intrinsics) -> simplex_t {
+fn @simplex(p: float3) -> simplex_t {
 	let skewed_base = skew(p);
-	let v_0 = unskew([intrinsics.floorf(skewed_base(0)), intrinsics.floorf(skewed_base(1)), intrinsics.floorf(skewed_base(2))]);
+	let v_0 = unskew([math_builtins::floor(skewed_base(0)), math_builtins::floor(skewed_base(1)), math_builtins::floor(skewed_base(2))]);
 
 	let v = float3_sub(p, v_0);
 
@@ -82,35 +82,35 @@ fn @simplexContribution(d: float3, gradient: float3) -> f32 {
 	if t > 0.0 { 8.0 * t4 * float3_dot(gradient, d) } else { 0.0 }
 }
 
-fn @simplexNoise(p: float3, intrinsics: Intrinsics) -> f32 {
-	let s = simplex(p, intrinsics);
+fn @simplexNoise(p: float3) -> f32 {
+	let s = simplex(p);
 
-	simplexContribution(float3_sub(p, s(0)), noiseGradient(s(0), intrinsics)) +
-	simplexContribution(float3_sub(p, s(1)), noiseGradient(s(1), intrinsics)) +
-	simplexContribution(float3_sub(p, s(2)), noiseGradient(s(2), intrinsics)) +
-	simplexContribution(float3_sub(p, s(3)), noiseGradient(s(3), intrinsics))
+	simplexContribution(float3_sub(p, s(0)), noiseGradient(s(0))) +
+	simplexContribution(float3_sub(p, s(1)), noiseGradient(s(1))) +
+	simplexContribution(float3_sub(p, s(2)), noiseGradient(s(2))) +
+	simplexContribution(float3_sub(p, s(3)), noiseGradient(s(3)))
 }
 
-fn @simplexNoiseFractal(p: float3, N: i32, intrinsics: Intrinsics) -> f32
+fn @simplexNoiseFractal(p: float3, N: i32) -> f32
 {
 	let mut r: f32 = 0.0;
 
 	for i in range(0, N) {
-		r += (1.0 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32), intrinsics);
+		r += (1.0 / (1 << i) as f32) * simplexNoise(float3_scale(p, (1 << i) as f32));
 	}
 
 	1.0 / (2.0 - 1.0 / (1 << (N - 1)) as f32) * r
 }
 
 
-// type stage_factory = fn (AccDevice, Intrinsics) -> Stage;
+// type stage_factory = fn (AccDevice) -> Stage;
 
 // fn demoStage1() -> Stage {
 // 	Stage {
 // 		produce = |_sink| {
 // 			// let rand_state = xorshift32(i);
 // 			// let elements = (rand_state % 8) as i32;
-// 			// // (simplexNoiseFractal([randf(i, intrinsics), randf(i * 2, intrinsics), randf(i * 3, intrinsics)], octaves, intrinsics) * 8.0f32) as u32
+// 			// // (simplexNoiseFractal([randf(i), randf(i * 2), randf(i * 3)], octaves) * 8.0f32) as u32
 // 			// for i in range(0, elements) {
 // 			// 	sink(i);
 // 			// }

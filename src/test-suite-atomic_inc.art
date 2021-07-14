@@ -8,7 +8,7 @@ fn @wrap_around_value(value: i32) -> u32 {
 	(1 << (4 + value)) as u32
 }
 
-fn @test_body(grid: gpu_grid_context, _intrinsics: Intrinsics, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
 	for block in grid.groups() {
 		for thread in block.threads() {
 			let bidx = block.idx(0) as i32;
