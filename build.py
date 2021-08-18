@@ -78,7 +78,7 @@ class LLVM(Build):
 
 	def configure(self, configs, anydsl):
 		for patch in [
-			anydsl.source_dir/"nvptx_feature_ptx60.patch"
+			anydsl.source_dir/"patches"/"llvm"/"nvptx_feature_ptx60.patch"
 		]:
 			git_apply_patch(self.source_dir, patch)
 
@@ -101,7 +101,8 @@ class LLVM(Build):
 			CLANG_INCLUDE_DOCS=False,
 			CLANG_INCLUDE_TESTS=False,
 			LLVM_RVPLUG_LINK_INTO_TOOLS=False,
-			LLVM_BUILD_LLVM_DYLIB=False if windows else True
+			LLVM_BUILD_LLVM_DYLIB=False if windows else True,
+			LLVM_LINK_LLVM_DYLIB=False if windows else True
 		)
 
 	def build(self, config):
@@ -155,10 +156,11 @@ class AnyDSLRuntime(Build):
 		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git")
 
 	def configure(self, configs, anydsl, llvm, thorin, artic):
-		for patch in [
-			anydsl.source_dir/"anydsl_runtime_cmake_multiconfig.patch"
-		]:
-			git_apply_patch(self.source_dir, patch)
+		if windows:
+			for patch in [
+				anydsl.source_dir/"patches"/"runtime"/"cmake_multiconfig.patch"
+			]:
+				git_apply_patch(self.source_dir, patch)
 
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
 			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
@@ -211,18 +213,17 @@ class LPNG(Build):
 	def build(self, config):
 		self.buildsystem.build(self.build_dir, config, "install")
 
-@component(depends_on=(ZLIB, LPNG, Boost, Artic, AnyDSLRuntime))
+@component(depends_on=(ZLIB, LPNG, Boost, AnyDSLRuntime))
 class AnyQ(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"build")
 		self.source_dir = dir
 
-	def configure(self, configs, zlib, libpng, boost, artic, runtime):
+	def configure(self, configs, zlib, libpng, boost, runtime):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
 			ZLIB_ROOT=zlib.install_dir,
 			PNG_ROOT=libpng.install_dir,
 			Boost_ROOT=boost.build_dir,
-			Artic_BINARY_DIR=artic.build_dir/"bin",
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake"
 		)
 
@@ -241,7 +242,7 @@ def lookup_dependency(name):
 
 def dependencies(dir, components):
 	def create_component(C):
-		return C(dir, NinjaBuild())
+		return C(dir, NinjaMultiConfigBuild() if windows else NinjaBuild())
 
 	yield from instantiate_dependencies(create_component, components)
 
@@ -283,7 +284,7 @@ if __name__ == "__main__":
 		args = sub_args.add_parser(name)
 		args.set_defaults(command=function)
 		args.add_argument("components", nargs="*")#, choices=dependency_name_map.keys())
-		args.add_argument("-cfg", "--config", action="append", dest="configs", default=["Debug", "Release"])
+		args.add_argument("-cfg", "--config", action="append", dest="configs", default=["Debug", "Release"] if windows else ["Release"])
 		args.add_argument("--no-deps", action="store_true")
 		return args
 
