@@ -110,8 +110,8 @@ struct BaseTest {
 	finish: fn() -> i32
 }
 
-fn createBaseTest(device: AccDevice, additional_mem: u32) -> BaseTest {
-	let memory_size = round_up_i64(additional_mem as i64 + sizeof[u32](), sizeof[u32]());
+fn createBaseTest(device: AccDevice, additional_mem: i64) -> BaseTest {
+	let memory_size = round_up_i64(additional_mem + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
 	let device_memory = bitcast[&mut addrspace(1) [i8]](device_test_state_alloc.data);
 	let device_failed_flag = bitcast[&mut addrspace(1) u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
@@ -164,10 +164,10 @@ struct IntrinsicsTest {
 }
 
 fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32)->i32, num_locals: i32, init_local: fn(i32)->i32) -> IntrinsicsTest {
-	let additional_mem = ((num_globals + num_locals) * sizeof[i32]() as i32) as u32;
+	let additional_mem = (num_globals + num_locals) as i64 * sizeof[i32]();
 	let test = createBaseTest(device, additional_mem);
 
-	let buffer = alloc_cpu(additional_mem as i64);
+	let buffer = alloc_cpu(additional_mem);
 	let data = bitcast[&mut[i32]](buffer.data);
 
 	let mut validation_result = true;
@@ -182,7 +182,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 			}
 
 			for device_memory, device_failed_flag in test.run_test() {
-				runtime_copy(0, buffer.data, 0, device.platform_device, device_memory as &mut[i8], 0, additional_mem as i64);
+				runtime_copy(0, buffer.data, 0, device.platform_device, device_memory as &mut[i8], 0, additional_mem);
 
 				let read = @|idx:i32| -> i32 { let ptr = bitcast[& addrspace(1) [i32]](device_memory); ptr(idx + num_globals) };
 				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut addrspace(1) [i32]](device_memory); ptr(idx + num_globals) = value; };
@@ -190,7 +190,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 
 				let result = body(read, write, global, device_failed_flag);
 
-				runtime_copy(device.platform_device, device_memory as &mut[i8], 0, 0, buffer.data, 0, additional_mem as i64);
+				runtime_copy(device.platform_device, device_memory as &mut[i8], 0, 0, buffer.data, 0, additional_mem);
 
 				result
 			}
@@ -239,16 +239,12 @@ struct QueueTest[T] {
 	finish: fn() -> i32
 }
 
-fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], additional_mem: u32) -> QueueTest[T] {
+fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], additional_mem: i64) -> QueueTest[T] {
 	let test = createBaseTest(device, additional_mem);
-
-	// cuda_device is a static in cuda_mapping
-	// device is a struct from createAccDevice()
 
 	QueueTest[T] {
 		run_test = @|body|@|queue_size| {
 			for device_memory, device_failed_flag in test.run_test() {
-				// let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 				let queue = createConcurrentProducerConsumerQueue[T](device, element_type, queue_size);
 
 				let block_dim = 256;

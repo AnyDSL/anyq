@@ -45,10 +45,11 @@ fn main() -> i32 {
 		// …
 	}
 
-	let pipeline = 
+	let pipe = pipeline(
 		inputDistributor[A, B](stage1,
 			persistentRedistributor[B, C](stage2, 1024 * 1024)
 		);
+	);
 
 	0
 }

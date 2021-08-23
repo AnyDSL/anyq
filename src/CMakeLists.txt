@@ -19,10 +19,14 @@ endfunction()
 
 set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.art
-	${CMAKE_CURRENT_SOURCE_DIR}/framework.art
 	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.art
-	${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
-	${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
+	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
+	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
+)
+
+set(COMMON_TEST_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/framework.art
+	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-common.art
 	${CMAKE_CURRENT_SOURCE_DIR}/demo.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.art
 )
@@ -74,7 +78,7 @@ endfunction()
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
-	offline_graph(${_target} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${ARGN})
+	offline_graph(${_target} ${COMMON_TEST_FILES} ${COMMON_ARTIC_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
 	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")
@@ -90,10 +94,10 @@ set(TEST_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	list(APPEND TEST_PLATFORMS cuda nvvm)
-    # add_schedule_test(test-ringbuffer-allocator.art cuda)
-    # add_schedule_test(test-ringbuffer-allocator.art nvvm)
-    # add_schedule_test(test-pipeline.art cuda)
-    # add_schedule_test(test-pipeline.art nvvm)
+	# add_schedule_test(test-ringbuffer-allocator.art cuda)
+	# add_schedule_test(test-ringbuffer-allocator.art nvvm)
+	# add_schedule_test(test-pipeline.art cuda)
+	# add_schedule_test(test-pipeline.art nvvm)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
@@ -111,7 +115,8 @@ set(TEST_SCHEDULE_FILES
 	test-basics.art
 	test-shuffles.art
 	test-barriers.art
-	test-producer-consumer-queue.art
+	test-producer-consumer-queue-push-pop-generic.art
+	test-producer-consumer-queue-push-pop-index.art
 )
 
 set(TEST_SUITE_FILES

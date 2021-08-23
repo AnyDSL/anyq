@@ -1,0 +1,73 @@
+
+fn push_pop_queue_test() -> i32 {
+	let device = createAccDevice();
+
+	let num_elements = 1024 * 1024;
+	let queue_test = createQueueTest[u32](device, indexQueueElementType(), num_elements as i64 * sizeof[u32]());
+	let block_dim = 256;
+
+	for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
+		// keep track of which slots have been handed out to whom.
+		let pushed_buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
+
+		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+			for thread in grid.threads() {
+				pushed_buffer(thread.idx(0)) = -1;
+			}
+		}
+
+		// parallel push until full, verify that each element is handed out exactly once
+		for grid in device.launch_1d(42, block_dim) {
+			for thread in grid.threads() {
+				while (for i in queue.push(thread) {
+					let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
+
+					if (old != -1) {
+						device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					}
+
+					thread.idx(0)
+				}) > 0 {};
+			}
+		}
+
+		// check that all elements have been handed out
+		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+			for thread in grid.threads() {
+				if pushed_buffer(thread.idx(0)) < 0 {
+					device.print_i32a("ERROR: queue element %u has been skipped!\n", [thread.idx(0) as i32]);
+					thread.atomic_exch_global_u32(device_failed_flag, -1);
+				}
+			}
+		}
+
+		// pop
+		for grid in device.launch_1d(42, block_dim) {
+			for thread in grid.threads() {
+				while (for el, i in queue.pop(thread) {
+					let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
+
+					if check != el {
+						device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					}
+				}) > 0 {};
+			}
+		}
+
+		// check that all elements have been popped
+		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+			for thread in grid.threads() {
+				if pushed_buffer(thread.idx(0)) != -1 {
+					device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
+					thread.atomic_exch_global_u32(device_failed_flag, -1);
+				}
+			}
+		}
+
+		true
+	}
+
+	queue_test.finish()
+}
