@@ -49,6 +49,28 @@ endif()
 
 set(AnyQ_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+function(add_testcase _target _testfile _mapping)
+	if(_mapping STREQUAL "cpu" AND Python3_FOUND)
+		# message(STATUS "add advanced test for ${_testfile}")
+		get_filename_component(_srcfile ${_testfile} ABSOLUTE)
+		get_target_property(_source_files ${_target} SOURCES)
+		list(FILTER _source_files INCLUDE REGEX "\.o$")
+		list(GET _source_files 0 _obj_file)
+		get_filename_component(_llvmname ${_obj_file} NAME_WE)
+		set(_llvmfile ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/${_llvmname}.ll)
+		# message(STATUS "${_llvmfile}")
+		set(_test_command
+			Python3::Interpreter ${AnyQ_SOURCE_DIR}/perform-cpu-test.py
+			--src-file ${_srcfile}
+			--llvm-file ${_llvmfile}
+			--bin-file $<TARGET_FILE:${_target}>
+		)
+	else()
+		set(_test_command ${_target})
+	endif()
+	add_test(NAME "${_target}" COMMAND ${_test_command} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endfunction()
+
 function(add_schedule_test _testfile _mapping)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
@@ -60,7 +82,7 @@ function(add_schedule_test _testfile _mapping)
 		target_link_libraries(${_target} PRIVATE ${ADDITIONAL_LINK_DEPENDENCY})
 	endif()
 	if (BUILD_TESTING)
-		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+		add_testcase(${_target} ${_testfile} ${_mapping})
 	endif()
 endfunction()
 
@@ -82,6 +104,7 @@ if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	list(APPEND TEST_PLATFORMS cpu)
 	# add_schedule_test(test-rv-intrinsics.art cpu)
 	# offline_graph(test-rv-atomic-minimal test-rv-atomic-minimal.art)
+	find_package(Python3 COMPONENTS Interpreter)
 endif()
 
 set(TEST_SCHEDULE_FILES

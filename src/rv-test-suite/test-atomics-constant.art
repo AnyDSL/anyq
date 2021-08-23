@@ -1,3 +1,9 @@
+
+// single atomic adding constant vec_width and reconstructing the result vector
+
+// inst_stats: atomicrmw(1), insertelement(1), shufflevector(1)
+
+
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
 	let _mydata = read(lane);
 

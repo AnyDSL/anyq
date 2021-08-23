@@ -1,14 +1,20 @@
+
+// cascade of atomic operations
+
+// inst_stats: extractelement(8), atomicrmw(8), insertelement(8)
+
+
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
 	let mydata = read(lane);
 
 	let atomic_add = atomic_add_i32(lane, vec_width);
 
 	let new_data = if mydata % 2 == 0 { atomic_add(global(0), 1) } else { -mydata };
-	//let mut new_data;
+	//let mut new_data:i32;
 	//if mydata % 2 == 0 {
-	//	new_data = atomic_add_i32(lane, global(0), 1);
+	//	new_data = atomic_add(global(0), 1);
 	//} else {
-	//	new_data = mydata;
+	//	new_data = -mydata;
 	//}
 
 	write(lane, new_data);
