@@ -20,6 +20,7 @@ set(TEST_SUITE_FILES
 	fiber-test-idx-group-thread.art
 	fiber-test-idx-wave.art
 	fiber-test-idx-wave-atomic.art
+	fiber-test-idx-wave-thread.art
 	fiber-test-idx-group-wave-thread.art
 )
 
