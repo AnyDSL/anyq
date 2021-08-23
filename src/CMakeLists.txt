@@ -36,16 +36,6 @@ if (Boost_FOUND)
 	set_target_properties(fiber-support PROPERTIES INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
 	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
-	add_executable(fiber-test test-fibers.cpp)
-	set_target_properties(fiber-test PROPERTIES
-		FOLDER "tests/cpu"
-		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-	target_link_libraries(fiber-test PRIVATE fiber-support)
-
-	offline_graph(fiber-integration fibers.art)
-	set_target_properties(fiber-integration PROPERTIES FOLDER "tests/cpu")
-	target_link_libraries(fiber-integration PRIVATE fiber-support)
-
 	set(AnyQ_FIBER_SUPPORT TRUE)
 	set(ADDITIONAL_LINK_DEPENDENCY_cpu fiber-support)
 else()
@@ -122,4 +112,8 @@ endforeach()
 
 if (Thorin_HAS_RV_SUPPORT)
 	add_subdirectory(rv-test-suite)
+endif()
+
+if (AnyQ_FIBER_SUPPORT)
+	add_subdirectory(fiber-test-suite)
 endif()
