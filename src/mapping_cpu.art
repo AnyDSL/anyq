@@ -584,7 +584,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 				let context = gpu_grid_context {
 					device = 0,
 					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
-					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id = logical_block_id as u32, warp_id = idx.block_id * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
 					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
 					num_groups = @|_i:i32| num_blocks,
 					num_waves = @|| num_warps,
