@@ -6,7 +6,7 @@ fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)
 	let mut new_data:i32;
 	
 	if mydata % 2 == 0 {
-		new_data = shuffle(mydata, 7 - mydata);
+		new_data = shuffle(mydata, 6 - mydata);
 	} else {
 		new_data = 23;
 	}
@@ -15,7 +15,7 @@ fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)
 }
 
 fn expected_result(_data: fn(i32)->i32, _global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
-	let values = [7, 23, 5, 23, 3, 23, 1, 23];
+	let values = [6, 23, 4, 23, 2, 23, 0, 23];
 	let result = 10;
 
 	(|i| values(i), result)
