@@ -1,4 +1,3 @@
-source_group("Artic Files" REGULAR_EXPRESSION "[.]art$")
 
 function(offline_graph _target)
 	set(_infiles ${ARGN})
@@ -27,6 +26,9 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/demo.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.art
 )
+
+source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/test-suite.art)
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 find_package(Boost 1.65 COMPONENTS fiber)
 
