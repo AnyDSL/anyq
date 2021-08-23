@@ -1,3 +1,9 @@
+
+// cascade of 2x extract + 1x insert to build a new vector
+
+// inst_stats: extractelement(16), insertelement(8)
+
+
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), _global: fn(i32)->&mut i32) -> () {
 	let mydata = read(lane);
 

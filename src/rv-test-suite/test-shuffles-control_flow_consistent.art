@@ -1,3 +1,9 @@
+
+// ends up with a single @llvm.x86.avx.blendv.ps.256
+
+// inst_stats: extractelement(16), insertelement(8), llvm.x86.avx.blendv.ps.256(1)
+
+
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), _global: fn(i32)->&mut i32) -> () {
 	let mydata = read(lane);
 
