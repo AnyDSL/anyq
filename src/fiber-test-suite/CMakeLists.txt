@@ -16,6 +16,7 @@ target_link_libraries(fiber-integration PRIVATE fiber-support)
 
 set(TEST_SUITE_FILES
 	fiber-test-idx-thread.art
+	fiber-test-idx-group-thread.art
 )
 
 foreach(_test_case ${TEST_SUITE_FILES})
