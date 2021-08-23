@@ -35,7 +35,10 @@ find_package(Boost 1.65 COMPONENTS fiber)
 if (Boost_FOUND)
 	find_package(Threads REQUIRED)
 	add_library(fiber-support STATIC fibers.h fibers.cpp)
-	set_target_properties(fiber-support PROPERTIES INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
+	target_include_directories(fiber-support
+		PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+		PRIVATE ${Boost_INCLUDE_DIRS}
+	)
 	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 	set(AnyQ_FIBER_SUPPORT TRUE)
