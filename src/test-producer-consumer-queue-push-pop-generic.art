@@ -1,0 +1,5 @@
+
+#[export]
+fn main() -> i32 {
+	push_pop_queue_test()
+}

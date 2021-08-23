@@ -1,86 +1,87 @@
 type Sink[T, Context] = fn(T, Context) -> ();
 type Source[T, Context] = fn(Sink[T, Context], Context) -> bool;
 
-// enum StageContext {
-// 	threads,
-// 	waves,
-// 	blocks,
-// }
+enum StageContext {
+	gpu_thread_context,
+	gpu_wave_context,
+	gpu_group_context,
+	gpu_grid_context
+}
 
-// struct Stage[Context] {
-// 	produce: fn(Sink[]) -> ()
-// }
+struct Stage[Context] {
+	produce: fn(Sink[], Context) -> ()
+}
 
-// struct WorkDistribution {
-// 	schedule: fn(Sink, gpu_grid_context) -> bool,
-// 	init: fn(gpu_grid_context) -> (),
-// 	release: fn() -> ()
-// }
+struct WorkDistribution {
+	schedule: fn(Sink, gpu_grid_context) -> bool,
+	init: fn(gpu_grid_context) -> (),
+	release: fn() -> ()
+}
 
-// type work_dist = fn(AccDevice) -> WorkDistribution;
+type work_dist = fn(AccDevice) -> WorkDistribution;
 
-// fn @inputDistributor(_stage: Stage) -> work_dist {
-// 	@|device| {
-// 		let device_state_alloc = device.alloc(sizeof[u32]());
-// 		let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
-// 		let _next_input = &mut device_memory(0);
+fn @inputDistributor(_stage: Stage) -> work_dist {
+	@|device| {
+		let device_state_alloc = device.alloc(sizeof[u32]());
+		let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+		let _next_input = &mut device_memory(0);
 
-// 		// fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
-// 		// 	let el = thread.atomic_add_global_u32(next_input, 1);
+		// fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
+		// 	let el = thread.atomic_add_global_u32(next_input, 1);
 
-// 		// 	if el < num_elements {
-// 		// 		sink(element(el));
-// 		// 		true
-// 		// 	}
-// 		// 	else {
-// 		// 		thread.atomic_exch_global_u32(next_input, num_elements);
-// 		// 		false
-// 		// 	}
-// 		// }
+		// 	if el < num_elements {
+		// 		sink(element(el));
+		// 		true
+		// 	}
+		// 	else {
+		// 		thread.atomic_exch_global_u32(next_input, num_elements);
+		// 		false
+		// 	}
+		// }
 
-// 		WorkDistribution {
-// 			schedule = @|_sink, _grid| {
-// 				false
-// 			},
+		WorkDistribution {
+			schedule = @|_sink, _grid| {
+				false
+			},
 
-// 			init = @|_grid| {
+			init = @|_grid| {
 
-// 			},
+			},
 
-// 			release = @|| {
-// 				release(device_state_alloc);
-// 			}
-// 		}
-// 	}
-// }
+			release = @|| {
+				release(device_state_alloc);
+			}
+		}
+	}
+}
 
-// fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
-// 	@|device| {
-// 		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
-// 		// let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
+	@|device| {
+		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
+		// let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
 
-// 		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
+		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 
-// 		WorkDistribution {
-// 			schedule = @|_sink, _grid| {
-// 				false
-// 			},
+		WorkDistribution {
+			schedule = @|_sink, _grid| {
+				false
+			},
 
-// 			init = @|grid| {
-// 				queue.reset(grid)
-// 			},
+			init = @|grid| {
+				queue.reset(grid)
+			},
 
-// 			release = @|| {
-// 				queue.release();
-// 				// release(device_state_alloc);
-// 			}
-// 		}
-// 	}
-// }
+			release = @|| {
+				queue.release();
+				// release(device_state_alloc);
+			}
+		}
+	}
+}
 
-// fn pipeline(Source: WorkDistribution) -> {
+fn pipeline(Source: WorkDistribution) -> {
 
-// }
+}
 
 
 fn producer_consumer_loop_wave[T](wave: gpu_wave_context, producer: Source[T, gpu_thread_context], consumer: Sink[T, gpu_thread_context], queue: ProducerConsumerQueue[T], should_flush: fn(gpu_thread_context) -> bool) -> () {
