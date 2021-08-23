@@ -34,7 +34,7 @@ if (Boost_FOUND)
 	find_package(Threads REQUIRED)
 	add_library(fiber-support STATIC fibers.h fibers.cpp)
 	set_target_properties(fiber-support PROPERTIES INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
-	target_link_libraries(fiber-support PRIVATE Boost::fiber ${CMAKE_THREAD_LIBS_INIT})
+	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 	add_executable(fiber-test test-fibers.cpp)
 	set_target_properties(fiber-test PROPERTIES
