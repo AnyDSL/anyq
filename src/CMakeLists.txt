@@ -111,7 +111,7 @@ foreach(_test_platform ${TEST_PLATFORMS})
 	endforeach()
 
 	foreach(_test_case ${TEST_SUITE_FILES})
-		add_schedule_test(${_test_case} ${_test_platform} test-suite.art)
+		add_schedule_test(${_test_case} ${_test_platform} ${AnyQ_SOURCE_DIR}/test-suite.art)
 	endforeach()
 endforeach()
 
