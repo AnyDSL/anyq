@@ -13,3 +13,13 @@ target_link_libraries(fiber-test PRIVATE fiber-support)
 offline_graph(fiber-integration fibers.art)
 set_target_properties(fiber-integration PROPERTIES FOLDER "tests/fibers")
 target_link_libraries(fiber-integration PRIVATE fiber-support)
+
+set(TEST_SUITE_FILES
+	fiber-test-idx-thread.art
+)
+
+foreach(_test_case ${TEST_SUITE_FILES})
+	get_filename_component(_testname ${_test_case} NAME_WE)
+	add_schedule_test(${_test_case} cpu ${CMAKE_CURRENT_SOURCE_DIR}/fiber-test-suite.art)
+	set_target_properties(${_testname}-cpu PROPERTIES FOLDER "tests/fibers")
+endforeach()

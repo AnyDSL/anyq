@@ -1,0 +1,32 @@
+
+static group_size = 512;
+static num_groups = 64;
+
+#[export]
+fn main() -> i32 {
+	let device = createAccDevice();
+
+	let num_globals = num_groups * group_size;
+	let num_locals = num_groups * group_size;
+
+	let (init_global, init_local) = setup_input(num_globals, num_locals);
+	let test = createIntrinsicsTest(device, num_globals, init_global, num_locals, init_local);
+
+	for read, write, global, _device_failed_flag in test.run_test() {
+		for grid in device.launch_1d(num_groups, group_size) {
+			test_body(grid, read, write, global);
+		}
+
+		true
+	}
+
+	let (expected_global, expected_local) = expected_result(test.globals, test.locals);
+
+	test.validate(
+		@|global, value| value == expected_global(global),
+		@|local, value|  value == expected_local(local),
+		false
+	);
+
+	test.finish()
+}
