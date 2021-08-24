@@ -1,5 +1,5 @@
 
-source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
+source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES})
 source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 source_group("/" REGULAR_EXPRESSION "test-.+[.]art$")
 
@@ -21,6 +21,7 @@ set(TEST_SUITE_FILES
 	fiber-test-idx-wave.art
 	fiber-test-idx-wave-atomic.art
 	fiber-test-idx-wave-thread.art
+	fiber-test-idx-group-wave.art
 	fiber-test-idx-group-wave-thread.art
 )
 
