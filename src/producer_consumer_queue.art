@@ -111,7 +111,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 				if idx == 0 {
 					if (*size != 0) {
-						device.print_i32("queue size (%d) is not zero!\n", *size as i32);
+						device.print_i32("queue size (%d) is not zero!\n", *size);
 						thread.atomic_or_global_u32(corrupted, 1);
 					}
 

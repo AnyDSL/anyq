@@ -1,9 +1,15 @@
 
-fn push_pop_queue_test() -> i32 {
+struct QueueTestCase[T] {
+	createTest: fn(AccDevice, i64) -> QueueTest[T],
+	generateElement: fn(u32) -> T,
+	checkElement: fn(T, u32) -> bool
+}
+
+fn push_pop_queue_test[T](test_case: QueueTestCase[T]) -> i32 {
 	let device = createAccDevice();
 
 	let num_elements = 1024 * 1024;
-	let queue_test = createQueueTest[u32](device, indexQueueElementType(), num_elements as i64 * sizeof[u32]());
+	let queue_test = test_case.createTest(device, num_elements as i64 * sizeof[u32]());
 	let block_dim = 256;
 
 	for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
@@ -27,7 +33,7 @@ fn push_pop_queue_test() -> i32 {
 						thread.atomic_exch_global_u32(device_failed_flag, -1);
 					}
 
-					thread.idx(0)
+					test_case.generateElement(thread.idx(0))
 				}) > 0 {};
 			}
 		}
@@ -48,7 +54,7 @@ fn push_pop_queue_test() -> i32 {
 				while (for el, i in queue.pop(thread) {
 					let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
 
-					if check != el {
+					if !test_case.checkElement(el, check) {
 						device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
 						thread.atomic_exch_global_u32(device_failed_flag, -1);
 					}
