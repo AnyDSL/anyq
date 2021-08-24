@@ -1,0 +1,27 @@
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_g: i32| 0;
+	let local  = @|_l: i32| 0xBEAF;
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for group in grid.groups() {
+		for wave in group.waves() {
+			// this code is executed by all threads within the wave (hence wave_size times)
+			let wid = (group.idx(0) * group.num_waves() + wave.idx()) as i32;
+
+			atomic_inc(global(wid));
+			// this is broken too (see fiber-test-idx-wave)
+			//(*global(wid)) += 1;
+
+			write(wid, wid);
+		}
+	}
+}
+
+fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let expected_global = |g: i32| { if g < (num_groups * group_size / warp_size as i32) { warp_size as i32 } else { 0 } };
+	let expected_local = |l: i32| { if l < (num_groups * group_size / warp_size as i32) { l } else { 0xBEAF } };
+
+	(expected_global, expected_local)
+}
