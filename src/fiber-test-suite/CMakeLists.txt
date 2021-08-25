@@ -24,6 +24,7 @@ set(TEST_SUITE_FILES
 	fiber-test-idx-group-wave.art
 	fiber-test-idx-group-wave-thread.art
 	fiber-test-idx-group-2xthread.art
+	fiber-test-idx-group-wave-1xthread-2xthread.art
 )
 
 foreach(_test_case ${TEST_SUITE_FILES})
