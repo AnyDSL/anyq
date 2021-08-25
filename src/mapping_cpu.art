@@ -593,6 +593,11 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 				@body(context)
 			}
 
+			// TODO: do we need a sync or yield here to ensure proper finalization of one block?
+			//       otherwise fibers may work on different blocks - does this cause issues?
+			//fibers_yield();
+			fibers_sync_block(block_id);
+
 		}
 	}
 
