@@ -1,3 +1,6 @@
+
+// inst_stats: llvm.x86.avx.movmsk.ps.256(1), llvm.ctpop.i32(1)
+
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_g: i32| 0;
 	let local  = @|_l: i32| 0xBEAF;
@@ -9,7 +12,12 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 		// this code is executed by all threads within the wave (hence wave_size times)
 		let wid = wave.idx() as i32;
 
-		(*global(wid)) += 1;
+		// ! this is undefined behavior
+		// (*global(wid)) += 1;
+
+		let mut value = *global(wid);
+		value = value + wave.barrier_count(true);
+		(*global(wid)) = value;
 
 		write(wid, wid);
 	}
