@@ -1,8 +1,13 @@
+
+// inst_stats: atomicrmw(1)
+
+
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_g: i32| 0;
 	let local  = @|_l: i32| 0xBEAF;
 	(global, local)
 }
+
 
 fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
 	for group in grid.groups() {
@@ -10,9 +15,10 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 			// this code is executed by all threads within the wave (hence wave_size times)
 			let wid = (group.idx(0) * group.num_waves() + wave.idx()) as i32;
 
+			// this is undefined behavior (see fiber-test-idx-wave-*)
+			//(*global(wid)) += my_func(1);
+
 			atomic_inc(global(wid));
-			// this is broken too (see fiber-test-idx-wave)
-			//(*global(wid)) += 1;
 
 			write(wid, wid);
 		}
