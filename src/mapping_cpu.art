@@ -244,38 +244,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			*/
 			atomic[i32](0, bitcast[&mut i32](addr), val, 7, "")
 		},
-		atomic_exch_global_u32 = @|addr: &mut addrspace(1)  u32, val: u32| -> u32 {
-			/*
-			let mut result:u32 = self; // mark result as varying for rv
-			let lane_mask = (vec_width as u32 - 1);
-			if rv_ballot_u32(true) & lane_mask == lane_mask {
-				// first shuffle all lanes of warp (left shift) and then atomic_xchg once
-				result = warp_shuffle_u32(val, ((self + 1) & lane_mask) as i32);
-				let new = rv_extract_u32(val, 0);
-				let old = atomic[u32](0, bitcast[&mut u32](addr), new, 7, "");
-				result = rv_insert_u32(result, vec_width - 1, old);
-			} else {
-				for l in unroll(0, vec_width) {
-					if rv_ballot_u32(true) & (1 << l as u32) != 0 {
-						let lane_val = rv_extract_u32(val, l);
-						let old = atomic[u32](0, bitcast[&mut u32](addr), lane_val, 7, "");
-						result = rv_insert_u32(result, l, old);
-					}
-				}
-			}
-			result
-			*/
-			/*
-			let mut val_per_lane:u32 = self; // mark val_per_lane as varying for rv
-			for l in unroll(0, vec_width) {
-				let lane_val = rv_extract_u32(val, l);
-				val_per_lane = rv_insert_u32(val_per_lane, l, lane_val);
-			}
-
-			atomic[u32](0, bitcast[&mut u32](addr), val_per_lane, 7, "")
-			*/
-			atomic[u32](0, bitcast[&mut u32](addr), val, 7, "")
-		},
+		atomic_exch_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](0, bitcast[&mut u32](addr), val, 7, ""),
 		atomic_exch_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](0, bitcast[&mut u64](addr), val, 7, ""),
 
 		atomic_min_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32]( 8, bitcast[&mut i32](addr), val, 7, ""),
