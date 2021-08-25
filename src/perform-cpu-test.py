@@ -20,8 +20,10 @@ if __name__ == "__main__":
     parser.add_argument("--src-file", type=Path, required=True)
     parser.add_argument("--bin-file", type=Path, required=True)
     parser.add_argument("--llvm-file", type=Path, required=True)
+    parser.add_argument("--config", type=str)
     args = parser.parse_args()
 
+    # print(Path.cwd())
     print("Perform test case", args.src_file, "...", "", end="")
 
     # print("executing", args.bin_file)
@@ -57,7 +59,15 @@ if __name__ == "__main__":
     for key in inst_stats.keys():
         current_stats[key] = 0
 
-    with open(args.llvm_file, 'r', encoding='utf-8') as file:
+    llvm_file = args.llvm_file
+    if not args.llvm_file.is_file():
+        llvm_file = args.llvm_file.parent / args.config / args.llvm_file.name
+
+    if not llvm_file.is_file():
+        print("llvm file not found:", args.llvm_file)
+        sys.exit(-2)
+
+    with open(llvm_file, 'r', encoding='utf-8') as file:
         for line in file:
             if line.lstrip().startswith('declare'):
                 continue

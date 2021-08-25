@@ -61,18 +61,19 @@ function(add_testcase _target _testfile _mapping)
 		list(FILTER _source_files INCLUDE REGEX "\.o$")
 		list(GET _source_files 0 _obj_file)
 		get_filename_component(_llvmname ${_obj_file} NAME_WE)
-		set(_llvmfile ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/${_llvmname}.ll)
+		set(_llvmfile ${_llvmname}.ll)
 		# message(STATUS "${_llvmfile}")
 		set(_test_command
 			Python3::Interpreter ${AnyQ_SOURCE_DIR}/perform-cpu-test.py
 			--src-file ${_srcfile}
+			--config $<CONFIG>
 			--llvm-file ${_llvmfile}
 			--bin-file $<TARGET_FILE:${_target}>
 		)
 	else()
 		set(_test_command ${_target})
 	endif()
-	add_test(NAME "${_target}" COMMAND ${_test_command} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+	add_test(NAME "${_target}" COMMAND ${_test_command} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()
 
 function(add_schedule_test _testfile _mapping)
