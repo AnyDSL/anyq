@@ -1,6 +1,14 @@
+
+// inst_stats: llvm.vector.reduce.add.v8i32(1), atomicrmw(17), extractelement(24), insertelement(8)
+
+// 1x atomicrmw add [ok]
+// 8x extract mask for cascade
+// 8x cascaded extract, atomicrmw xchg, insert [ok]
+// 8x atomicrmw add [todo] -> should be 1x llvm.vector.reduce.add.v8i32 and 1x atomicrmw add
+
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_: i32| 0;
-	let local  = @|l: i32| l;
+	let local  = @|l: i32| l & 0xFFFFFE;
 	(global, local)
 }
 
@@ -11,10 +19,10 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, _write: WriteFn, global: Glo
 		let mydata = read(tidx);
 		thread.atomic_add_global_i32(global(0), mydata);
 
-		let mut newdata = mydata;
-		//if mydata & 1 == 0 {
+		let mut newdata = 0; // mydata;
+		if mydata & 1 == 0 {
 			newdata = thread.atomic_exch_global_i32(global(2), mydata);
-		//}
+		}
 
 		thread.atomic_add_global_i32(global(1), newdata);
 	}
@@ -24,8 +32,9 @@ fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32
 	let last_value = global(2);
 	//print_string("last_value: "); print_i32(last_value); print_string("\n");
 
-	let values = |l: i32| l;
-	let result = |g: i32| match g { 0 => 130816, 1 => 130816 - last_value, 2 => last_value, _ => 0x0 };
+	let values = |l: i32| l & 0xFFFFFE;
+//	let result = |g: i32| match g { 0 => 130816, 1 => 65280 - last_value, 2 => last_value, _ => 0x0 };
+	let result = |g: i32| match g { 0 => 130560, 1 => 130560 - last_value, 2 => last_value, _ => 0x0 };
 
 	(result, values)
 }
