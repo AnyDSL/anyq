@@ -1,0 +1,37 @@
+
+// inst_stats: llvm.vector.reduce.add.v8i32(2), atomicrmw(3), extractelement(1), shufflevector(1), insertelement(1)
+
+// 1x atomicrmw add [ok]
+// 1x extract, shufflevector, atomicrmw xchg, insert [perfect]
+// 1x atomicrmw add [ok]
+
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| l;
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, read: ReadFn, _write: WriteFn, global: GlobalFn) -> () {
+	for thread in grid.threads() {
+		let tidx = thread.idx(0) as i32;
+
+		let mydata = read(tidx);
+		thread.atomic_add_global_i32(global(0), mydata);
+
+		let mut newdata = mydata;
+		newdata = thread.atomic_exch_global_i32(global(2), mydata);
+
+		thread.atomic_add_global_i32(global(1), newdata);
+	}
+}
+
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let last_value = global(2);
+	//print_string("last_value: "); print_i32(last_value); print_string("\n");
+
+	let values = |l: i32| l;
+	let result = |g: i32| match g { 0 => 130816, 1 => 130816 - last_value, 2 => last_value, _ => 0x0 };
+	//let result = |g: i32| match g { 0 => 130560, 1 => 130560 - last_value, 2 => last_value, _ => 0x0 };
+
+	(result, values)
+}

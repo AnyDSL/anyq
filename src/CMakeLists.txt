@@ -129,6 +129,7 @@ set(TEST_SUITE_FILES
 	test-suite-atomic_or.art
 	test-suite-atomic_cas.art
 	test-suite-atomic_exch.art
+	test-suite-atomic_exch-uniform.art
 	test-suite-atomic_inc.art
 	test-suite-scatter_writes.art
 	test-suite-shfl_bfly.art
