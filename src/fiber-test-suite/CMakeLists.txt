@@ -18,7 +18,7 @@ set(TEST_SUITE_FILES
 	fiber-test-idx-thread.art
 	fiber-test-idx-group.art
 	fiber-test-idx-group-thread.art
-	fiber-test-idx-wave.art
+	fiber-test-idx-wave-barrier.art
 	fiber-test-idx-wave-atomic.art
 	fiber-test-idx-wave-shuffle.art
 	fiber-test-idx-wave-constant-shuffle.art
