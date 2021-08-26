@@ -6,8 +6,8 @@ struct Element {
 
 #[export]
 fn main() -> i32 {
-	push_pop_queue_test[Element](QueueTestCase[Element] {
-		createTest = @|device, additional_mem| createQueueTest[Element](device, genericQueueElementType[Element](), additional_mem),
+	queue_tests::concurrent_push_pop[Element](queue_tests::QueueTestCase[Element] {
+		element_type = genericQueueElementType[Element](),
 		generateElement = @|id:u32| Element { payload = [0; 7], blub = id },
 		checkElement = @|el:Element, check:u32| el.blub == check
 	})

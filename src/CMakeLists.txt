@@ -116,8 +116,10 @@ set(TEST_SCHEDULE_FILES
 	test-basics.art
 	test-shuffles.art
 	test-barriers.art
-	test-producer-consumer-queue-push-pop-generic.art
-	test-producer-consumer-queue-push-pop-index.art
+	# test-producer-consumer-queue-push-and-then-pop-generic.art
+	test-producer-consumer-queue-push-and-then-pop-index.art
+	# test-producer-consumer-queue-concurrent-push-pop-generic.art
+	test-producer-consumer-queue-concurrent-push-pop-index.art
 )
 
 set(TEST_SUITE_FILES

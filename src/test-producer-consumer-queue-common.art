@@ -1,79 +1,239 @@
 
-struct QueueTestCase[T] {
-	createTest: fn(AccDevice, i64) -> QueueTest[T],
-	generateElement: fn(u32) -> T,
-	checkElement: fn(T, u32) -> bool
-}
+// mod queue_tests {
+	// use super::self;
+	// use super::range;
+	// use super::sizeof;
+	// use super::bitcast;
+	// use super::div_up;
+	// use super::AccDevice;
+	// use super::createAccDevice;
+	// use super::ProducerConsumerQueue;
+	// use super::QueueElementType;
+	// use super::createConcurrentProducerConsumerQueue;
+	// use super::createBaseTest;
 
-fn push_pop_queue_test[T](test_case: QueueTestCase[T]) -> i32 {
-	let device = createAccDevice();
-
-	let num_elements = 1024 * 1024;
-	let queue_test = test_case.createTest(device, num_elements as i64 * sizeof[u32]());
-	let block_dim = 256;
-
-	for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
-		// keep track of which slots have been handed out to whom.
-		let pushed_buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
-
-		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
-			for thread in grid.threads() {
-				pushed_buffer(thread.idx(0)) = -1;
-			}
-		}
-
-		// parallel push until full, verify that each element is handed out exactly once
-		for grid in device.launch_1d(42, block_dim) {
-			for thread in grid.threads() {
-				while (for i in queue.push(thread) {
-					let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
-
-					if (old != -1) {
-						device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+	struct QueueTest[T] {
+		run_test: fn(fn(ProducerConsumerQueue[T], &mut addrspace(1) [i8], &mut addrspace(1) u32) -> bool) -> fn(i32) -> (),
+		finish: fn() -> i32
+	}
+	
+	fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], additional_mem: i64) -> QueueTest[T] {
+		let test = createBaseTest(device, additional_mem);
+	
+		QueueTest[T] {
+			run_test = @|body|@|queue_size| {
+				for device_memory, device_failed_flag in test.run_test() {
+					let queue = createConcurrentProducerConsumerQueue[T](device, element_type, queue_size);
+	
+					let block_dim = 256;
+					let num_blocks = (queue_size + block_dim - 1) / block_dim;
+	
+					for grid in device.launch_1d(num_blocks, block_dim) {
+						queue.reset(grid);
 					}
-
-					test_case.generateElement(thread.idx(0))
-				}) > 0 {};
-			}
-		}
-
-		// check that all elements have been handed out
-		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
-			for thread in grid.threads() {
-				if pushed_buffer(thread.idx(0)) < 0 {
-					device.print_i32a("ERROR: queue element %u has been skipped!\n", [thread.idx(0) as i32]);
-					thread.atomic_exch_global_u32(device_failed_flag, -1);
-				}
-			}
-		}
-
-		// pop
-		for grid in device.launch_1d(42, block_dim) {
-			for thread in grid.threads() {
-				while (for el, i in queue.pop(thread) {
-					let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
-
-					if !test_case.checkElement(el, check) {
-						device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+	
+					let cpu_result = body(queue, device_memory, device_failed_flag);
+	
+					for grid in device.launch_1d(num_blocks, block_dim) {
+						queue.validate(device_failed_flag, grid);
 					}
-				}) > 0 {};
-			}
-		}
-
-		// check that all elements have been popped
-		for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
-			for thread in grid.threads() {
-				if pushed_buffer(thread.idx(0)) != -1 {
-					device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
-					thread.atomic_exch_global_u32(device_failed_flag, -1);
+	
+					device.synchronize();
+					queue.release();
+	
+					cpu_result
 				}
+			},
+	
+			finish = @|| {
+				test.finish()
 			}
 		}
-
-		true
 	}
 
-	queue_test.finish()
-}
+
+	struct QueueTestCase[T] {
+		element_type: QueueElementType[T],
+		generateElement: fn(u32) -> T,
+		checkElement: fn(T, u32) -> bool
+	}
+
+	fn push_and_then_pop[T](test_case: QueueTestCase[T]) -> i32 {
+		let device = createAccDevice();
+
+		let num_elements = 1000000;
+		let queue_test = createQueueTest(device, test_case.element_type, num_elements as i64 * sizeof[u32]());
+		let block_dim = 256;
+
+		for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
+			// keep track of which slots have been handed out to whom.
+			let pushed_buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
+
+			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if thread.idx(0) as i32 < num_elements {
+						pushed_buffer(thread.idx(0)) = -1;
+					}
+				}
+			}
+
+			// concurrent push until full, verify that each element is handed out exactly once
+			for grid in device.launch_1d(42, block_dim) {
+				for thread in grid.threads() {
+					while (for i in queue.push(thread) {
+						let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
+
+						if (old != -1) {
+							device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
+							thread.atomic_exch_global_u32(device_failed_flag, -1);
+						}
+
+						test_case.generateElement(thread.idx(0))
+					}) > 0 {};
+				}
+			}
+
+			// check that all elements have been handed out
+			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if pushed_buffer(thread.idx(0)) < 0 {
+						device.print_i32a("ERROR: queue element %u has been skipped!\n", [thread.idx(0) as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					}
+				}
+			}
+
+			// concurrent pop until empty, verify that each element comes from the correct slot
+			for grid in device.launch_1d(42, block_dim) {
+				for thread in grid.threads() {
+					while (for el, i in queue.pop(thread) {
+						let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
+
+						if !test_case.checkElement(el, check) {
+							device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
+							thread.atomic_exch_global_u32(device_failed_flag, -1);
+						}
+					}) > 0 {};
+				}
+			}
+
+			// check that all elements have been popped
+			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if pushed_buffer(thread.idx(0)) != -1 {
+						device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					}
+				}
+			}
+
+			true
+		}
+
+		queue_test.finish()
+	}
+
+	fn concurrent_push_pop[T](test_case: QueueTestCase[T]) -> i32 {
+		let device = createAccDevice();
+
+		let num_elements = 1000000;
+		let queue_test = createQueueTest(device, test_case.element_type, (num_elements as i64 + 2) * sizeof[u32]());
+		let block_dim = 256;
+
+		for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
+			// keep track of which slots have been handed out to whom.
+			let pushed_buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
+			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 0));
+			let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 1));
+
+			for grid in device.launch_1d(div_up(num_elements + 2, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if thread.idx(0) as i32 >= num_elements {
+						if thread.idx(0) as i32 < num_elements + 2 {
+							pushed_buffer(thread.idx(0)) = 0;
+						}
+					}
+					else {
+						pushed_buffer(thread.idx(0)) = -1;
+					}
+				}
+			}
+
+			// concurrent push and pop, verify that each element is handed out exactly once and comes from the correct slot
+			for grid in device.launch_1d(42, block_dim) {
+				for thread in grid.threads() {
+					let mut rand_state = rand::xorseed32(thread.idx(0));
+
+					for i in range(0, 10) {
+						if rand_state < (-1 as u32) / 2 {
+							// push
+							for i in queue.push(thread) {
+								let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
+
+								if (old != -1) {
+									device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
+									thread.atomic_exch_global_u32(device_failed_flag, -1);
+								}
+
+								test_case.generateElement(thread.idx(0))
+							}
+
+							thread.atomic_add_global_i32(num_pushed, 1);
+
+							if thread.idx(0) == 0 {
+								device.print_i32a("push %d\n", [i as i32]);
+							}
+						}
+						else {
+							// pop
+							for el, i in queue.pop(thread) {
+								let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
+			
+								if !test_case.checkElement(el, check) {
+									device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
+									thread.atomic_exch_global_u32(device_failed_flag, -1);
+								}
+							}
+
+							thread.atomic_add_global_i32(num_popped, 1);
+
+							if thread.idx(0) == 0 {
+								device.print_i32a("pop %d\n", [i as i32]);
+							}
+						}
+
+						rand_state = rand::xorshift32(rand_state);
+					}
+				}
+			}
+
+			// pop remaining elements until empty, verify that each element comes from the correct slot
+			for grid in device.launch_1d(42, block_dim) {
+				for thread in grid.threads() {
+					while (for el, i in queue.pop(thread) {
+						let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
+
+						if !test_case.checkElement(el, check) {
+							device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
+							thread.atomic_exch_global_u32(device_failed_flag, -1);
+						}
+					}) > 0 {};
+				}
+			}
+
+			// check that all elements have been popped
+			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if pushed_buffer(thread.idx(0)) != -1 {
+						device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
+						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					}
+				}
+			}
+
+			true
+		}
+
+		queue_test.finish()
+	}
+// }

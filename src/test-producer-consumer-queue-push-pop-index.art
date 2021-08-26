@@ -1,9 +1,0 @@
-
-#[export]
-fn main() -> i32 {
-	push_pop_queue_test[u32](QueueTestCase[u32] {
-		createTest = @|device, additional_mem| createQueueTest[u32](device, indexQueueElementType(), additional_mem),
-		generateElement = @|id:u32| id,
-		checkElement = @|el:u32, check:u32| el == check
-	})
-}
