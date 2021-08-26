@@ -18,11 +18,15 @@ set(TEST_SUITE_FILES
 	fiber-test-idx-thread.art
 	fiber-test-idx-group.art
 	fiber-test-idx-group-thread.art
-	fiber-test-idx-wave.art
+	fiber-test-idx-wave-barrier.art
 	fiber-test-idx-wave-atomic.art
+	fiber-test-idx-wave-shuffle.art
+	fiber-test-idx-wave-constant-shuffle.art
 	fiber-test-idx-wave-thread.art
 	fiber-test-idx-group-wave.art
 	fiber-test-idx-group-wave-thread.art
+	fiber-test-idx-group-2xthread.art
+	fiber-test-idx-group-wave-1xthread-2xthread.art
 )
 
 foreach(_test_case ${TEST_SUITE_FILES})

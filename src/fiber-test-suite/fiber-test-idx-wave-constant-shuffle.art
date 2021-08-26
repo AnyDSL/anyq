@@ -1,3 +1,6 @@
+
+// inst_stats: shufflevector(0)
+
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_g: i32| 0;
 	let local  = @|_l: i32| 0xBEAF;
@@ -9,7 +12,19 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 		// this code is executed by all threads within the wave (hence wave_size times)
 		let wid = wave.idx() as i32;
 
-		(*global(wid)) += 1;
+		// ! this is undefined behavior:
+		// (*global(wid)) += 1;
+
+		let mut value = 1;
+		value = value + wave.shfl_bfly_i32(value, 0x1, wave.num_threads());
+		value = value + wave.shfl_bfly_i32(value, 0x2, wave.num_threads());
+		value = value + wave.shfl_bfly_i32(value, 0x4, wave.num_threads());
+
+		for thread in wave.threads() {
+			if thread.idx(0) == 6 {
+				(*global(wid)) = value;
+			}
+		}
 
 		write(wid, wid);
 	}

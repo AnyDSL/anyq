@@ -1,6 +1,5 @@
 
-// inst_stats: atomicrmw(1)
-
+// inst_stats: llvm.x86.avx.movmsk.ps.256(1), llvm.ctpop.i32(1)
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_g: i32| 0;
@@ -8,20 +7,19 @@ fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->
 	(global, local)
 }
 
-
 fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
-	for group in grid.groups() {
-		for wave in group.waves() {
-			// this code is executed by all threads within the wave (hence wave_size times)
-			let wid = (group.idx(0) * group.num_waves() + wave.idx()) as i32;
+	for wave in grid.waves() {
+		// this code is executed by all threads within the wave (hence wave_size times)
+		let wid = wave.idx() as i32;
 
-			// this is undefined behavior (see fiber-test-idx-wave-*)
-			//(*global(wid)) += my_func(1);
+		// ! this is undefined behavior
+		// (*global(wid)) += 1;
 
-			atomic_inc(global(wid));
+		let mut value = *global(wid);
+		value = value + wave.barrier_count(true);
+		(*global(wid)) = value;
 
-			write(wid, wid);
-		}
+		write(wid, wid);
 	}
 }
 
