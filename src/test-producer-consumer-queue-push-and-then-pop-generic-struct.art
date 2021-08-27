@@ -1,0 +1,14 @@
+
+struct Element {
+	payload: bool,
+	blub: u32
+}
+
+#[export]
+fn main() -> i32 {
+	push_and_then_pop_queue_test[Element](QueueTestCase[Element] {
+		element_type = genericQueueElementType[Element](),
+		generateElement = @|id:u32| Element { payload = id % 3 == 0, blub = id },
+		checkElement = @|el:Element, check:u32| el.blub == check
+	})
+}

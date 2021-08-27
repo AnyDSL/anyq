@@ -58,7 +58,7 @@
 		checkElement: fn(T, u32) -> bool
 	}
 
-	fn push_and_then_pop[T](test_case: QueueTestCase[T]) -> i32 {
+	fn push_and_then_pop_queue_test[T](test_case: QueueTestCase[T]) -> i32 {
 		let device = createAccDevice();
 
 		let num_elements = 1000000;
@@ -133,7 +133,7 @@
 		queue_test.finish()
 	}
 
-	fn concurrent_push_pop[T](test_case: QueueTestCase[T]) -> i32 {
+	fn concurrent_push_pop_queue_test[T](test_case: QueueTestCase[T]) -> i32 {
 		let device = createAccDevice();
 
 		let num_elements = 1000000;
@@ -180,9 +180,9 @@
 
 							thread.atomic_add_global_i32(num_pushed, 1);
 
-							if thread.idx(0) == 0 {
-								device.print_i32a("push %d\n", [i as i32]);
-							}
+							// if thread.idx(0) == 0 {
+							// 	device.print_i32a("push %d\n", [i]);
+							// }
 						}
 						else {
 							// pop
@@ -197,9 +197,9 @@
 
 							thread.atomic_add_global_i32(num_popped, 1);
 
-							if thread.idx(0) == 0 {
-								device.print_i32a("pop %d\n", [i as i32]);
-							}
+							// if thread.idx(0) == 0 {
+							// 	device.print_i32a("pop %d\n", [i]);
+							// }
 						}
 
 						rand_state = rand::xorshift32(rand_state);

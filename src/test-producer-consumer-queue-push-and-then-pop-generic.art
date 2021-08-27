@@ -1,14 +1,11 @@
 
-struct Element {
-	payload: [u32 * 7],
-	blub: u32
-}
+type Element = i64;
 
 #[export]
 fn main() -> i32 {
-	push_and_then_pop[Element](QueueTestCase[Element] {
+	push_and_then_pop_queue_test[Element](QueueTestCase[Element] {
 		element_type = genericQueueElementType[Element](),
-		generateElement = @|id:u32| Element { payload = [0; 7], blub = id },
-		checkElement = @|el:Element, check:u32| el.blub == check
+		generateElement = @|id:u32| -> Element { id as i64 },
+		checkElement = @|el:Element, check:u32| el == check as i64
 	})
 }

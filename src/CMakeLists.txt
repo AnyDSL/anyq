@@ -117,6 +117,8 @@ set(TEST_SCHEDULE_FILES
 	test-shuffles.art
 	test-barriers.art
 	test-producer-consumer-queue-push-and-then-pop-generic.art
+	test-producer-consumer-queue-push-and-then-pop-generic-struct.art
+	test-producer-consumer-queue-push-and-then-pop-generic-definite-array.art
 	test-producer-consumer-queue-push-and-then-pop-index.art
 	test-producer-consumer-queue-concurrent-push-pop-generic.art
 	test-producer-consumer-queue-concurrent-push-pop-index.art
