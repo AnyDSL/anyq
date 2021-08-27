@@ -6,7 +6,7 @@ struct Element {
 
 #[export]
 fn main() -> i32 {
-	queue_tests::push_and_then_pop[Element](queue_tests::QueueTestCase[Element] {
+	push_and_then_pop[Element](QueueTestCase[Element] {
 		element_type = genericQueueElementType[Element](),
 		generateElement = @|id:u32| Element { payload = [0; 7], blub = id },
 		checkElement = @|el:Element, check:u32| el.blub == check
