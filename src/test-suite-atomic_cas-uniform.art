@@ -1,7 +1,5 @@
 
-// inst_stats: extractelement(16), cmpxchg(8), insertelement(12), shufflevector(4)
-
-// TODO: review the generated code and the implemented scalarized mapping
+// inst_stats: extractelement(16), cmpxchg(8), insertelement(8)
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
@@ -15,23 +13,21 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 		let tidx = thread.idx(0) as i32;
 
 		let mydata = read(tidx);
-		let newdata = mydata + 2;
+		let newdata = mydata + 1;
 
 		let mut old = -1;
 		let assumed = mydata;
 
-		if tidx & 0x1 == 0 {
-			while assumed != old {
-				old = thread.atomic_cas_global_i32(global(0), assumed, newdata);
-			}
-
-			write(tidx, newdata);
+		while assumed != old {
+			old = thread.atomic_cas_global_i32(global(0), assumed, newdata);
 		}
+
+		write(tidx, newdata);
 	}
 }
 
 fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-	let values = |l: i32| if l % 2 == 0 { l + 2 } else { l };
+	let values = |l: i32| l + 1;
 	let result = |g: i32| match g { 0 => 512, _ => 0x0 };
 
 	(result, values)
