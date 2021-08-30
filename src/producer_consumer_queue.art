@@ -165,6 +165,10 @@ fn @genericQueueElementType[T]() {
 					thread.memory_barrier();
 
 					sink(*element, i);
+
+					thread.memory_barrier();
+
+					thread.atomic_exch_global_u32(lock, 0);
 				},
 				store = @|source, thread| {
 					while thread.atomic_cas_global_u32(lock, 0, 1) != 0 {
