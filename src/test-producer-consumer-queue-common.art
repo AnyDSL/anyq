@@ -120,9 +120,11 @@
 			// check that all elements have been popped
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if pushed_buffer(thread.idx(0)) != -1 {
-						device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					if thread.idx(0) as i32 < num_elements {
+						if pushed_buffer(thread.idx(0)) != -1 {
+							device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
+							thread.atomic_exch_global_u32(device_failed_flag, -1);
+						}
 					}
 				}
 			}
@@ -224,9 +226,11 @@
 			// check that all elements have been popped
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if pushed_buffer(thread.idx(0)) != -1 {
-						device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+					if thread.idx(0) as i32 < num_elements {
+						if pushed_buffer(thread.idx(0)) != -1 {
+							device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
+							thread.atomic_exch_global_u32(device_failed_flag, -1);
+						}
 					}
 				}
 			}

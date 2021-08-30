@@ -115,15 +115,15 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 						thread.atomic_or_global_u32(corrupted, 1);
 					}
 
-					if (*head != 0) {
-						device.print_i32("queue head (%d) is not zero!\n", *head as i32);
-						thread.atomic_or_global_u32(corrupted, 1);
-					}
+					// if (*head != 0) {
+					// 	device.print_i32("queue head (%d) is not zero!\n", *head as i32);
+					// 	thread.atomic_or_global_u32(corrupted, 1);
+					// }
 
-					if (*tail != 0) {
-						device.print_i32("queue tail (%d) is not zero!\n", *tail as i32);
-						thread.atomic_or_global_u32(corrupted, 1);
-					}
+					// if (*tail != 0) {
+					// 	device.print_i32("queue tail (%d) is not zero!\n", *tail as i32);
+					// 	thread.atomic_or_global_u32(corrupted, 1);
+					// }
 				}
 
 				if idx < num_elements as u32 {
