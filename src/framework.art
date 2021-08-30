@@ -79,6 +79,21 @@ fn @wrap_dim_3d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	}
 }
 
+fn @print_hex(val: i32, skip_leading_zeros: bool) -> () {
+	print_char('0'); print_char('x');
+	let mut leading = skip_leading_zeros;
+	let l = 2 * sizeof[i32]() as i32;
+	for i in range(0, l) {
+		let curr = (val as u32 >> 4*(l-i-1) as u32) & 0xf as u32;
+		leading = leading && (curr == 0) && i < l-1;
+		if leading {
+			continue()
+		}
+		let off = if curr < 10 { '0' } else { 'A' - 10 };
+		print_char(off + curr as u8);
+	}
+}
+
 fn @print_binary(value: u32) -> () {
 	let group = 4;
 	let length = 16;
@@ -205,7 +220,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 			for idx in range(0, num_globals) {
 					let check = validate_global(idx, data(idx));
 					if !check {
-						print_string("validation failed! global("); print_i32(idx); print_string(") = "); print_i32(data(idx)); print_char('\n');
+						print_string("validation failed! global("); print_hex(idx, false); print_string(") = "); print_i32(data(idx)); print_char('\n');
 						if stop_on_first_fail { return(false) }
 					}
 					result &= check;
@@ -213,7 +228,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 			for idx in range(0, num_locals) {
 					let check = validate_local(idx, data(num_globals + idx));
 					if !check {
-						print_string("validation failed! local("); print_i32(idx); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
+						print_string("validation failed! local("); print_hex(idx, false); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
 						if stop_on_first_fail { return(false) }
 					}
 					result &= check;
