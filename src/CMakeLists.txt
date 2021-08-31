@@ -89,6 +89,7 @@ function(add_schedule_test _testfile _mapping)
 	if (BUILD_TESTING)
 		add_testcase(${_target} ${_testfile} ${_mapping})
 	endif()
+	add_dependencies(${_mapping} ${_target})
 endfunction()
 
 set(TEST_PLATFORMS)
@@ -141,6 +142,8 @@ set(TEST_SUITE_FILES
 )
 
 foreach(_test_platform ${TEST_PLATFORMS})
+	add_custom_target(${_test_platform})
+
 	foreach(_test_schedule ${TEST_SCHEDULE_FILES})
 		add_schedule_test(${_test_schedule} ${_test_platform})
 	endforeach()
