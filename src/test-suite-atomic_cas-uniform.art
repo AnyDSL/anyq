@@ -1,7 +1,8 @@
 
-// inst_stats: extractelement(24), cmpxchg(8), insertelement(8)
+// inst_stats: extractelement(25), cmpxchg(8), insertelement(8)
 
-// 3x extractelement (cmp, new, lane active), 1x cmpxchg, 1x insertelement
+// vec_width: 3x extractelement (cmp, new, lane active), 1x cmpxchg, 1x insertelement
+// 1x extractelement for masked fiber_yield
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
@@ -17,11 +18,13 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 		let mydata = read(tidx);
 		let newdata = mydata + 1;
 
-		let mut old = -1;
+		let mut old = -42;
 		let assumed = mydata;
 
 		while assumed != old {
 			old = thread.atomic_cas_global_i32(global(0), assumed, newdata);
+			// the fiber scheduler is not fair -> we need to yield if we wait for some other thread
+			thread.yield();
 		}
 
 		write(tidx, newdata);
