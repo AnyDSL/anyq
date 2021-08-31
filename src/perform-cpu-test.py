@@ -72,6 +72,18 @@ if __name__ == "__main__":
             if line.lstrip().startswith('declare'):
                 continue
 
+            if line.lstrip().startswith(';'):
+                continue
+
+            if line.lstrip().startswith('!'):
+                continue
+
+            if line.lstrip().startswith('source_filename'):
+                continue
+
+            if line.lstrip().startswith('target'):
+                continue
+
             for key in inst_stats.keys():
                 if key not in line:
                     continue
