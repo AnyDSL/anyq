@@ -257,12 +257,12 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 
 		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
 		atomic_cas_global_i32 = @|addr: &mut addrspace(1) i32, cmp: i32, new: i32| -> i32 {
-			//match cmpxchg[i32](bitcast[&mut i32](addr), cmp, new, 7, "") { (old, _success) => old }
-
+			match cmpxchg[i32](bitcast[&mut i32](addr), cmp, new, 7, "") { (old, _success) => old }
+			/*
 			let mut result:i32 = self as i32; // mark result as varying for rv
 			for l in unroll(0, vec_width) {
-				//if rv_ballot_u32(true) & (1 << l as u32) != 0 {
-				if self as i32 == l {
+				if rv_ballot_u32(true) & (1 << l as u32) != 0 {
+				//if self as i32 == l {
 					let lane_cmp = rv_extract_i32(cmp, l);
 					let lane_new = rv_extract_i32(new, l);
 					let lane_old = match cmpxchg[i32](bitcast[&mut i32](addr), lane_cmp, lane_new, 7, "") {
@@ -272,6 +272,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 				}
 			}
 			result
+			*/
 		},
 		atomic_cas_global_u32 = @|addr: &mut addrspace(1) u32, cmp: u32, new: u32| -> u32 {
 

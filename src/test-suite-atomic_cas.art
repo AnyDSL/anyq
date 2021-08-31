@@ -1,7 +1,8 @@
 
-// inst_stats: extractelement(16), cmpxchg(8), insertelement(12), shufflevector(4)
+// inst_stats: extractelement(12), cmpxchg(4), insertelement(8), shufflevector(4)
 
-// TODO: review the generated code and the implemented scalarized mapping
+// 3x extractelement (cmp, new, lane active), 1x cmpxchg, 1x insertelement
+// 4x insertelement + 4x shufflevector for broadcasts
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
@@ -17,7 +18,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 		let mydata = read(tidx);
 		let newdata = mydata + 2;
 
-		let mut old = -1;
+		let mut old = -42;
 		let assumed = mydata;
 
 		if tidx & 0x1 == 0 {

@@ -1,5 +1,7 @@
 
-// inst_stats: extractelement(16), cmpxchg(8), insertelement(8)
+// inst_stats: extractelement(24), cmpxchg(8), insertelement(8)
+
+// 3x extractelement (cmp, new, lane active), 1x cmpxchg, 1x insertelement
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
