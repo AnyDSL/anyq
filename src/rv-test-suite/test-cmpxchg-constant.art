@@ -1,0 +1,30 @@
+
+// 2x extract, 1x cmpxchg, 2x insert per lane
+
+// inst_stats: cmpxchg(8), extractelement(16), insertelement(16)
+
+
+fn @loop_body(lane: i32, vec_width: i32, _read: fn(i32)->i32, _write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+	let atomic_cmpxchg = atomic_cmpxchg_i32(lane, vec_width);
+
+	let ptr = global(0);
+
+	let mut old:i32 = *ptr;
+	let mut cmp:bool = false;
+	let mut new:i32;
+
+	while(!cmp) {
+		new = old + 1;
+		let (res_old, res_cmp) = atomic_cmpxchg(ptr, old, new);
+		old = res_old;
+		cmp = res_cmp;
+	}
+}
+
+fn expected_result(_data: fn(i32)->i32, _global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
+	let values = [0, 1, 2, 3, 4, 5, 6, 7];
+	let result = 18;
+
+	(|i| values(i), result)
+}
