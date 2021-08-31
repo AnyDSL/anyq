@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     passed = True
     for key in inst_stats.keys():
-        passed = current_stats[key] <= inst_stats[key]
+        passed = current_stats[key] == inst_stats[key]
         if not passed:
             break
 
