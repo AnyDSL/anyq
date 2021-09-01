@@ -45,7 +45,7 @@ fn main() -> i32 {
 								true
 							}
 							else {
-								thread.atomic_exch_global_u32(next_input, num_elements);
+								thread.atomic_store_global_u32(next_input, num_elements);
 								false
 							}
 						}
@@ -70,7 +70,7 @@ fn main() -> i32 {
 				for thread in grid.threads() {
 					if *next_input != num_elements {
 						device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+						thread.atomic_store_global_u32(device_failed_flag, -1);
 					}
 				}
 			}

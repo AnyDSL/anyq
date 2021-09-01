@@ -87,7 +87,7 @@
 
 						if (old != -1) {
 							device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
-							thread.atomic_exch_global_u32(device_failed_flag, -1);
+							thread.atomic_store_global_u32(device_failed_flag, -1);
 						}
 
 						test_case.generateElement(thread.idx(0))
@@ -102,7 +102,7 @@
 				for thread in grid.threads() {
 					if pushed_buffer(thread.idx(0)) < 0 {
 						device.print_i32a("ERROR: queue element %u has been skipped!\n", [thread.idx(0) as i32]);
-						thread.atomic_exch_global_u32(device_failed_flag, -1);
+						thread.atomic_store_global_u32(device_failed_flag, -1);
 					}
 				}
 			}
@@ -117,7 +117,7 @@
 
 						if !test_case.checkElement(el, check) {
 							device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
-							thread.atomic_exch_global_u32(device_failed_flag, -1);
+							thread.atomic_store_global_u32(device_failed_flag, -1);
 						}
 					}) > 0 {};
 				}
@@ -131,7 +131,7 @@
 					if thread.idx(0) as i32 < num_elements {
 						if pushed_buffer(thread.idx(0)) != -1 {
 							device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
-							thread.atomic_exch_global_u32(device_failed_flag, -1);
+							thread.atomic_store_global_u32(device_failed_flag, -1);
 						}
 					}
 				}
@@ -184,7 +184,7 @@
 
 								if (old != -1) {
 									device.print_i32a("ERROR: queue element %u handed out more than once!\n", [i as i32]);
-									thread.atomic_exch_global_u32(device_failed_flag, -1);
+									thread.atomic_store_global_u32(device_failed_flag, -1);
 								}
 
 								test_case.generateElement(thread.idx(0))
@@ -201,7 +201,7 @@
 			
 								if !test_case.checkElement(el, check) {
 									device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
-									thread.atomic_exch_global_u32(device_failed_flag, -1);
+									thread.atomic_store_global_u32(device_failed_flag, -1);
 								}
 							} > 0 {
 								thread.atomic_add_global_i32(num_popped, 1);
@@ -225,7 +225,7 @@
 
 						if !test_case.checkElement(el, check) {
 							device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
-							thread.atomic_exch_global_u32(device_failed_flag, -1);
+							thread.atomic_store_global_u32(device_failed_flag, -1);
 						}
 					}) > 0 {};
 				}
@@ -239,7 +239,7 @@
 					if thread.idx(0) as i32 < num_elements {
 						if pushed_buffer(thread.idx(0)) != -1 {
 							device.print_i32a("ERROR: queue element %u has not been popped!\n", [thread.idx(0) as i32]);
-							thread.atomic_exch_global_u32(device_failed_flag, -1);
+							thread.atomic_store_global_u32(device_failed_flag, -1);
 						}
 					}
 				}
