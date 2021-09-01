@@ -236,58 +236,19 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 		},
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
-			let active_lanes = rv_ballot_u32(true);
-			let _num_active_lanes = cpu_popcount_u32(active_lanes) as u32;
-
-			let _wrap = val + 1;
-
-			let mut result:u32 = self; // mark result as varying for rv
-			//let mut active_lane:u32 = 0;
 
 			// this is the generic version
-			/*
 			let mut old:u32 = atomic_load[u32](ptr, 7, "");
 			let mut cmp:bool = false;
 
 			while(!cmp) {
-				let new = if old >= val { num_active_lanes - 1 } else { old + num_active_lanes } % wrap;
+				let new = if old >= val { 0 } else { old + 1 };
 				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, 7, "");
 				old = res_old;
 				cmp = res_cmp;
 			}
 
-			for l in unroll(0, vec_width) {
-				if active_lanes & (1 << l as u32) != 0 {
-					result = rv_insert_u32(result, l, (old + active_lane++) % wrap);
-				}
-			}
-			*/
-
-			// this is optimized for wrap being 2**n
-			/*
-			// atomic_add
-			let old:u32 = atomic[u32](1, ptr, num_active_lanes, 7, "");
-			if old >= val {
-				// atomic_and to mask overflow bits
-				// however, we must ensure that addr will not be read outside of this function
-				atomic[u32](3, ptr, val, 7, "");
-			}
-
-			for l in unroll(0, vec_width) {
-				if active_lanes & (1 << l as u32) != 0 {
-					result = rv_insert_u32(result, l, (old + active_lane++) & val);
-				}
-			}
-			*/
-			let old:u32 = atomic[u32](1, ptr, 1, 7, "");
-			if old >= val {
-				// atomic_and to mask overflow bits
-				// however, we must ensure that addr will not be read outside of this function
-				atomic[u32](3, ptr, val, 7, "");
-			}
-			result = old & val;
-
-			result
+			old
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
