@@ -179,7 +179,7 @@
 					for i in range(0, 10) {
 						if rand_state < (-1 as u32) / 2 {
 							// push
-							for i in queue.push(thread) {
+							if for i in queue.push(thread) {
 								let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
 
 								if (old != -1) {
@@ -188,30 +188,26 @@
 								}
 
 								test_case.generateElement(thread.idx(0))
+							} > 0 {
+								thread.atomic_add_global_i32(num_pushed, 1);
+
+								// device.print_i32a("push %d\n", [i]);
 							}
-
-							thread.atomic_add_global_i32(num_pushed, 1);
-
-							// if thread.idx(0) == 0 {
-							// 	device.print_i32a("push %d\n", [i]);
-							// }
 						}
 						else {
 							// pop
-							for el, i in queue.pop(thread) {
+							if for el, i in queue.pop(thread) {
 								let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
 			
 								if !test_case.checkElement(el, check) {
 									device.print_i32a("ERROR: popped queue element %u does not match reference value!\n", [i as i32]);
 									thread.atomic_exch_global_u32(device_failed_flag, -1);
 								}
+							} > 0 {
+								thread.atomic_add_global_i32(num_popped, 1);
+
+								// device.print_i32a("pop %d\n", [i]);
 							}
-
-							thread.atomic_add_global_i32(num_popped, 1);
-
-							// if thread.idx(0) == 0 {
-							// 	device.print_i32a("pop %d\n", [i]);
-							// }
 						}
 
 						rand_state = rand::xorshift32(rand_state);
