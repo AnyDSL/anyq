@@ -77,6 +77,8 @@
 				}
 			}
 
+			device.synchronize();
+
 			// concurrent push until full, verify that each element is handed out exactly once
 			for grid in device.launch_1d(42, block_dim) {
 				for thread in grid.threads() {
@@ -93,6 +95,8 @@
 				}
 			}
 
+			device.synchronize();
+
 			// check that all elements have been handed out
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
 				for thread in grid.threads() {
@@ -102,6 +106,8 @@
 					}
 				}
 			}
+
+			device.synchronize();
 
 			// concurrent pop until empty, verify that each element comes from the correct slot
 			for grid in device.launch_1d(42, block_dim) {
@@ -116,6 +122,8 @@
 					}) > 0 {};
 				}
 			}
+
+			device.synchronize();
 
 			// check that all elements have been popped
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
@@ -160,6 +168,8 @@
 					}
 				}
 			}
+
+			device.synchronize();
 
 			// concurrent push and pop, verify that each element is handed out exactly once and comes from the correct slot
 			for grid in device.launch_1d(42, block_dim) {
@@ -209,6 +219,8 @@
 				}
 			}
 
+			device.synchronize();
+
 			// pop remaining elements until empty, verify that each element comes from the correct slot
 			for grid in device.launch_1d(42, block_dim) {
 				for thread in grid.threads() {
@@ -222,6 +234,8 @@
 					}) > 0 {};
 				}
 			}
+
+			device.synchronize();
 
 			// check that all elements have been popped
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
