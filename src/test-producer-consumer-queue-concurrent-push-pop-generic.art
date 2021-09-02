@@ -1,3 +1,3 @@
 
 #[export]
-fn main() = concurrent_push_pop_queue_test[GenericElementSimple](genericTestCaseSimple());
+fn main() = concurrent_push_pop_queue_test[GenericElementSimple](1000000, genericTestElementSimple());
