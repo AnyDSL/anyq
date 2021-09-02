@@ -58,6 +58,43 @@
 		checkElement: fn(T, u32) -> bool
 	}
 
+	fn indexTestCase() = QueueTestCase[u32] {
+		element_type = indexQueueElementType(),
+		generateElement = @|id:u32| id,
+		checkElement = @|el:u32, check:u32| el == check
+	};
+
+	type GenericElementSimple = i64;
+
+	fn genericTestCaseSimple() = QueueTestCase[GenericElementSimple] {
+		element_type = genericQueueElementType[GenericElementSimple](),
+		generateElement = @|id:u32| -> GenericElementSimple { id as i64 },
+		checkElement = @|el:GenericElementSimple, check:u32| el == check as i64
+	};
+
+	struct GenericElementStruct {
+		payload: bool,
+		blub: u32
+	}
+
+	fn genericTestCaseStruct() = QueueTestCase[GenericElementStruct] {
+		element_type = genericQueueElementType[GenericElementStruct](),
+		generateElement = @|id:u32| GenericElementStruct { payload = id % 3 == 0, blub = id },
+		checkElement = @|el:GenericElementStruct, check:u32| el.blub == check
+	};
+
+	struct GenericElementComplexStruct {
+		payload: [u32 * 7],
+		blub: u32
+	}
+
+	fn genericTestCaseComplexStruct() = QueueTestCase[GenericElementComplexStruct] {
+		element_type = genericQueueElementType[GenericElementComplexStruct](),
+		generateElement = @|id:u32| GenericElementComplexStruct { payload = [0; 7], blub = id },
+		checkElement = @|el:GenericElementComplexStruct, check:u32| el.blub == check
+	};
+
+
 	fn push_and_then_pop_queue_test[T](test_case: QueueTestCase[T]) -> i32 {
 		let device = createAccDevice();
 

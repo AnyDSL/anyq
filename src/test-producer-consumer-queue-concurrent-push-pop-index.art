@@ -1,9 +1,3 @@
 
 #[export]
-fn main() -> i32 {
-	concurrent_push_pop_queue_test[u32](QueueTestCase[u32] {
-		element_type = indexQueueElementType(),
-		generateElement = @|id:u32| id,
-		checkElement = @|el:u32, check:u32| el == check
-	})
-}
+fn main() = concurrent_push_pop_queue_test[u32](indexTestCase());
