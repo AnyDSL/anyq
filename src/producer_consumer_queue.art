@@ -175,6 +175,8 @@ fn @genericQueueElementType[T]() {
 						thread.yield();
 					}
 
+					thread.memory_barrier();
+
 					*element = source(i);
 
 					thread.memory_barrier();
