@@ -1,11 +1,11 @@
 
-type Element = i64;
+type Element = u32;
 
 #[export]
 fn main() -> i32 {
 	push_and_then_pop_queue_test[Element](QueueTestCase[Element] {
 		element_type = genericQueueElementType[Element](),
-		generateElement = @|id:u32| -> Element { id as i64 },
-		checkElement = @|el:Element, check:u32| el == check as i64
+		generateElement = @|id:u32| -> Element { id  },
+		checkElement = @|el:Element, check:u32| el == check
 	})
 }

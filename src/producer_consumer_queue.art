@@ -1,7 +1,7 @@
 struct QueueElement[T] {
 	clear: fn() -> (),
 	is_free: fn() -> bool,
-	store: fn(fn(u32) -> T, gpu_thread_context) -> (),
+	store: fn(fn() -> T, gpu_thread_context) -> (),
 	load: fn(fn(T, u32) -> (), gpu_thread_context) -> (),
 	debug_print: fn(AccDevice) -> ()
 }
@@ -40,7 +40,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 
 	ProducerConsumerQueue[T] {
-		push = @|source|@|thread| -> i32 {
+		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
 			if thread.atomic_load_global_i32(size) >= num_elements {
 				0
 			}
@@ -55,7 +55,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
 					let element = element_type.buffer_element(buffer, i);
-					element.store(source, thread);
+					element.store(@|| source(i), thread);
 
 					1
 				}
@@ -175,7 +175,7 @@ fn @genericQueueElementType[T]() {
 						thread.yield();
 					}
 
-					*element = source(i);
+					*element = source();
 
 					thread.memory_barrier();
 
@@ -216,7 +216,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 				}
 			},
 			store = @|source, thread| {
-				let value = source(i);
+				let value = source();
 				while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
 					thread.yield();
 				}
