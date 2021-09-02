@@ -5,8 +5,20 @@ fn @createAccDevice() = AccDevice {
 	synchronize = || synchronize_cuda(nvvm_device),
 	alloc = |size| alloc_cuda(nvvm_device, size),
 	platform_device = runtime_device(1, nvvm_device),
-	print_i32 = @|format: &[u8], arg: i32| { nvvm_vprintf(format, bitcast[&[u8]](&arg)); },
-	print_i32a = @|format: &[u8], args: &[i32]| { nvvm_vprintf(format, bitcast[&[u8]](&args(0))); }
+
+	print_i32 = @|format: &[u8], arg: i32| {
+		nvvm_vprintf(format, bitcast[&[u8]](&arg));
+	},
+
+	print_2xi32 = @|format: &[u8], arg1: i32, arg2: i32| {
+		let args = [arg1, arg2];
+		nvvm_vprintf(format, bitcast[&[u8]](&args(0)));
+	},
+
+	print_3xi32 = @|format: &[u8], arg1: i32, arg2: i32, arg3: i32| {
+		let args = [arg1, arg2, arg3];
+		nvvm_vprintf(format, bitcast[&[u8]](&args(0)));
+	}
 };
 
 fn @nvvm_pred(b: bool) -> i32 {

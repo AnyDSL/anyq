@@ -8,7 +8,8 @@ fn @createAccDevice() = AccDevice {
     alloc = |size| alloc_hsa(amdgpu_device, size),
     platform_device = runtime_device(3, amdgpu_device),
     print_i32 = @|_format: &[u8], _arg: i32| { /*trap()*/ },
-    print_i32a = @|_format: &[u8], _args: &[i32]| { /*trap()*/ }
+    print_2xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32| { /*trap()*/ },
+    print_3xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32, _arg3: i32| { /*trap()*/ }
 };
 
 

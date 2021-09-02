@@ -21,7 +21,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 		let mut old = -42;
 		let assumed = mydata;
 
-		//anyq_print_i32a("process tidx: %d / assumed: %d\n", tidx, assumed);
+		//anyq_print_2xi32("process tidx: %d / assumed: %d\n", tidx, assumed);
 
 		while assumed != old {
 			old = thread.atomic_cas_global_i32(global(0), assumed, newdata);
@@ -29,7 +29,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 			thread.yield();
 		}
 
-		//anyq_print_i32a("finish  tidx: %d / assumed: %d\n", tidx, assumed);
+		//anyq_print_2xi32("finish  tidx: %d / assumed: %d\n", tidx, assumed);
 
 		write(tidx, newdata);
 	}

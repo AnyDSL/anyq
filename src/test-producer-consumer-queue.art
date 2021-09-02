@@ -69,7 +69,7 @@ fn main() -> i32 {
 			for grid in device.launch_1d(1, 1) {
 				for thread in grid.threads() {
 					if *next_input != num_elements {
-						device.print_i32a("inconsistent next_input %d != %d\n", [*next_input as i32, num_elements as i32]);
+						device.print_2xi32("inconsistent next_input %d != %d\n", *next_input as i32, num_elements as i32);
 						thread.atomic_store_global_u32(device_failed_flag, -1);
 					}
 				}
@@ -92,7 +92,7 @@ fn main() -> i32 {
 				for thread in grid.threads() {
 					for i in range_step(thread.idx(0) as i32, num_elements as i32, grid.num_threads(0) as i32) {
 						if ref_output(i) != output(i) {
-							device.print_i32a("Difference in queue output for element(%d) = %d\n", [i, output(i) as i32]);
+							device.print_2xi32("Difference in queue output for element(%d) = %d\n", i, output(i) as i32);
 						}
 					}
 				}
