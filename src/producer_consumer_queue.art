@@ -158,7 +158,7 @@ fn @genericQueueElementType[T]() {
 				clear = @|| *lock = 0,
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
-					while thread.atomic_load_global_u32(lock) != -1 {
+					while thread.atomic_load_global_u32(lock) != 2 {
 						thread.yield();
 					}
 
@@ -181,7 +181,7 @@ fn @genericQueueElementType[T]() {
 
 					thread.memory_barrier();
 
-					thread.atomic_store_global_u32(lock, -1);
+					thread.atomic_store_global_u32(lock, 2);
 				},
 				debug_print = @|device| {
 					device.print_2xi32("inconsistent queue state: buffer[%d] = %d\n", i as i32, *lock as i32);
