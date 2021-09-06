@@ -2,7 +2,7 @@ struct QueueElement[T] {
 	clear: fn() -> (),
 	is_free: fn() -> bool,
 	store: fn(fn() -> T, gpu_thread_context) -> (),
-	load: fn(fn(T, u32) -> (), gpu_thread_context) -> (),
+	load: fn(fn(T) -> (), gpu_thread_context) -> (),
 	debug_print: fn(AccDevice) -> ()
 }
 
@@ -62,7 +62,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 			}
 		},
 
-		pop = @|sink|@|thread| -> i32 {
+		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
 			if thread.atomic_load_global_i32(size) <= 0 {
 				0
 			}
@@ -77,7 +77,8 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
 					let element = element_type.buffer_element(buffer, i);
-					element.load(sink, thread);
+					device.print_i32("queue.pop(%d)\n", i as i32);
+					element.load(@|el:T| sink(el, i), thread);
 
 					1
 				}
@@ -164,7 +165,7 @@ fn @genericQueueElementType[T]() {
 
 					thread.memory_barrier();
 
-					sink(*element, i);
+					sink(*element);
 
 					thread.memory_barrier();
 
@@ -202,7 +203,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 			clear = @|| *element = FREE,
 			is_free = @|| *element == FREE,
 			load = @|sink, thread| {
-				let tryDequeue = @|sink: fn(u32) -> ()| {
+				let tryDequeue = @|| {
 					let el = thread.atomic_exch_global_u32(element, FREE);
 					if el != FREE {
 						sink(el);
@@ -213,7 +214,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 					}
 				};
 
-				while !tryDequeue(@|el| sink(el, i)) {
+				while !tryDequeue() {
 					thread.yield();
 				}
 			},
