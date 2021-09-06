@@ -9,7 +9,7 @@ instructions = [
 ]
 
 prefix = '//inst_stats:'
-srcstats = re.compile('([a-z0-9\.]+)\(([0-9]+)\),?')
+srcstats = re.compile('([a-z0-9\._]+)\(([0-9]+)\),?')
 
 if __name__ == "__main__":
     import sys
