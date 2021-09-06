@@ -72,6 +72,9 @@ if __name__ == "__main__":
             if line.lstrip().startswith('declare'):
                 continue
 
+            if line.lstrip().startswith('define'):
+                continue
+
             if line.lstrip().startswith(';'):
                 continue
 
