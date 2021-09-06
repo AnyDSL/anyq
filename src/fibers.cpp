@@ -307,10 +307,10 @@ void anydsl_fibers_spawn(
 
 static std::mutex fiber_print_mtx{};
 
-int32_t anyq_print_i32a(const char* format, int32_t val0, int32_t val1) {
+int32_t anyq_print_3xi32(const char* format, int32_t val0, int32_t val1, int32_t val2) {
 	lock_type lk(fiber_print_mtx);
 
-	fprintf(stdout, format, val0, val1);
+	fprintf(stdout, format, val0, val1, val2);
 	fflush(stdout);
 
 	return 0;

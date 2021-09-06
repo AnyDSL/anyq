@@ -85,7 +85,7 @@ fn @createRingbufferAllocator(_device: AccDevice, _element_size: i32, _element_a
 	// 			if idx < num_elements {
 	// 				if ref_count(idx) != 0 {
 	// 					thread.atomic_or_global_u32(corrupted, 1);
-	// 					device.print_i32a("inconsistent ringbuffer allocator state: buffer[%d] = %d\n", [idx, buffer(idx) as i32]);
+	// 					device.print_2xi32("inconsistent ringbuffer allocator state: buffer[%d] = %d\n", idx, buffer(idx) as i32);
 	// 				}
 	// 			}
 	// 		}

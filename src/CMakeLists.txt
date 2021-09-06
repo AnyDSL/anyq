@@ -121,8 +121,10 @@ set(TEST_SCHEDULE_FILES
 	test-producer-consumer-queue-push-and-then-pop-generic-struct.art
 	test-producer-consumer-queue-push-and-then-pop-generic-definite-array.art
 	test-producer-consumer-queue-push-and-then-pop-index.art
-	test-producer-consumer-queue-concurrent-push-pop-generic.art
-	test-producer-consumer-queue-concurrent-push-pop-index.art
+	test-producer-consumer-queue-concurrent-push-pop-generic-small.art
+	test-producer-consumer-queue-concurrent-push-pop-generic-large.art
+	test-producer-consumer-queue-concurrent-push-pop-index-small.art
+	test-producer-consumer-queue-concurrent-push-pop-index-large.art
 )
 
 set(TEST_SUITE_FILES

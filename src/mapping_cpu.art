@@ -12,32 +12,15 @@ fn @createAccDevice() = AccDevice {
 	platform_device = runtime_device(0, 0),
 
 	print_i32 = @|msg: &[u8], i: i32| {
-		anyq_print_i32a(msg, i, 0);
-
-		//let active_lanes = rv_ballot(rv_mask());
-		//for j in unroll(0, vec_width as i32) {
-		//	let lane_mask = (1 << j);
-		//	if (active_lanes & lane_mask) == lane_mask {
-		//		let i0 = rv_extract_i32(i, j);
-		//		print_string(msg); print_i32(i0); print_char('\n');
-		//	}
-		//}
+		anyq_print_3xi32(msg, i, 0, 0);
 	},
 
-	print_i32a = @|format: &[u8], args: &[i32]| {
-		anyq_print_i32a(format, args(0), args(1));
+	print_2xi32 = @|format: &[u8], a1: i32, a2: i32| {
+		anyq_print_3xi32(format, a1, a2, 0);
+	},
 
-		//let active_lanes = rv_ballot(rv_mask());
-		//let num_active_lanes = cpu_popcount32(active_lanes);
-		//print_string("num_active_lanes: "); print_i32(num_active_lanes); print_char('\n');
-		//for j in unroll(0, vec_width as i32) {
-		//	let lane_mask = (1 << j);
-		//	if (active_lanes & lane_mask) == lane_mask {
-		//		let arg0 = rv_extract_i32(args(0), j);
-		//		let arg1 = rv_extract_i32(args(1), j);
-		//		print_string(format); print_i32(arg0); print_char('\n'); print_i32(arg1); print_char('\n');
-		//	}
-		//}
+	print_3xi32 = @|format: &[u8], a1: i32, a2: i32, a3: i32| {
+		anyq_print_3xi32(format, a1, a2, a3);
 	}
 };
 
@@ -48,7 +31,7 @@ fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_
 #[import(cc = "C", name = "anydsl_fibers_sync_block"              )] fn fibers_sync_block(i32) -> ();
 #[import(cc = "C", name = "anydsl_fibers_sync_block_with_result"  )] fn fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
 #[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield() -> ();
-#[import(cc = "C")] fn anyq_print_i32a(&[u8], i32, i32) -> i32;
+#[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
 
 
 #[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;

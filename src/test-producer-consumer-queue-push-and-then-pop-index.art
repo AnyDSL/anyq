@@ -1,9 +1,3 @@
 
 #[export]
-fn main() -> i32 {
-	push_and_then_pop_queue_test[u32](QueueTestCase[u32] {
-		element_type = indexQueueElementType(),
-		generateElement = @|id:u32| id,
-		checkElement = @|el:u32, check:u32| el == check
-	})
-}
+fn main() = push_and_then_pop_queue_test[u32](indexTestElement());
