@@ -77,80 +77,6 @@ fn @unroll_reduction_step(body: fn(i32) -> ()) {
 	loop
 }
 
-fn @atomic_red_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32) -> i32 {
-	let shuffle = @|v: i32, l: u32| shuffle_i32(self, vec_width)(v, l as i32);
-
-	@|op, ptr, val, nop, combine| {
-		let active_lane = rv_ballot_u32(true) & (1 << self) != 0;
-		let mut my_value = if active_lane { val } else { nop };
-
-		for mask in unroll_reduction_step(0x1, vec_width) {
-			let other_value = shuffle(my_value, self ^ mask as u32);
-			my_value = combine(other_value, my_value);
-		}
-
-		let result0 = rv_extract_i32(my_value, 0);
-		let result = atomic[i32](op, ptr, result0, 7, "");
-
-		result
-	}
-}
-
-fn @atomic_red_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32) -> u32 {
-	let shuffle = @|v: u32, l: u32| shuffle_u32(self, vec_width)(v, l as i32);
-
-	@|op, ptr, val, nop, combine| {
-		let active_lane = rv_ballot_u32(true) & (1 << self) != 0;
-		let mut my_value = if active_lane { val } else { nop };
-
-		for mask in unroll_reduction_step(0x1, vec_width) {
-			let other_value = shuffle(my_value, self ^ mask as u32);
-			my_value = combine(other_value, my_value);
-		}
-
-		let result0 = rv_extract_u32(my_value, 0);
-		let result = atomic[u32](op, ptr, result0, 7, "");
-
-		result
-	}
-}
-
-fn @atomic_op_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32, fn(i32, i32)->i32) -> i32 {
-	@|op, ptr, val, nop, combine, extract| {
-		let mut aggregate = 0;
-		let mut intermediate:i32 = self as i32; // self is needed to make result marked as varying
-		let mut old:i32;
-
-		for l in unroll(0, vec_width) {
-			let lane_val = if rv_ballot_u32(true) & (1 << l as u32) != 0 { rv_extract_i32(val, l) } else { nop };
-			intermediate = rv_insert_i32(intermediate, l, aggregate);
-			aggregate = combine(aggregate, lane_val);
-		}
-
-		old = atomic[i32](op, ptr, aggregate, 7, "");
-
-		extract(old, intermediate)
-	}
-}
-
-fn @atomic_op_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32, fn(u32, u32)->u32) -> u32 {
-	@|op, ptr, val, nop, combine, extract| {
-		let mut aggregate:u32 = 0;
-		let mut intermediate:u32 = self; // self is needed to make result marked as varying
-		let mut old:u32;
-
-		for l in unroll(0, vec_width) {
-			let lane_val = if rv_ballot_u32(true) & (1 << l as u32) != 0 { rv_extract_u32(val, l) } else { nop };
-			intermediate = rv_insert_u32(intermediate, l, aggregate);
-			aggregate = combine(aggregate, lane_val);
-		}
-
-		old = atomic[u32](op, ptr, aggregate, 7, "");
-
-		extract(old, intermediate)
-	}
-}
-
 fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 	@|body:fn(u32, u32)->()| {
 		let mask = rv_ballot(true) as u32;
@@ -164,15 +90,6 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
-
-	let _atomic_i32 = atomic_op_i32(self, vec_width);
-	let _atomic_u32 = atomic_op_u32(self, vec_width);
-
-	let _reduction_i32 = atomic_red_i32(self, vec_width);
-	let _reduction_u32 = atomic_red_u32(self, vec_width);
-
-	let _warp_shuffle_i32 = shuffle_i32(self, vec_width);
-	let _warp_shuffle_u32 = shuffle_u32(self, vec_width);
 
 	let do_once = do_once_op(self, vec_width);
 
