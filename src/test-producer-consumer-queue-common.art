@@ -290,14 +290,14 @@
 				for thread in grid.threads() {
 					let mut rand_state = rand::xorseed32(thread.idx(0));
 
-					for i in range(0, 10) {
+					for n in range(0, 10) {
 						if rand_state < (-1 as u32) / 2 {
 							// push
 							if for i in queue.push(thread) {
 								let old = thread.atomic_exch_global_u32(&mut pushed_buffer(i), thread.idx(0));
 
 								if (old != -1) {
-									device.print_i32("ERROR: queue element %u handed out more than once!\n", i as i32);
+									device.print_3xi32("ERROR: queue element %u handed out more than once! (previously to %u) iteration: %d\n", i as i32, old as i32, n);
 									thread.atomic_store_global_u32(device_failed_flag, -1);
 								}
 
@@ -315,7 +315,7 @@
 								let check = thread.atomic_exch_global_u32(&mut pushed_buffer(i), -1);
 			
 								if !test_case.checkElement(el, check) {
-									device.print_i32("ERROR: popped queue element %u does not match reference value!\n", i as i32);
+									device.print_3xi32("ERROR: popped queue element %u does not match reference value (%u)! iteration: %d\n", i as i32, check as i32, n);
 									thread.atomic_store_global_u32(device_failed_flag, -1);
 								}
 							} > 0 {
@@ -360,10 +360,8 @@
 					}
 
 					if thread.idx(0) == 0 {
-						device.print_i32("num_pushed = %d\n", *num_pushed);
-						device.print_i32("num_popped = %d\n", *num_popped);
-						device.print_i32("num_not_pushed = %d\n", *num_not_pushed);
-						device.print_i32("num_not_popped = %d\n", *num_not_popped);
+						device.print_3xi32("pushed + not pushed = %d + %d = %d\n", *num_pushed, *num_not_pushed, *num_pushed + *num_not_pushed);
+						device.print_3xi32("popped + not popped = %d + %d = %d\n", *num_popped, *num_not_popped, *num_popped + *num_not_popped);
 					}
 				}
 			}
