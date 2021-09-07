@@ -268,6 +268,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(
 }
 
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
+
+	let vec_width = warp_size as i32;
+	let do_once = do_once_op(idx.local_id, vec_width);
+
 	@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
@@ -279,31 +283,31 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		barrier = @|| -> () { if idx.local_id == 0 { fibers_sync_block(idx.block_id as i32); } },
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if rv_all(predicate) { 1 } else {0 };
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_and_global_i32
 				atomic[i32](3, addr(1), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any = @|predicate:bool| -> bool {
 			let warp_pred = if rv_any(predicate) { 1 } else {0 };
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_or_global_i32
 				atomic[i32](5, addr(2), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count = @|predicate:bool| -> i32 {
 			let warp_count = cpu_popcount_u32(rv_ballot_u32(predicate));
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_add_global_i32
 				atomic[i32](1, addr(3), warp_count, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result
 		},
