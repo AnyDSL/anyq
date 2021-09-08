@@ -99,10 +99,11 @@
 		let device = createAccDevice();
 
 		let num_elements = 20;
+		let queue_size = num_elements;
 		let queue_test = createQueueTest(device, test_case.element_type, (num_elements + 2) as i64 * sizeof[u32]());
 		let block_dim = 8;
 
-		for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements / 2) {
+		for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
 			// keep track of which slots have been handed out to whom.
 			let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);
 			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 0));
@@ -145,7 +146,7 @@
 							true
 						}
 						else {
-							thread.atomic_load_global_i32(num_pushed) < num_elements
+							thread.atomic_load_global_i32(num_pushed) < queue_size
 						}
 					) {}
 				}
@@ -203,7 +204,7 @@
 							true
 						}
 						else {
-							thread.atomic_load_global_i32(num_popped) < num_elements
+							thread.atomic_load_global_i32(num_popped) < queue_size
 						}
 					) {}
 				}
@@ -224,14 +225,21 @@
 					}
 
 					if thread.idx(0) == 0 {
-						if *num_pushed != num_elements {
-							device.print_2xi32("pushed only %d elements out of %d\n", *num_pushed, num_elements);
-							thread.atomic_store_global_u32(device_failed_flag, -1);
+						let num_pushed_val = thread.atomic_load_global_i32(num_pushed);
+						let num_popped_val = thread.atomic_load_global_i32(num_popped);
+
+						if num_pushed_val != num_elements {
+							device.print_2xi32("pushed only %d elements out of %d\n", num_pushed_val, num_elements);
+							if num_pushed_val != queue_size {
+								thread.atomic_or_global_u32(device_failed_flag, 1 << 5);
+							}
 						}
 
-						if *num_popped != num_elements {
-							device.print_2xi32("popped only %d elements out of %d\n", *num_popped, num_elements);
-							thread.atomic_store_global_u32(device_failed_flag, -1);
+						if num_popped_val != num_elements {
+							device.print_2xi32("popped only %d elements out of %d\n", num_popped_val, num_elements);
+							if num_popped_val != queue_size {
+								thread.atomic_or_global_u32(device_failed_flag, 1 << 6);
+							}
 						}
 					}
 				}
