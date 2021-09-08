@@ -135,6 +135,7 @@
 						if for i in queue.push(thread) {
 							let old = thread.atomic_exch_global_i32(&mut pushed_buffer(i), thread.idx(0) as i32);
 
+							//device.print_2xi32("pushed queue element %u by %u)\n", i as i32, thread.idx(0) as i32);
 							if (old != -1) {
 								device.print_2xi32("ERROR: queue element %u handed out more than once! (previously to %u)\n", i as i32, old);
 								thread.atomic_store_global_u32(device_failed_flag, -1);
@@ -166,7 +167,7 @@
 			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
 				for thread in grid.threads() {
 					if thread.idx(0) < num_elements as u32 {
-						device.print_2xi32("pushed_buffer(%d) = %d\n", thread.idx(0) as i32, pushed_buffer(thread.idx(0)));
+						//device.print_2xi32("pushed_buffer(%d) = %d\n", thread.idx(0) as i32, pushed_buffer(thread.idx(0)));
 						if thread.atomic_load_global_i32(&mut pushed_buffer(thread.idx(0))) < 0 {
 							device.print_i32("ERROR: queue element %u has been skipped!\n", thread.idx(0) as i32);
 							thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
@@ -183,7 +184,7 @@
 				for thread in grid.threads() {
 					while (
 						if for el, i in queue.pop(thread) {
-							device.print_2xi32("check pushed_buffer(%d) for %d\n", i as i32, bitcast[u32](el) as i32);
+							//device.print_2xi32("check pushed_buffer(%d) for %d\n", i as i32, bitcast[u32](el) as i32);
 
 							if i < num_elements as u32 {
 

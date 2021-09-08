@@ -77,7 +77,6 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
 					let element = element_type.buffer_element(buffer, i);
-					device.print_i32("queue.pop(%d)\n", i as i32);
 					element.load(@|el:T| sink(el, i), thread);
 
 					1
