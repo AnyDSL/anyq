@@ -1,0 +1,10 @@
+
+fn @do_once(self: i32, _vec_width: i32) -> fn(fn(i32, u32) -> ()) -> () {
+	@|body:fn(i32, u32)->()| {
+		let mask = rv_ballot(true);
+		let lsb = mask & -mask;
+		if 1 << self == lsb {
+			body(self, mask as u32)
+		}
+	}
+}

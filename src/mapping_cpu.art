@@ -77,77 +77,13 @@ fn @unroll_reduction_step(body: fn(i32) -> ()) {
 	loop
 }
 
-fn @atomic_red_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32) -> i32 {
-	let shuffle = @|v: i32, l: u32| shuffle_i32(self, vec_width)(v, l as i32);
-
-	@|op, ptr, val, nop, combine| {
-		let active_lane = rv_ballot_u32(true) & (1 << self) != 0;
-		let mut my_value = if active_lane { val } else { nop };
-
-		for mask in unroll_reduction_step(0x1, vec_width) {
-			let other_value = shuffle(my_value, self ^ mask as u32);
-			my_value = combine(other_value, my_value);
+fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
+	@|body:fn(u32, u32)->()| {
+		let mask = rv_ballot(true) as u32;
+		let lsb = mask & -mask;
+		if 1 << self == lsb {
+			body(self, mask)
 		}
-
-		let result0 = rv_extract_i32(my_value, 0);
-		let result = atomic[i32](op, ptr, result0, 7, "");
-
-		result
-	}
-}
-
-fn @atomic_red_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32) -> u32 {
-	let shuffle = @|v: u32, l: u32| shuffle_u32(self, vec_width)(v, l as i32);
-
-	@|op, ptr, val, nop, combine| {
-		let active_lane = rv_ballot_u32(true) & (1 << self) != 0;
-		let mut my_value = if active_lane { val } else { nop };
-
-		for mask in unroll_reduction_step(0x1, vec_width) {
-			let other_value = shuffle(my_value, self ^ mask as u32);
-			my_value = combine(other_value, my_value);
-		}
-
-		let result0 = rv_extract_u32(my_value, 0);
-		let result = atomic[u32](op, ptr, result0, 7, "");
-
-		result
-	}
-}
-
-fn @atomic_op_i32(self: u32, vec_width: i32) -> fn(u32, &mut i32, i32, i32, fn(i32, i32)->i32, fn(i32, i32)->i32) -> i32 {
-	@|op, ptr, val, nop, combine, extract| {
-		let mut aggregate = 0;
-		let mut intermediate:i32 = self as i32; // self is needed to make result marked as varying
-		let mut old:i32;
-
-		for l in unroll(0, vec_width) {
-			let lane_val = if rv_ballot_u32(true) & (1 << l as u32) != 0 { rv_extract_i32(val, l) } else { nop };
-			intermediate = rv_insert_i32(intermediate, l, aggregate);
-			aggregate = combine(aggregate, lane_val);
-		}
-
-		old = atomic[i32](op, ptr, aggregate, 7, "");
-
-		extract(old, intermediate)
-	}
-}
-
-fn @atomic_op_u32(self: u32, vec_width: i32) -> fn(u32, &mut u32, u32, u32, fn(u32, u32)->u32, fn(u32, u32)->u32) -> u32 {
-	@|op, ptr, val, nop, combine, extract| {
-		let mut aggregate:u32 = 0;
-		let mut intermediate:u32 = self; // self is needed to make result marked as varying
-		let mut old:u32;
-
-		for l in unroll(0, vec_width) {
-			let lane_val = if rv_ballot_u32(true) & (1 << l as u32) != 0 { rv_extract_u32(val, l) } else { nop };
-			intermediate = rv_insert_u32(intermediate, l, aggregate);
-			aggregate = combine(aggregate, lane_val);
-		}
-
-		old = atomic[u32](op, ptr, aggregate, 7, "");
-
-		extract(old, intermediate)
 	}
 }
 
@@ -155,14 +91,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
-	let _atomic_i32 = atomic_op_i32(self, vec_width);
-	let _atomic_u32 = atomic_op_u32(self, vec_width);
-
-	let _reduction_i32 = atomic_red_i32(self, vec_width);
-	let _reduction_u32 = atomic_red_u32(self, vec_width);
-
-	let _warp_shuffle_i32 = shuffle_i32(self, vec_width);
-	let _warp_shuffle_u32 = shuffle_u32(self, vec_width);
+	let do_once = do_once_op(self, vec_width);
 
 	@body(gpu_thread_context {
 		idx = tid,
@@ -262,7 +191,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 
 		memory_barrier = @|| {},  // TODO
 
-		yield = @|| { if idx.local_id == 0 { fibers_yield(); } }
+		yield = @|| { do_once(@|_, _| { fibers_yield(); }); }
 	});
 }
 
@@ -339,6 +268,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(
 }
 
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
+
+	let vec_width = warp_size as i32;
+	let do_once = do_once_op(idx.local_id, vec_width);
+
 	@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
@@ -350,31 +283,31 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		barrier = @|| -> () { if idx.local_id == 0 { fibers_sync_block(idx.block_id as i32); } },
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if rv_all(predicate) { 1 } else {0 };
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_and_global_i32
 				atomic[i32](3, addr(1), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any = @|predicate:bool| -> bool {
 			let warp_pred = if rv_any(predicate) { 1 } else {0 };
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_or_global_i32
 				atomic[i32](5, addr(2), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count = @|predicate:bool| -> i32 {
 			let warp_count = cpu_popcount_u32(rv_ballot_u32(predicate));
-			if idx.local_id == 0 {
+			do_once(@|_, _| {
 				// atomic_add_global_i32
 				atomic[i32](1, addr(3), warp_count, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
-			}
+			});
 			let result = *(addr(0));
 			result
 		},

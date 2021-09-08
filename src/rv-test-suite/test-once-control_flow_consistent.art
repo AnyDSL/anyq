@@ -1,0 +1,41 @@
+
+
+// inst_stats: llvm.x86.avx.movmsk.ps.256(2), insertelement(2), shufflevector(2), xpowf_avx2(2), llvm.masked.store.v8i32.p0v8i32(2)
+
+// 2x rv_ballot: llvm.x86.avx.movmsk.ps.256, insertelement + shufflevector for broadcast
+// 2x call to math function
+// 2x masked store
+
+
+fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
+
+	let once = do_once(lane, vec_width);
+
+	let ptr = global(0);
+	let value = read(lane);
+
+	if value < 8 {
+
+		once(|lane, mask| {
+			*ptr = mask as i32;
+			let result = math_builtins::pow[f32](4 + value as f32, 2);
+			write(lane, result as i32)
+		});
+
+	} else {
+
+		once(|lane, mask| {
+			*ptr = mask as i32;
+			let result = math_builtins::pow[f32](4 + value as f32, 3);
+			write(lane, result as i32)
+		});
+
+	}
+}
+
+fn expected_result(_data: fn(i32)->i32, _global: fn(i32)->&mut i32) -> (fn(i32)->i32, i32) {
+	let values = [16, 1, 2, 3, 4, 5, 6, 7];
+	let result = 0xff;
+
+	(|i| values(i), result)
+}

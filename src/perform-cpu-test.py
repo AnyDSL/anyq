@@ -9,7 +9,7 @@ instructions = [
 ]
 
 prefix = '//inst_stats:'
-srcstats = re.compile('([a-z0-9\.]+)\(([0-9]+)\),?')
+srcstats = re.compile('([a-z0-9\._]+)\(([0-9]+)\),?')
 
 if __name__ == "__main__":
     import sys
@@ -70,6 +70,9 @@ if __name__ == "__main__":
     with open(llvm_file, 'r', encoding='utf-8') as file:
         for line in file:
             if line.lstrip().startswith('declare'):
+                continue
+
+            if line.lstrip().startswith('define'):
                 continue
 
             if line.lstrip().startswith(';'):

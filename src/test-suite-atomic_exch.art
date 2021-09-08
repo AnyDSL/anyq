@@ -1,10 +1,10 @@
 
-// inst_stats: llvm.vector.reduce.add.v8i32(1), atomicrmw(17), extractelement(24), insertelement(8)
+// inst_stats: llvm.vector.reduce.add.v8i32(2), atomicrmw(10), extractelement(16), insertelement(8)
 
 // 1x atomicrmw add [ok]
 // 8x extract mask for cascade
 // 8x cascaded extract, atomicrmw xchg, insert [ok]
-// 8x atomicrmw add [todo] -> should be 1x llvm.vector.reduce.add.v8i32 and 1x atomicrmw add
+// 1x atomicrmw add [ok]
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_: i32| 0;
