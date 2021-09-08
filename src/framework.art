@@ -249,3 +249,20 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 		}
 	}
 }
+
+
+struct error_cont
+{
+	throw: fn() -> (),
+	throw_print_i32: fn(&[u8], i32) -> (),
+	throw_print_2xi32: fn(&[u8], i32, i32) -> (),
+	throw_print_3xi32: fn(&[u8], i32, i32, i32) -> ()
+}
+
+
+static error_handler = @|device: AccDevice, cont: fn() -> ()| error_cont {
+	throw = @|| cont(),
+	throw_print_i32 = @|format, arg| -> () { device.print_i32(format, arg); cont(); },
+	throw_print_2xi32 = @|format, arg_1, arg_2| -> () { device.print_2xi32(format, arg_1, arg_2); cont(); },
+	throw_print_3xi32 = @|format, arg_1, arg_2, arg_3| -> () { device.print_3xi32(format, arg_1, arg_2, arg_3); cont(); }
+};
