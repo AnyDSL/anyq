@@ -188,16 +188,17 @@
 
 							if i < num_elements as u32 {
 
-							let check = thread.atomic_exch_global_i32(&mut pushed_buffer(i), -1);
-							if check < 0 {
-								device.print_i32("ERROR: popped queue element %d was not used in pushed_buffer!\n", i as i32);
-							}
+								let check = thread.atomic_exch_global_i32(&mut pushed_buffer(i), -1);
+								if check < 0 {
+									device.print_i32("ERROR: popped queue element %d was not used in pushed_buffer!\n", i as i32);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 2);
+								}
 
-							if !test_case.checkElement(el, check as u32) {
-								device.print_2xi32("ERROR: popped queue element %d does not match reference value (%d)!\n", i as i32, check);
-								//device.print_2xi32("Expected %d - found %d\n", [check as i32, bitcast[u32](el) as i32]);
-								thread.atomic_store_global_u32(device_failed_flag, -1);
-							}
+								if !test_case.checkElement(el, check as u32) {
+									device.print_2xi32("ERROR: popped queue element %d does not match reference value (%d)!\n", i as i32, check);
+									device.print_2xi32("Expected %d - found %d\n", check, bitcast[u32](el) as i32);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
+								}
 
 							}
 						} > 0 {
