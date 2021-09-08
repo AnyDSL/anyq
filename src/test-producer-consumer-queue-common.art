@@ -136,6 +136,7 @@
 							let old = thread.atomic_exch_global_i32(&mut pushed_buffer(i), thread.idx(0) as i32);
 
 							//device.print_2xi32("pushed queue element %u by %u)\n", i as i32, thread.idx(0) as i32);
+
 							if (old != -1) {
 								device.print_2xi32("ERROR: queue element %u handed out more than once! (previously to %u)\n", i as i32, old);
 								thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
@@ -177,6 +178,7 @@
 			}
 
 			device.synchronize();
+
 			device.print_i32("concurrent pop until empty ...\n", 0);
 
 			// concurrent pop until empty, verify that each element comes from the correct slot
@@ -246,7 +248,6 @@
 					}
 				}
 			}
-
 			true
 		}
 
