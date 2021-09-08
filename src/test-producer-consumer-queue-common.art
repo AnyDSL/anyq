@@ -138,7 +138,7 @@
 							//device.print_2xi32("pushed queue element %u by %u)\n", i as i32, thread.idx(0) as i32);
 							if (old != -1) {
 								device.print_2xi32("ERROR: queue element %u handed out more than once! (previously to %u)\n", i as i32, old);
-								thread.atomic_store_global_u32(device_failed_flag, -1);
+								thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
 							}
 
 							test_case.generateElement(thread.idx(0))
@@ -222,7 +222,7 @@
 					if thread.idx(0) as i32 < num_elements {
 						if pushed_buffer(thread.idx(0)) != -1 {
 							device.print_i32("ERROR: queue element %u has not been popped!\n", thread.idx(0) as i32);
-							thread.atomic_store_global_u32(device_failed_flag, -1);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
 						}
 					}
 
