@@ -1,3 +1,3 @@
 
 #[export]
-fn main() = push_and_then_pop_queue_test[GenericElementComplexStruct](genericTestElementComplexStruct());
+fn main() = push_and_then_pop_queue_test[GenericElementComplexStruct](100000, 256, 1000000, genericTestElementComplexStruct());

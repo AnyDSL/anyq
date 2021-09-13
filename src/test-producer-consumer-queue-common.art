@@ -54,97 +54,68 @@
 
 	struct QueueTestElement[T] {
 		element_type: QueueElementType[T],
-		push: fn(ProducerConsumerQueue[T], gpu_thread_context, &mut addrspace(1) [i32], error_cont) -> i32,
-		pop: fn(ProducerConsumerQueue[T], gpu_thread_context, &mut addrspace(1) [i32], error_cont) -> i32,
+		generateElement: fn(i32) -> T,
+		unpackRefValue: fn (T) -> i32
 	}
 
 
-	fn indexTestElement() = QueueTestElement[u32] {
+	fn @indexTestElement() = QueueTestElement[u32] {
 		element_type = indexQueueElementType(),
-		push = @|queue: ProducerConsumerQueue[u32], thread: gpu_thread_context, _pushed_buffer: &mut addrspace(1) [i32], _err: error_cont| -> i32 {
-			for _i in queue.push(thread) {
-				thread.idx(0)
-			}
-		},
-		pop = @|queue: ProducerConsumerQueue[u32], thread: gpu_thread_context, _pushed_buffer: &mut addrspace(1) [i32], _err: error_cont| -> i32 {
-			for _el, _i in queue.pop(thread) {
-			}
-		}
+		generateElement = @|ref_value:i32| ref_value as u32,
+		unpackRefValue = @|el:u32| el as i32
 	};
 
 
-	fn genericTestElement[T](generateElement: fn(i32) -> T, checkElement: fn (T, i32) -> bool) = QueueTestElement[T] {
+	fn @genericTestElement[T](generateElement: fn(i32) -> T, unpackRefValue: fn (T) -> i32) = QueueTestElement[T] {
 		element_type = genericQueueElementType[T](),
-		push = @|queue: ProducerConsumerQueue[T], thread: gpu_thread_context, pushed_buffer: &mut addrspace(1) [i32], err: error_cont| -> i32 {
-			for i in queue.push(thread) {
-				let old = thread.atomic_exch_global_i32(&mut pushed_buffer(i), thread.idx(0) as i32);
-
-				if (old != -1) {
-					err.throw_print_2xi32("ERROR: queue element %u handed out more than once! (previously to %u)\n", i as i32, old);
-				}
-
-				generateElement(thread.idx(0) as i32)
-			}
-		},
-		pop = @|queue: ProducerConsumerQueue[T], thread: gpu_thread_context, pushed_buffer: &mut addrspace(1) [i32], err: error_cont| -> i32 {
-			for el, i in queue.pop(thread) {
-				let check = thread.atomic_exch_global_i32(&mut pushed_buffer(i), -1);
-
-				if !checkElement(el, check) {
-					err.throw_print_2xi32("ERROR: popped queue element %u does not match reference value (%u)!\n", i as i32, check);
-				}
-			}
-		}
+		generateElement = generateElement,
+		unpackRefValue = unpackRefValue
 	};
 
 	type GenericElementSimple = i64;
 
 	fn genericTestElementSimple() = genericTestElement[GenericElementSimple](
-		@|id:i32| -> GenericElementSimple { id as i64 },
-		@|el:GenericElementSimple, check:i32| el == check as i64
+		@|ref_value:i32| -> GenericElementSimple { ref_value as i64 },
+		@|el:GenericElementSimple| el as i32
 	);
 
 	struct GenericElementStruct {
 		payload: bool,
-		check: i32
+		ref_value: i32
 	}
 
 	fn genericTestElementStruct() = genericTestElement[GenericElementStruct] (
-		@|id:i32| GenericElementStruct { payload = id % 3 == 0, check = id },
-		@|el:GenericElementStruct, check:i32| el.check == check
+		@|ref_value:i32| GenericElementStruct { payload = ref_value % 3 == 0, ref_value = ref_value },
+		@|el:GenericElementStruct| el.ref_value
 	);
 
 	struct GenericElementComplexStruct {
 		payload: [u32 * 7],
-		check: i32
+		ref_value: i32
 	}
 
 	fn genericTestElementComplexStruct() = genericTestElement[GenericElementComplexStruct] (
-		@|id:i32| GenericElementComplexStruct { payload = [0; 7], check = id },
-		@|el:GenericElementComplexStruct, check:i32| el.check == check
+		@|ref_value:i32| GenericElementComplexStruct { payload = [0; 7], ref_value = ref_value },
+		@|el:GenericElementComplexStruct| el.ref_value
 	);
 
 
-	fn push_and_then_pop_queue_test[T](test_element: QueueTestElement[T]) -> i32 {
+	fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size: i32, test_element: QueueTestElement[T]) -> i32 {
 		let device = createAccDevice();
 
-		let num_elements = 1000000;
-		let queue_size = num_elements;
-		let queue_test = createQueueTest(device, test_element.element_type, (num_elements + 2) as i64 * sizeof[u32]());
-		let block_dim = 256;
+		let queue_test = createQueueTest(device, test_element.element_type, (queue_size + 2) as i64 * sizeof[u32]());
 
 		for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-			// keep track of which slots have been handed out to whom.
 			let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);
-			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 0));
-			let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 1));
+			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(queue_size + 0));
+			let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(queue_size + 1));
 
-			device.print_i32("initialize debug pushed_buffer ...\n", 0);
+			print_string("initialize debug pushed_buffer ...\n");
 
-			for grid in device.launch_1d(div_up(num_elements + 2, block_dim), block_dim) {
+			for grid in device.launch_1d(div_up(queue_size + 2, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if thread.idx(0) as i32 >= num_elements {
-						if thread.idx(0) as i32 < num_elements + 2 {
+					if thread.idx(0) as i32 >= queue_size {
+						if thread.idx(0) as i32 < queue_size + 2 {
 							pushed_buffer(thread.idx(0)) = 0;
 						}
 					}
@@ -156,47 +127,53 @@
 
 			device.synchronize();
 
-			device.print_i32("concurrent push until full ...\n", 0);
+			print_string("concurrent push until full, verify that each element is within bounds and handed out no more than once ...\n");
 
-			let error_handler = @|thread: gpu_thread_context, flag: u32, cont: fn() -> ()| {
-				error_handler(device, @||{ thread.atomic_or_global_u32(device_failed_flag, flag); cont() })
-			};
-
-			// concurrent push until full, verify that each element is handed out exactly once
-			for grid in device.launch_1d(42, block_dim) {
+			for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 				for thread in grid.threads() {
-					while (
-						if test_element.push(queue, thread, pushed_buffer, error_handler(thread, 1 << 0, @||continue())) > 0 {
-							thread.atomic_add_global_i32(num_pushed, 1);
-							true
+					if thread.idx(0) as i32 < num_threads {
+						while (thread.atomic_load_global_i32(num_pushed) < queue_size) {
+							if for i in queue.push(thread) {
+								if i >= queue_size as u32 {
+									device.print_i32("ERROR: got queue element %d out of bounds to push to!\n", i as i32);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
+								}
+
+								let check = thread.atomic_exch_global_i32(&mut pushed_buffer(i), thread.idx(0) as i32);
+
+								if (check != -1) {
+									device.print_2xi32("ERROR: queue element %d handed out more than once! (previously to thread %d)\n", i as i32, check);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
+								}
+
+								test_element.generateElement(thread.idx(0) as i32)
+							} > 0 {
+								thread.atomic_add_global_i32(num_pushed, 1);
+							}
 						}
-						else {
-							thread.atomic_load_global_i32(num_pushed) < queue_size
-						}
-					) {}
+					}
 				}
 			}
 
 			device.synchronize();
 
-			for grid in device.launch_1d(1, block_dim) {
+			print_string("check that all elements have been handed out and queue size is consistent\n");
+
+			for grid in device.launch_1d(div_up(queue_size, block_dim), block_dim) {
 				for thread in grid.threads() {
 					if thread.idx(0) == 0 {
-						device.print_i32("queue size: %d\n", queue.size(thread));
-					}
-				}
-			}
+						let size = queue.size(thread);
 
-			// check that all elements have been handed out
-			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
-				for thread in grid.threads() {
-					if thread.idx(0) < num_elements as u32 {
-						//device.print_2xi32("pushed_buffer(%d) = %d\n", thread.idx(0) as i32, pushed_buffer(thread.idx(0)));
+						if size != queue_size {
+							device.print_2xi32("ERROR: queue size (%d) does not match number of elements reported pushed (%d)!\n", size, queue_size);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 2);
+						}
+					}
+
+					if thread.idx(0) as i32 < queue_size {
 						if thread.atomic_load_global_i32(&mut pushed_buffer(thread.idx(0))) < 0 {
-							if num_elements == queue_size {
-								device.print_i32("ERROR: queue element %u has been skipped!\n", thread.idx(0) as i32);
-							}
-							thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
+							device.print_i32("ERROR: queue element %d has been skipped!\n", thread.idx(0) as i32);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
 						}
 					}
 				}
@@ -204,53 +181,52 @@
 
 			device.synchronize();
 
-			device.print_i32("concurrent pop until empty ...\n", 0);
+			print_string("concurrent pop until empty, verify that each element is within bounds and comes from the correct slot ...\n");
 
-			// concurrent pop until empty, verify that each element comes from the correct slot
-			for grid in device.launch_1d(42, block_dim) {
+			for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 				for thread in grid.threads() {
-					while (
-						if test_element.pop(queue, thread, pushed_buffer, error_handler(thread, 1 << 3, @||{continue()})) > 0 {
-							thread.atomic_add_global_i32(num_popped, 1);
-							true
+					if thread.idx(0) as i32 < num_threads {
+						while (thread.atomic_load_global_i32(num_popped) < queue_size) {
+							if for el, i in queue.pop(thread) {
+								if i >= queue_size as u32 {
+									device.print_i32("ERROR: got queue element %d out of bounds to pop from!\n", i as i32);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
+								}
+
+								let check = thread.atomic_exch_global_i32(&mut pushed_buffer(i), -1);
+								let elval = test_element.unpackRefValue(el);
+
+								if elval != check {
+									device.print_3xi32("ERROR: popped queue element %d (at index %d) does not match reference value (%d)!\n", elval, i as i32, check);
+									thread.atomic_or_global_u32(device_failed_flag, 1 << 5);
+								}
+							} > 0 {
+								thread.atomic_add_global_i32(num_popped, 1);
+							}
 						}
-						else {
-							thread.atomic_load_global_i32(num_popped) < queue_size
-						}
-					) {}
+					}
 				}
 			}
 
 			device.synchronize();
 
-			device.print_i32("check that all elements have been popped ...\n", 0);
+			print_string("check that all elements have been popped and queue size is consistent ...\n");
 
-			// check that all elements have been popped
-			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+			for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if thread.idx(0) as i32 < num_elements {
+					if thread.idx(0) == 0 {
+						let size = queue.size(thread);
+
+						if size != 0 {
+							device.print_i32("ERROR: queue size (%d) is not 0!\n", size);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 6);
+						}
+					}
+
+					if thread.idx(0) as i32 < num_threads {
 						if pushed_buffer(thread.idx(0)) != -1 {
 							device.print_i32("ERROR: queue element %u has not been popped!\n", thread.idx(0) as i32);
-							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
-						}
-					}
-
-					if thread.idx(0) == 0 {
-						let num_pushed_val = thread.atomic_load_global_i32(num_pushed);
-						let num_popped_val = thread.atomic_load_global_i32(num_popped);
-
-						if num_pushed_val != num_elements {
-							device.print_2xi32("pushed only %d elements out of %d\n", num_pushed_val, num_elements);
-							if num_pushed_val != queue_size {
-								thread.atomic_or_global_u32(device_failed_flag, 1 << 5);
-							}
-						}
-
-						if num_popped_val != num_elements {
-							device.print_2xi32("popped only %d elements out of %d\n", num_popped_val, num_elements);
-							if num_popped_val != queue_size {
-								thread.atomic_or_global_u32(device_failed_flag, 1 << 6);
-							}
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 7);
 						}
 					}
 				}
@@ -261,24 +237,26 @@
 		queue_test.finish()
 	}
 
-	fn concurrent_push_pop_queue_test[T](num_elements: i32, test_element: QueueTestElement[T]) -> i32 {
+	fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_per_thread: i32, queue_size: i32, test_element: QueueTestElement[T]) -> i32 {
 		let device = createAccDevice();
 
-		let queue_test = createQueueTest(device, test_element.element_type, (num_elements as i64 + 4) * sizeof[u32]());
-		let block_dim = 256;
+		let pushed_buffer_size = num_threads * attempts_per_thread;
+		let queue_test = createQueueTest(device, test_element.element_type, (pushed_buffer_size as i64 + 5) * sizeof[u32]());
 
-		for queue, device_memory, device_failed_flag in queue_test.run_test(num_elements) {
-			// keep track of which slots have been handed out to whom.
+		for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
 			let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);
-			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 0));
-			let num_not_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 1));
-			let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 2));
-			let num_not_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(num_elements + 3));
+			let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 0));
+			let num_not_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 1));
+			let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 2));
+			let num_not_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 3));
+			let num_left_in_push_buffer = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 4));
 
-			for grid in device.launch_1d(div_up(num_elements + 4, block_dim), block_dim) {
+			print_string("initialize debug pushed_buffer ...\n");
+
+			for grid in device.launch_1d(div_up(pushed_buffer_size + 5, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if thread.idx(0) as i32 >= num_elements {
-						if thread.idx(0) as i32 < num_elements + 4 {
+					if thread.idx(0) as i32 >= pushed_buffer_size {
+						if thread.idx(0) as i32 < pushed_buffer_size + 5 {
 							pushed_buffer(thread.idx(0)) = 0;
 						}
 					}
@@ -290,74 +268,154 @@
 
 			device.synchronize();
 
-			let error_handler = @|thread: gpu_thread_context, flag: u32, cont: fn() -> ()| {
-				error_handler(device, @||{ thread.atomic_or_global_u32(device_failed_flag, flag); cont() })
+			print_string("concurrent push and pop, verify that each element is within bounds and does not get corrupted ...\n");
+
+			let push = @|thread: gpu_thread_context, ref_value_slot: i32| {
+				if for i in queue.push(thread) {
+					if i >= queue_size as u32 {
+						device.print_i32("ERROR: got queue element %d out of bounds to push to!\n", i as i32);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 0);
+					}
+
+					pushed_buffer(ref_value_slot) = i as i32;
+					thread.memory_barrier();
+
+					test_element.generateElement(ref_value_slot)
+				} > 0 {
+					thread.atomic_add_global_i32(num_pushed, 1);
+				}
+				else {
+					thread.atomic_add_global_i32(num_not_pushed, 1);
+				}
 			};
 
-			// concurrent push and pop, verify that each element is handed out exactly once and comes from the correct slot
-			for grid in device.launch_1d(42, block_dim) {
+			let pop = @|thread: gpu_thread_context| {
+				if for el, i in queue.pop(thread) {
+					if i >= queue_size as u32 {
+						device.print_i32("ERROR: got queue element %d out of bounds to pop from!\n", i as i32);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 1);
+					}
+
+					let ref_value_slot = test_element.unpackRefValue(el);
+
+					if ref_value_slot >= 0 && ref_value_slot < pushed_buffer_size {
+						thread.memory_barrier();
+
+						if pushed_buffer(ref_value_slot) != i as i32 {
+							device.print_3xi32("ERROR: popped queue element %d (at index %d) was corrupted (got back index %d)!\n", ref_value_slot, i as i32, pushed_buffer(ref_value_slot));
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 2);
+						}
+
+						pushed_buffer(ref_value_slot) = -1;
+						thread.memory_barrier();
+					}
+					else {
+						device.print_3xi32("ERROR: popped queue element %d (at index %d) was corrupted (got back ref slot %d out of bounds)!\n", ref_value_slot, i as i32, ref_value_slot);
+						thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
+					}
+				} > 0 {
+					thread.atomic_add_global_i32(num_popped, 1);
+				}
+				else {
+					thread.atomic_add_global_i32(num_not_popped, 1);
+				}
+			};
+
+			for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 				for thread in grid.threads() {
-					let mut rand_state = rand::xorseed32(thread.idx(0));
+					if thread.idx(0) as i32 < num_threads {
+						let mut rand_state = rand::xorseed32(thread.idx(0));
 
-					for _n in range(0, 10) {
-						if rand_state as i32 > 0 {
-							if test_element.push(queue, thread, pushed_buffer, error_handler(thread, 1 << 0, @||{continue()})) > 0 {
-								thread.atomic_add_global_i32(num_pushed, 1);
+						for n in range(0, attempts_per_thread) {
+							if rand_state as i32 > 0 {
+								push(thread, thread.idx(0) as i32 * attempts_per_thread + n);
 							}
 							else {
-								thread.atomic_add_global_i32(num_not_pushed, 1);
+								pop(thread);
 							}
-						}
-						else {
-							if test_element.pop(queue, thread, pushed_buffer, error_handler(thread, 1 << 1, @||{continue()})) > 0 {
-								thread.atomic_add_global_i32(num_popped, 1);
-							}
-							else {
-								thread.atomic_add_global_i32(num_not_popped, 1);
-							}
-						}
 
-						rand_state = rand::xorshift32(rand_state);
+							rand_state = rand::xorshift32(rand_state);
+						}
 					}
 				}
 			}
 
 			device.synchronize();
 
-			// pop remaining elements until empty, verify that each element comes from the correct slot
-			for grid in device.launch_1d(42, block_dim) {
-				for thread in grid.threads() {
-					while (
-						if test_element.pop(queue, thread, pushed_buffer, error_handler(thread, 1 << 2, @||{continue()})) > 0 {
-							thread.atomic_add_global_i32(num_popped, 1);
-							true
-						}
-						else {
-							thread.atomic_load_global_i32(num_popped) < *num_pushed
-						}
-					) {}
-				}
-			}
+			print_string("verify queue size, push and pop counters, and pushed_buffer state are consistent ...\n");
 
-			device.synchronize();
-
-			// check that all elements have been popped
-			for grid in device.launch_1d(div_up(num_elements, block_dim), block_dim) {
+			for grid in device.launch_1d(div_up(pushed_buffer_size, block_dim), block_dim) {
 				for thread in grid.threads() {
-					if thread.idx(0) as i32 < num_elements {
+					if thread.idx(0) as i32 < pushed_buffer_size {
 						if pushed_buffer(thread.idx(0)) != -1 {
-							device.print_i32("ERROR: queue element %u has not been popped!\n", thread.idx(0) as i32);
-							thread.atomic_or_global_u32(device_failed_flag, 1 << 3);
+							thread.atomic_add_global_i32(num_left_in_push_buffer, 1);
+						}
+					}
+				}
+			}
+
+			device.synchronize();
+
+			for grid in device.launch_1d(1, 1) {
+				for thread in grid.threads() {
+					if thread.idx(0) == 0 {
+						let size = queue.size(thread);
+						let elements_left_reported = *num_pushed - *num_popped;
+
+						if size != elements_left_reported {
+							device.print_2xi32("ERROR: queue size (%d) is not consistent with number of elements reported pushed and not popped (%d)!\n", size, elements_left_reported);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
+						}
+
+						if size != *num_left_in_push_buffer {
+							device.print_2xi32("ERROR: queue size (%d) is not consistent with number of elements left in pushed_buffer (%d)!\n", size, *num_left_in_push_buffer);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
+						}
+
+						let num_attempts = num_threads * attempts_per_thread;
+						let num_attempts_reported = *num_pushed + *num_popped + *num_not_pushed + *num_not_popped;
+
+						if num_attempts_reported != num_attempts {
+							device.print_2xi32("ERROR: number of elements reported pushed/popped and not pushed/popped (%d) does not match number of attempts to push/pop (%d)!\n", num_attempts_reported, num_attempts);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 5);
+						}
+					}
+				}
+			}
+
+			device.synchronize();
+
+			print_string("pop remaining elements until empty, verify that each element is within bounds and did not get corrupted ...\n");
+
+			for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if thread.idx(0) as i32 < num_threads {
+						while (thread.atomic_load_global_i32(num_popped) < *num_pushed) {
+							pop(thread);
+						}
+					}
+				}
+			}
+
+			device.synchronize();
+
+			print_string("check that all elements have been popped and queue size is consistent ...\n");
+
+			for grid in device.launch_1d(div_up(pushed_buffer_size, block_dim), block_dim) {
+				for thread in grid.threads() {
+					if thread.idx(0) == 0 {
+						let size = queue.size(thread);
+
+						if size != 0 {
+							device.print_i32("ERROR: queue size (%d) is not 0!\n", size);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 6);
 						}
 					}
 
-					if thread.idx(0) == 0 {
-						device.print_3xi32("pushed + not pushed = %d + %d = %d\n", *num_pushed, *num_not_pushed, *num_pushed + *num_not_pushed);
-						device.print_3xi32("popped + not popped = %d + %d = %d\n", *num_popped, *num_not_popped, *num_popped + *num_not_popped);
-
-						if *num_popped != *num_pushed {
-							device.print_2xi32("ERROR: number of popped elements (%d) does not match number of elements pushed (%d)!\n", *num_popped, *num_pushed);
-							thread.atomic_or_global_u32(device_failed_flag, 1 << 4);
+					if thread.idx(0) as i32 < pushed_buffer_size {
+						if pushed_buffer(thread.idx(0)) >= 0 {
+							device.print_i32("ERROR: queue element %u has not been popped!\n", thread.idx(0) as i32);
+							thread.atomic_or_global_u32(device_failed_flag, 1 << 7);
 						}
 					}
 				}

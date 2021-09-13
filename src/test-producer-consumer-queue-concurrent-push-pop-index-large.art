@@ -1,3 +1,3 @@
 
 #[export]
-fn main() = concurrent_push_pop_queue_test[u32](1000000, indexTestElement());
+fn main() = concurrent_push_pop_queue_test[u32](10000, 256, 10, 1000000, indexTestElement());
