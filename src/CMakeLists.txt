@@ -27,6 +27,8 @@ set(COMMON_ARTIC_FILES
 set(COMMON_TEST_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/framework.art
 	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-common.art
+	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-push-and-then-pop.art
+	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-concurrent-push-pop.art
 	${CMAKE_CURRENT_SOURCE_DIR}/demo.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.art
 )
