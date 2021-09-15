@@ -155,7 +155,8 @@ class Thorin(Build):
 	def configure(self, configs, llvm):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
 			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
-			Half_INCLUDE_DIR=self.half_source_dir/"include"
+			Half_INCLUDE_DIR=self.half_source_dir/"include",
+			THORIN_PROFILE=False
 		)
 
 	def build(self, config):
