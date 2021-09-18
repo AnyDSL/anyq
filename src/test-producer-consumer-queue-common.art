@@ -61,7 +61,7 @@ fn @genericTestElement[T](generateElement: fn(i32) -> T, unpackRefValue: fn (T) 
 type GenericElementSimple = i64;
 
 fn genericTestElementSimple() = genericTestElement[GenericElementSimple](
-	@|ref_value:i32| -> GenericElementSimple { ref_value as i64 },
+	@|ref_value:i32| -> GenericElementSimple { ref_value as GenericElementSimple },
 	@|el:GenericElementSimple| el as i32
 );
 
