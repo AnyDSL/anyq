@@ -123,7 +123,7 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 					}
 				}
 
-				if thread.idx(0) as i32 < num_threads {
+				if thread.idx(0) as i32 < num_threads && thread.idx(0) as i32 < queue_size {
 					if pushed_buffer(thread.idx(0)) != -1 {
 						device.print_i32("ERROR: queue element %u has not been popped!\n", thread.idx(0) as i32);
 						thread.atomic_or_global_u32(device_failed_flag, 1 << 7);

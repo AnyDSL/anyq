@@ -28,6 +28,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let buffer_size = element_type.buffer_size(num_elements);
 	let buffer_alignment = element_type.buffer_alignment();
 
+	// TODO: size, head, tail are only i32 + 2x u32!
 	let buffer_data_offset = round_up_i64(sizeof[i32]() + 3 * sizeof[u32](), buffer_alignment);
 
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
@@ -38,6 +39,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let tail =   bitcast[&mut addrspace(1) u32](&mut queue_device_memory(sizeof[i32]() + sizeof[u32]()));
 	let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_device_memory(buffer_data_offset));
 
+	let buffer_element = @|i:u32| -> QueueElement[T] { element_type.buffer_element(buffer, i) };
 
 	ProducerConsumerQueue[T] {
 		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
@@ -54,8 +56,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				else {
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
 
-					let element = element_type.buffer_element(buffer, i);
-					element.store(@|| source(i), thread);
+					buffer_element(i).store(@|| source(i), thread);
 
 					1
 				}
@@ -76,8 +77,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				else {
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
 
-					let element = element_type.buffer_element(buffer, i);
-					element.load(@|el:T| sink(el, i), thread);
+					buffer_element(i).load(@|el:T| sink(el, i), thread);
 
 					1
 				}
@@ -99,8 +99,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				}
 
 				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
-					let element = element_type.buffer_element(buffer, i as u32);
-					element.clear();
+					buffer_element(i as u32).clear();
 				}
 			}
 		},
@@ -127,7 +126,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				}
 
 				if idx < num_elements as u32 {
-					let element = element_type.buffer_element(buffer, idx);
+					let element = buffer_element(idx);
 					if !element.is_free() {
 						thread.atomic_store_global_u32(corrupted, 1);
 						element.debug_print(device);
@@ -142,17 +141,25 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	}
 }
 
+type lock_type = u32;
+struct QueueBufferElement[T] {
+	lock: lock_type,
+	data: T
+}
+
 fn @genericQueueElementType[T]() {
-	let element_alignment = if alignof[T]() < alignof[u32]() {alignof[u32]()} else {alignof[T]()};
-	let lock_offset = round_up_i64(sizeof[T](), alignof[u32]());
-	let element_size = round_up_i64(lock_offset + sizeof[u32](), element_alignment);
+
+	let element_alignment = alignof[QueueBufferElement[T]]();
+	let element_size = round_up_i64(sizeof[QueueBufferElement[T]](), element_alignment);
 
 	QueueElementType[T] {
 		buffer_size = @|num_elements| num_elements as i64 * element_size,
 		buffer_alignment = @|| element_alignment,
 		buffer_element = @|buffer, i| {
-			let element = bitcast[&mut addrspace(1) T](&mut buffer(i as i64 * element_size));
-			let lock = bitcast[&mut addrspace(1) u32](&mut buffer(i as i64 * element_size + lock_offset));
+
+			let element_ptr = bitcast[&mut addrspace(1) [QueueBufferElement[T]]](buffer);
+			let lock:&mut addrspace(1) lock_type = &mut (element_ptr(i).lock);
+			let data:&mut addrspace(1) T = &mut (element_ptr(i).data);
 
 			QueueElement[T] {
 				clear = @|| *lock = 0,
@@ -163,8 +170,9 @@ fn @genericQueueElementType[T]() {
 					}
 
 					thread.memory_barrier();
-
-					sink(*element);
+					
+					let payload:T = *data;
+					sink(payload);
 
 					thread.memory_barrier();
 
@@ -177,7 +185,8 @@ fn @genericQueueElementType[T]() {
 
 					thread.memory_barrier();
 
-					*element = source();
+					let payload:T = source();
+					*data = payload;
 
 					thread.memory_barrier();
 
