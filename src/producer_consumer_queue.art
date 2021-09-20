@@ -176,10 +176,6 @@ fn @genericQueueElementType[T]() {
 
 					thread.memory_barrier();
 
-					// TODO: without next line: Assertion failed: type() == with->type(), file D:\Projects\anydsl\thorin\src\thorin\def.cpp, line 119
-					let vptr = bitcast[&i64](data);
-					//anyq_print_3xi32("load element %d at location %d\n", *vptr, i as i32, 0);
-
 					thread.atomic_store_global_u32(lock, 0);
 				},
 				store = @|source, thread| {
@@ -193,10 +189,6 @@ fn @genericQueueElementType[T]() {
 					*data = value;
 
 					thread.memory_barrier();
-
-					// TODO: without the next two lines: the llvm.masked.scatter.v8i64.v8p1i64 disappears and no store happens
-					let vptr = bitcast[&i64](data);
-					anyq_print_3xi32("store element %d at location %d\n", *vptr as i32, i as i32, 0);
 
 					thread.atomic_store_global_u32(lock, 2);
 				},

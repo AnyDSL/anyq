@@ -2,4 +2,4 @@
 type Element = u32;
 
 #[export]
-fn main() = push_and_then_pop_queue_test[GenericElementSimple](32, 16, 20, genericTestElementSimple());
+fn main() = push_and_then_pop_queue_test[GenericElementSimple](100000, 256, 1000000, genericTestElementSimple());
