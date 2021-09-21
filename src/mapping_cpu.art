@@ -87,8 +87,8 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 	}
 }
 
-fn @cpu_atomic_load[T](location: &mut addrspace(1) T, _order: memory_order)
-	= atomic_load[T](bitcast[&mut T](location), builtin_memory_order(memory_order::seq_cst), "");
+fn @cpu_atomic_load[T](location: &addrspace(1) T, _order: memory_order)
+	= atomic_load[T](bitcast[&T](location), builtin_memory_order(memory_order::seq_cst), "");
 
 fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, _order: memory_order)
 	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(memory_order::seq_cst), "");
