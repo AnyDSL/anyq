@@ -88,19 +88,19 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 }
 
 fn @cpu_atomic_load[T](location: &mut addrspace(1) T, order: memory_order)
-	= atomic_load_p1[T](location, builtin_memory_order(order), "");
+	= atomic_load[T](bitcast[&mut T](location), builtin_memory_order(order), "");
 
 fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
-	= atomic_store_p1[T](location, value, builtin_memory_order(order), "");
+	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(order), "");
 
 fn @cpu_atomic_rmw[T](op: u32) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-		atomic_p1[T](op, location, value, builtin_memory_order(order), "")
+		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(order), "")
 	}
 }
 
 fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-	match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "") {
+	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "") {
 		(old, _success) => old
 	}
 }
