@@ -43,8 +43,8 @@ fn @cuda_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
 	}
 }
 
-fn @cuda_legacy_atomic_memory_order_wrap_load[T](f: fn(&mut addrspace(1) T) -> T) {
-	@|location:&mut addrspace(1) T, order:memory_order| -> T {
+fn @cuda_legacy_atomic_memory_order_wrap_load[T](f: fn(&addrspace(1) T) -> T) {
+	@|location:&addrspace(1) T, order:memory_order| -> T {
 		let mut res:T;
 		cuda_legacy_atomic_memory_order_wrap(order, @|| res = f(location));
 		res
