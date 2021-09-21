@@ -87,6 +87,24 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 	}
 }
 
+fn @cpu_atomic_load[T](location: &mut addrspace(1) T, order: memory_order)
+	= atomic_load_p1[T](location, builtin_memory_order(order), "");
+
+fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
+	= atomic_store_p1[T](location, value, builtin_memory_order(order), "");
+
+fn @cpu_atomic_rmw[T](op: u32) {
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+		atomic_p1[T](op, location, value, builtin_memory_order(order), "")
+	}
+}
+
+fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+	match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "") {
+		(old, _success) => old
+	}
+}
+
 fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
@@ -96,66 +114,60 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 	@body(gpu_thread_context {
 		idx = tid,
 
-		atomic_load_global_i32 = @|addr: &mut addrspace(1) i32| atomic_load[i32](bitcast[&mut i32](addr), 7, ""),
-		atomic_load_global_u32 = @|addr: &mut addrspace(1) u32| atomic_load[u32](bitcast[&mut u32](addr), 7, ""),
-		atomic_load_global_u64 = @|addr: &mut addrspace(1) u64| atomic_load[u64](bitcast[&mut u64](addr), 7, ""),
+		atomic_load_global_i32 = cpu_atomic_load[i32],
+		atomic_load_global_u32 = cpu_atomic_load[u32],
+		atomic_load_global_u64 = cpu_atomic_load[u64],
 
-		atomic_store_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic_store[i32](bitcast[&mut i32](addr), val, 7, ""),
-		atomic_store_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic_store[u32](bitcast[&mut u32](addr), val, 7, ""),
-		atomic_store_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic_store[u64](bitcast[&mut u64](addr), val, 7, ""),
+		atomic_store_global_i32 = cpu_atomic_store[i32],
+		atomic_store_global_u32 = cpu_atomic_store[u32],
+		atomic_store_global_u64 = cpu_atomic_store[u64],
 
-		atomic_add_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](1, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_add_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](1, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_add_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](1, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_add_global_i32 = cpu_atomic_rmw[i32](1),
+		atomic_add_global_u32 = cpu_atomic_rmw[u32](1),
+		atomic_add_global_u64 = cpu_atomic_rmw[u64](1),
 
-		atomic_sub_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](2, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_sub_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](2, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_sub_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](2, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_sub_global_i32 = cpu_atomic_rmw[i32](2),
+		atomic_sub_global_u32 = cpu_atomic_rmw[u32](2),
+		atomic_sub_global_u64 = cpu_atomic_rmw[u64](2),
 
-		atomic_and_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](3, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_and_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](3, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_and_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](3, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_and_global_i32 = cpu_atomic_rmw[i32](3),
+		atomic_and_global_u32 = cpu_atomic_rmw[u32](3),
+		atomic_and_global_u64 = cpu_atomic_rmw[u64](3),
 
-		atomic_or_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](5, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_or_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](5, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_or_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](5, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_or_global_i32 = cpu_atomic_rmw[i32](5),
+		atomic_or_global_u32 = cpu_atomic_rmw[u32](5),
+		atomic_or_global_u64 = cpu_atomic_rmw[u64](5),
 
-		atomic_xor_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](6, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_xor_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](6, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_xor_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](6, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_xor_global_i32 = cpu_atomic_rmw[i32](6),
+		atomic_xor_global_u32 = cpu_atomic_rmw[u32](6),
+		atomic_xor_global_u64 = cpu_atomic_rmw[u64](6),
 
-		atomic_exch_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32](0, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_exch_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](0, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_exch_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](0, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_exch_global_i32 = cpu_atomic_rmw[i32](0),
+		atomic_exch_global_u32 = cpu_atomic_rmw[u32](0),
+		atomic_exch_global_u64 = cpu_atomic_rmw[u64](0),
 
-		atomic_min_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32]( 8, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_min_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32](10, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_min_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64](10, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_min_global_i32 = cpu_atomic_rmw[i32]( 8),
+		atomic_min_global_u32 = cpu_atomic_rmw[u32](10),
+		atomic_min_global_u64 = cpu_atomic_rmw[u64](10),
 
-		atomic_max_global_i32 = @|addr: &mut addrspace(1) i32, val: i32| atomic[i32]( 7, bitcast[&mut i32](addr), val, 7, ""),
-		atomic_max_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| atomic[u32]( 9, bitcast[&mut u32](addr), val, 7, ""),
-		atomic_max_global_u64 = @|addr: &mut addrspace(1) u64, val: u64| atomic[u64]( 9, bitcast[&mut u64](addr), val, 7, ""),
+		atomic_max_global_i32 = cpu_atomic_rmw[i32](7),
+		atomic_max_global_u32 = cpu_atomic_rmw[u32](9),
+		atomic_max_global_u64 = cpu_atomic_rmw[u64](9),
 
-		// atomic_cas_global_u16: cuda_atomic_cas_global_u16,
-		atomic_cas_global_i32 = @|addr: &mut addrspace(1) i32, cmp: i32, new: i32| -> i32 {
-			match cmpxchg[i32](bitcast[&mut i32](addr), cmp, new, 7, "") { (old, _success) => old }
-		},
-		atomic_cas_global_u32 = @|addr: &mut addrspace(1) u32, cmp: u32, new: u32| -> u32 {
-			match cmpxchg[u32](bitcast[&mut u32](addr), cmp, new, 7, "") { (old, _success) => old }
-		},
-		atomic_cas_global_i64 = @|addr: &mut addrspace(1) u64, cmp: u64, new: u64| -> u64 {
-			match cmpxchg[u64](bitcast[&mut u64](addr), cmp, new, 7, "") { (old, _success) => old }
-		},
+		atomic_cas_global_i32 = cpu_atomic_cas[i32],
+		atomic_cas_global_u32 = cpu_atomic_cas[u32],
+		atomic_cas_global_u64 = cpu_atomic_cas[u64],
+
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
 
 			// this is the generic version
-			let mut old:u32 = atomic_load[u32](ptr, 7, "");
+			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
 			let mut cmp:bool = false;
 
 			while(!cmp) {
 				let new = if old >= val { 0 } else { old + 1 };
-				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, 7, "");
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), "");
 				old = res_old;
 				cmp = res_cmp;
 			}
@@ -166,11 +178,11 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			let ptr = bitcast[&mut u32](addr);
 
 			// this is the generic version
-			let mut old:u32 = atomic_load[u32](ptr, 7, "");
+			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
 			let mut cmp:bool = false;
 			while(!cmp) {
 				let new = if (old == 0) || (old > val) { val } else { old - 1 };
-				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, 7, "");
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), "");
 				old = res_old;
 				cmp = res_cmp;
 			}
@@ -178,18 +190,18 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			// this is optimized for val being 2**n-1
 			/*
 			// atomic sub
-			let old:u32 = atomic[u32](2, ptr, 1, 7, "");
+			let old:u32 = atomic[u32](2, ptr, 1, 2, "");
 			if old == 0 {
 				// atomic and to mask overflow bits
 				// however, we must ensure that addr will not be read outside of this function
-				atomic[u32](3, ptr, val, 7, "");
+				atomic[u32](3, ptr, val, 2, "");
 			}
 			*/
 
 			old
 		},
 
-		memory_barrier = @|| {},  // TODO
+		memory_barrier = @|order:memory_order| fence(builtin_memory_order(order), ""),
 
 		yield = @|| { do_once(@|_, _| { fibers_yield(); }); }
 	});

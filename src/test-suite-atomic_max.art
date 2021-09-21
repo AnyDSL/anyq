@@ -16,7 +16,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 		let j = thread.idx(0) & 1;
 
 		if j == 0 {
-			thread.atomic_max_global_i32(global(i), mydata);
+			thread.atomic_max_global_i32(global(i), mydata, memory_order::relaxed);
 		}
 
 		write(thread.idx(0) as i32, mydata + 1);

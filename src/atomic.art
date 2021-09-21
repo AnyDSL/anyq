@@ -1,0 +1,28 @@
+
+
+enum memory_order {
+	relaxed,
+	acquire,
+	release,
+	acq_rel,
+	seq_cst
+}
+
+
+fn @is_weaker_memory_order(a:memory_order, b:memory_order) -> bool {
+	builtin_memory_order(a) < builtin_memory_order(b)
+}
+
+fn @stronger_memory_order(a:memory_order, b:memory_order) -> memory_order {
+	if is_weaker_memory_order(a, b) { b } else { a }
+}
+
+fn @builtin_memory_order(order: memory_order) -> u32 {
+	match order {
+		memory_order::relaxed => 2,
+		memory_order::acquire => 4,
+		memory_order::release => 5,
+		memory_order::acq_rel => 6,
+		memory_order::seq_cst => 7,
+	}
+}

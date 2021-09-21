@@ -11,7 +11,7 @@ fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->
 fn @test_body(grid: gpu_grid_context, read: ReadFn, _write: WriteFn, global: GlobalFn) -> () {
 	for thread in grid.threads() {
 		let mydata = read(thread.idx(0) as i32);
-		thread.atomic_add_global_i32(global(0), mydata);
+		thread.atomic_add_global_i32(global(0), mydata, memory_order::relaxed);
 	}
 }
 

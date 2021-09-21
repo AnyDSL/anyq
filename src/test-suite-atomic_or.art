@@ -15,7 +15,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, _write: WriteFn, global: Glo
 		let i = mydata >> 7;
 		let j = mydata & 0x7f;
 
-		thread.atomic_or_global_i32(global(i), j << (8*i));
+		thread.atomic_or_global_i32(global(i), j << (8*i), memory_order::relaxed);
 	}
 }
 

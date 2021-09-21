@@ -16,7 +16,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 
 			let mydata = read(tidx);
 
-			thread.atomic_min_global_i32(global(bidx), mydata);
+			thread.atomic_min_global_i32(global(bidx), mydata, memory_order::relaxed);
 
 			write(tidx, mydata + 1);
 		}

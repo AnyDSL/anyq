@@ -17,59 +17,76 @@ fn @amdgpu_pred(b: bool) -> i32 {
     if b { 1 } else { 0 }
 }
 
+fn @amdgpu_atomic_load[T](location: &mut addrspace(1) T, order: memory_order)
+    = atomic_load_p1[T](location, builtin_memory_order(order), "agent");
+
+fn @amdgpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
+    = atomic_store_p1[T](location, value, builtin_memory_order(order), "agent");
+
+fn @amdgpu_atomic_rmw[T](op: u32) {
+    @|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+        atomic_p1[T](op, location, val, builtin_memory_order(order), "agent")
+    }
+}
+
+fn @amdgpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+    match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "agent") {
+        (old, _success) => old
+    }
+}
+
 fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {
         idx = idx,
 
-        atomic_load_global_i32 = amdgcn_atomic_load_global_i32,
-        atomic_load_global_u32 = amdgcn_atomic_load_global_u32,
-        atomic_load_global_u64 = amdgcn_atomic_load_global_u64,
+        atomic_load_global_i32 = amdgpu_atomic_load[i32],
+        atomic_load_global_u32 = amdgpu_atomic_load[u32],
+        atomic_load_global_u64 = amdgpu_atomic_load[u64],
 
-        atomic_store_global_i32 = amdgcn_atomic_store_global_i32,
-        atomic_store_global_u32 = amdgcn_atomic_store_global_u32,
-        atomic_store_global_u64 = amdgcn_atomic_store_global_u64,
+        atomic_store_global_i32 = amdgpu_atomic_store[i32],
+        atomic_store_global_u32 = amdgpu_atomic_store[u32],
+        atomic_store_global_u64 = amdgpu_atomic_store[u64],
 
-        atomic_add_global_i32 = amdgcn_atomic_add_global_i32,
-        atomic_add_global_u32 = amdgcn_atomic_add_global_u32,
-        atomic_add_global_u64 = amdgcn_atomic_add_global_u64,
+        atomic_add_global_i32 = amdgpu_atomic_rmw[i32](1),
+        atomic_add_global_u32 = amdgpu_atomic_rmw[u32](1),
+        atomic_add_global_u64 = amdgpu_atomic_rmw[u64](1),
 
-        atomic_sub_global_i32 = amdgcn_atomic_sub_global_i32,
-        atomic_sub_global_u32 = amdgcn_atomic_sub_global_u32,
-        atomic_sub_global_u64 = amdgcn_atomic_sub_global_u64,
+        atomic_sub_global_i32 = amdgpu_atomic_rmw[i32](2),
+        atomic_sub_global_u32 = amdgpu_atomic_rmw[u32](2),
+        atomic_sub_global_u64 = amdgpu_atomic_rmw[u64](2),
 
-        atomic_and_global_i32 = amdgcn_atomic_and_global_i32,
-        atomic_and_global_u32 = amdgcn_atomic_and_global_u32,
-        atomic_and_global_u64 = amdgcn_atomic_and_global_u64,
+        atomic_and_global_i32 = amdgpu_atomic_rmw[i32](3),
+        atomic_and_global_u32 = amdgpu_atomic_rmw[u32](3),
+        atomic_and_global_u64 = amdgpu_atomic_rmw[u64](3),
 
-        atomic_or_global_i32 = amdgcn_atomic_or_global_i32,
-        atomic_or_global_u32 = amdgcn_atomic_or_global_u32,
-        atomic_or_global_u64 = amdgcn_atomic_or_global_u64,
+        atomic_or_global_i32 = amdgpu_atomic_rmw[i32](5),
+        atomic_or_global_u32 = amdgpu_atomic_rmw[u32](5),
+        atomic_or_global_u64 = amdgpu_atomic_rmw[u64](5),
 
-        atomic_xor_global_i32 = amdgcn_atomic_xor_global_i32,
-        atomic_xor_global_u32 = amdgcn_atomic_xor_global_u32,
-        atomic_xor_global_u64 = amdgcn_atomic_xor_global_u64,
+        atomic_xor_global_i32 = amdgpu_atomic_rmw[i32](6),
+        atomic_xor_global_u32 = amdgpu_atomic_rmw[u32](6),
+        atomic_xor_global_u64 = amdgpu_atomic_rmw[u64](6),
 
-        atomic_exch_global_i32 = amdgcn_atomic_exch_global_i32,
-        atomic_exch_global_u32 = amdgcn_atomic_exch_global_u32,
-        atomic_exch_global_u64 = amdgcn_atomic_exch_global_u64,
+        atomic_exch_global_i32 = amdgpu_atomic_rmw[i32](0),
+        atomic_exch_global_u32 = amdgpu_atomic_rmw[u32](0),
+        atomic_exch_global_u64 = amdgpu_atomic_rmw[u64](0),
 
-        atomic_min_global_i32 = amdgcn_atomic_min_global_i32,
-        atomic_min_global_u32 = amdgcn_atomic_min_global_u32,
-        atomic_min_global_u64 = amdgcn_atomic_min_global_u64,
+        atomic_min_global_i32 = amdgpu_atomic_rmw[i32]( 8),
+        atomic_min_global_u32 = amdgpu_atomic_rmw[u32](10),
+        atomic_min_global_u64 = amdgpu_atomic_rmw[u64](10),
 
-        atomic_max_global_i32 = amdgcn_atomic_max_global_i32,
-        atomic_max_global_u32 = amdgcn_atomic_max_global_u32,
-        atomic_max_global_u64 = amdgcn_atomic_max_global_u64,
+        atomic_max_global_i32 = amdgpu_atomic_rmw[i32](7),
+        atomic_max_global_u32 = amdgpu_atomic_rmw[u32](9),
+        atomic_max_global_u64 = amdgpu_atomic_rmw[u64](9),
 
-        // atomic_cas_global_u16 = amdgcn_atomic_cas_global_u16,
-        atomic_cas_global_i32 = amdgcn_atomic_cas_global_i32,
-        atomic_cas_global_u32 = amdgcn_atomic_cas_global_u32,
-        atomic_cas_global_i64 = amdgcn_atomic_cas_global_u64,
+        atomic_cas_global_i32 = amdgpu_atomic_cas[i32],
+        atomic_cas_global_u32 = amdgpu_atomic_cas[u32],
+        atomic_cas_global_u64 = amdgpu_atomic_cas[u64],
 
         atomic_inc_global_u32 = @|addr, val| amdgcn_atomic_inc_global_u32(addr, val, 0, 0, false),
         atomic_dec_global_u32 = @|addr, val| amdgcn_atomic_dec_global_u32(addr, val, 0, 0, false),
 
-        memory_barrier = @|| {},  // TODO
+        memory_barrier = @|order:memory_order| fence(builtin_memory_order(order), "agent"),
 
         yield = @|| amdgcn_s_sleep(0)
     });

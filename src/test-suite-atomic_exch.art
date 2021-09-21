@@ -17,14 +17,14 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, _write: WriteFn, global: Glo
 		let tidx = thread.idx(0) as i32;
 
 		let mydata = read(tidx);
-		thread.atomic_add_global_i32(global(0), mydata);
+		thread.atomic_add_global_i32(global(0), mydata, memory_order::relaxed);
 
 		let mut newdata = 0; // mydata;
 		if mydata & 1 == 0 {
-			newdata = thread.atomic_exch_global_i32(global(2), mydata);
+			newdata = thread.atomic_exch_global_i32(global(2), mydata, memory_order::relaxed);
 		}
 
-		thread.atomic_add_global_i32(global(1), newdata);
+		thread.atomic_add_global_i32(global(1), newdata, memory_order::relaxed);
 	}
 }
 

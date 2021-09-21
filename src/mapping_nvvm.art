@@ -25,58 +25,102 @@ fn @nvvm_pred(b: bool) -> i32 {
 	if b {1} else {0}
 }
 
+fn @nvvm_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
+	match order {
+		memory_order::release => nvvm_threadfence(),
+		memory_order::acq_rel => nvvm_threadfence(),
+		memory_order::seq_cst => nvvm_threadfence(),
+		_ => ()
+	}
+
+	f();
+
+	match order {
+		memory_order::acquire => nvvm_threadfence(),
+		memory_order::acq_rel => nvvm_threadfence(),
+		memory_order::seq_cst => nvvm_threadfence(),
+		_ => ()
+	}
+}
+
+fn @nvvm_legacy_atomic_memory_order_wrap_load[T](f: fn(&mut addrspace(1) T) -> T) {
+	@|location:&mut addrspace(1) T, order:memory_order| -> T {
+		let mut res:T;
+		nvvm_legacy_atomic_memory_order_wrap(order, @|| res = f(location));
+		res
+	}
+}
+
+fn @nvvm_legacy_atomic_memory_order_wrap_store[T](f: fn(&mut addrspace(1) T, T) -> ()) {
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> () {
+		nvvm_legacy_atomic_memory_order_wrap(order, @|| f(location, value));
+	}
+}
+
+fn @nvvm_atomic_rmw[T](op: u32) {
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+		atomic_p1[T](op, location, value, builtin_memory_order(order), "")
+	}
+}
+
+fn @nvvm_atomic_cas[T](location:&mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+	match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "agent") {
+		(old, _success) => old
+	}
+}
+
 fn @nvvm_thread(idx: fn(i32) -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	@body(gpu_thread_context {
 		idx = idx,
 
-		atomic_load_global_i32 = @|location:&mut addrspace(1) i32| nvvm_atomic_add_global_i32(location, 0),
-		atomic_load_global_u32 = @|location:&mut addrspace(1) u32| nvvm_atomic_add_global_u32(location, 0),
-		atomic_load_global_u64 = @|location:&mut addrspace(1) u64| nvvm_atomic_add_global_u64(location, 0),
+		atomic_load_global_i32 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&mut addrspace(1) i32| { let mut res:i32; asm("ld.volatile.s32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u32 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&mut addrspace(1) u32| { let mut res:u32; asm("ld.volatile.u32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u64 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&mut addrspace(1) u64| { let mut res:u64; asm("ld.volatile.u64 $0, [$1];" : "=l"(res) : "l"(location) : "memory"); res }),
 
-		atomic_store_global_i32 = @|location:&mut addrspace(1) i32, value:i32| -> () { nvvm_atomic_exch_global_i32(location, value); },
-		atomic_store_global_u32 = @|location:&mut addrspace(1) u32, value:u32| -> () { nvvm_atomic_exch_global_u32(location, value); },
-		atomic_store_global_u64 = @|location:&mut addrspace(1) u64, value:u64| -> () { nvvm_atomic_exch_global_u64(location, value); },
+		atomic_store_global_i32 = nvvm_legacy_atomic_memory_order_wrap_store(@|location:&mut addrspace(1) i32, value:i32| asm("st.volatile.s32 [$0], $1;" : : "l"(location), "r"(value) : "memory")),
+		atomic_store_global_u32 = nvvm_legacy_atomic_memory_order_wrap_store(@|location:&mut addrspace(1) u32, value:u32| asm("st.volatile.u32 [$0], $1;" : : "l"(location), "r"(value) : "memory")),
+		atomic_store_global_u64 = nvvm_legacy_atomic_memory_order_wrap_store(@|location:&mut addrspace(1) u64, value:u64| asm("st.volatile.u64 [$0], $1;" : : "l"(location), "l"(value) : "memory")),
 
-		atomic_add_global_i32 = nvvm_atomic_add_global_i32,
-		atomic_add_global_u32 = nvvm_atomic_add_global_u32,
-		atomic_add_global_u64 = nvvm_atomic_add_global_u64,
+		atomic_add_global_i32 = nvvm_atomic_rmw[i32](1),
+		atomic_add_global_u32 = nvvm_atomic_rmw[u32](1),
+		atomic_add_global_u64 = nvvm_atomic_rmw[u64](1),
 
-		atomic_sub_global_i32 = nvvm_atomic_sub_global_i32,
-		atomic_sub_global_u32 = nvvm_atomic_sub_global_u32,
-		atomic_sub_global_u64 = nvvm_atomic_sub_global_u64,
+		atomic_sub_global_i32 = nvvm_atomic_rmw[i32](2),
+		atomic_sub_global_u32 = nvvm_atomic_rmw[u32](2),
+		atomic_sub_global_u64 = nvvm_atomic_rmw[u64](2),
 
-		atomic_and_global_i32 = nvvm_atomic_and_global_i32,
-		atomic_and_global_u32 = nvvm_atomic_and_global_u32,
-		atomic_and_global_u64 = nvvm_atomic_and_global_u64,
+		atomic_and_global_i32 = nvvm_atomic_rmw[i32](3),
+		atomic_and_global_u32 = nvvm_atomic_rmw[u32](3),
+		atomic_and_global_u64 = nvvm_atomic_rmw[u64](3),
 
-		atomic_or_global_i32 = nvvm_atomic_or_global_i32,
-		atomic_or_global_u32 = nvvm_atomic_or_global_u32,
-		atomic_or_global_u64 = nvvm_atomic_or_global_u64,
+		atomic_or_global_i32 = nvvm_atomic_rmw[i32](5),
+		atomic_or_global_u32 = nvvm_atomic_rmw[u32](5),
+		atomic_or_global_u64 = nvvm_atomic_rmw[u64](5),
 
-		atomic_xor_global_i32 = nvvm_atomic_xor_global_i32,
-		atomic_xor_global_u32 = nvvm_atomic_xor_global_u32,
-		atomic_xor_global_u64 = nvvm_atomic_xor_global_u64,
+		atomic_xor_global_i32 = nvvm_atomic_rmw[i32](6),
+		atomic_xor_global_u32 = nvvm_atomic_rmw[u32](6),
+		atomic_xor_global_u64 = nvvm_atomic_rmw[u64](6),
 
-		atomic_exch_global_i32 = nvvm_atomic_exch_global_i32,
-		atomic_exch_global_u32 = nvvm_atomic_exch_global_u32,
-		atomic_exch_global_u64 = nvvm_atomic_exch_global_u64,
+		atomic_exch_global_i32 = nvvm_atomic_rmw[i32](0),
+		atomic_exch_global_u32 = nvvm_atomic_rmw[u32](0),
+		atomic_exch_global_u64 = nvvm_atomic_rmw[u64](0),
 
-		atomic_min_global_i32 = nvvm_atomic_min_global_i32,
-		atomic_min_global_u32 = nvvm_atomic_min_global_u32,
-		atomic_min_global_u64 = nvvm_atomic_min_global_u64,
+		atomic_min_global_i32 = nvvm_atomic_rmw[i32]( 8),
+		atomic_min_global_u32 = nvvm_atomic_rmw[u32](10),
+		atomic_min_global_u64 = nvvm_atomic_rmw[u64](10),
 
-		atomic_max_global_i32 = nvvm_atomic_max_global_i32,
-		atomic_max_global_u32 = nvvm_atomic_max_global_u32,
-		atomic_max_global_u64 = nvvm_atomic_max_global_u64,
+		atomic_max_global_i32 = nvvm_atomic_rmw[i32](7),
+		atomic_max_global_u32 = nvvm_atomic_rmw[u32](9),
+		atomic_max_global_u64 = nvvm_atomic_rmw[u64](9),
 
-		atomic_cas_global_i32 = nvvm_atomic_cas_global_i32,
-		atomic_cas_global_u32 = nvvm_atomic_cas_global_u32,
-		atomic_cas_global_i64 = nvvm_atomic_cas_global_u64,
+		atomic_cas_global_i32 = nvvm_atomic_cas[i32],
+		atomic_cas_global_u32 = nvvm_atomic_cas[u32],
+		atomic_cas_global_u64 = nvvm_atomic_cas[u64],
 
 		atomic_inc_global_u32 = nvvm_atomic_inc_global_u32,
 		atomic_dec_global_u32 = nvvm_atomic_dec_global_u32,
 
-		memory_barrier = nvvm_threadfence,
+		memory_barrier = @|_:memory_order| nvvm_threadfence(),
 
 		// yield = @|| nvvm_nanosleep(0)
 		yield = @|| nvvm_threadfence()

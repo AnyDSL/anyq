@@ -43,14 +43,14 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 	ProducerConsumerQueue[T] {
 		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
-			if thread.atomic_load_global_i32(size) >= num_elements {
+			if thread.atomic_load_global_i32(size, memory_order::relaxed) >= num_elements {
 				0
 			}
 			else {
-				let new_size = thread.atomic_add_global_i32(size, 1);
+				let new_size = thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
 
 				if new_size >= num_elements {
-					thread.atomic_sub_global_i32(size, 1);
+					thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
@@ -64,14 +64,14 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 		},
 
 		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
-			if thread.atomic_load_global_i32(size) <= 0 {
+			if thread.atomic_load_global_i32(size, memory_order::relaxed) <= 0 {
 				0
 			}
 			else {
-				let available = thread.atomic_sub_global_i32(size, 1);
+				let available = thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
 
 				if available <= 0 {
-					thread.atomic_add_global_i32(size, 1);
+					thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
@@ -85,7 +85,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 		},
 
 		size = @|thread| {
-			thread.atomic_load_global_i32(size)
+			thread.atomic_load_global_i32(size, memory_order::relaxed)
 		},
 
 		reset = @|grid| {
@@ -111,24 +111,14 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				if idx == 0 {
 					if (*size != 0) {
 						device.print_i32("queue size (%d) is not zero!\n", *size);
-						thread.atomic_store_global_u32(corrupted, 1);
+						thread.atomic_store_global_u32(corrupted, 1, memory_order::relaxed);
 					}
-
-					// if (*head != 0) {
-					// 	device.print_i32("queue head (%d) is not zero!\n", *head as i32);
-					// 	thread.atomic_store_global_u32(corrupted, 1);
-					// }
-
-					// if (*tail != 0) {
-					// 	device.print_i32("queue tail (%d) is not zero!\n", *tail as i32);
-					// 	thread.atomic_store_global_u32(corrupted, 1);
-					// }
 				}
 
 				if idx < num_elements as u32 {
 					let element = buffer_element(idx);
 					if !element.is_free() {
-						thread.atomic_store_global_u32(corrupted, 1);
+						thread.atomic_store_global_u32(corrupted, 1, memory_order::relaxed);
 						element.debug_print(device);
 					}
 				}
@@ -165,32 +155,24 @@ fn @genericQueueElementType[T]() {
 				clear = @|| *lock = 0,
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
-					while thread.atomic_load_global_u32(lock) != 2 {
+					while thread.atomic_load_global_u32(lock, memory_order::acquire) != 2 {
 						thread.yield();
 					}
-
-					thread.memory_barrier();
 					
 					let payload:T = *data;
 					sink(payload);
 
-					thread.memory_barrier();
-
-					thread.atomic_store_global_u32(lock, 0);
+					thread.atomic_store_global_u32(lock, 0, memory_order::release);
 				},
 				store = @|source, thread| {
-					while thread.atomic_cas_global_u32(lock, 0, 1) != 0 {
+					while thread.atomic_cas_global_u32(lock, 0, 1, memory_order::acquire, memory_order::relaxed) != 0 {
 						thread.yield();
 					}
-
-					thread.memory_barrier();
 
 					let payload:T = source();
 					*data = payload;
 
-					thread.memory_barrier();
-
-					thread.atomic_store_global_u32(lock, 2);
+					thread.atomic_store_global_u32(lock, 2, memory_order::release);
 				},
 				debug_print = @|device| {
 					device.print_2xi32("inconsistent queue state: buffer[%d] = %d\n", i as i32, *lock as i32);
@@ -212,7 +194,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 			is_free = @|| *element == FREE,
 			load = @|sink, thread| {
 				let tryDequeue = @|| {
-					let el = thread.atomic_exch_global_u32(element, FREE);
+					let el = thread.atomic_exch_global_u32(element, FREE, memory_order::relaxed);
 					if el != FREE {
 						sink(el);
 						true
@@ -228,7 +210,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 			},
 			store = @|source, thread| {
 				let value = source();
-				while thread.atomic_cas_global_u32(element, FREE, value) != FREE {
+				while thread.atomic_cas_global_u32(element, FREE, value, memory_order::relaxed, memory_order::relaxed) != FREE {
 					thread.yield();
 				}
 			},
