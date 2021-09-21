@@ -25,7 +25,7 @@ fn @amdgpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memor
 
 fn @amdgpu_atomic_rmw[T](op: u32) {
     @|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-        atomic_p1[T](op, location, val, builtin_memory_order(order), "agent")
+        atomic_p1[T](op, location, value, builtin_memory_order(order), "agent")
     }
 }
 
