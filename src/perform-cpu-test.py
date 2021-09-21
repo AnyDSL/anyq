@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print("Perform test case", args.src_file, "...", "", end="")
 
     # print("executing", args.bin_file)
-    result = subprocess.run(args.bin_file, capture_output=True, encoding='utf-8')
+    result = subprocess.run(str(args.bin_file.resolve()), capture_output=True, encoding='utf-8')
     if result.returncode != 0:
         print('failed with incorrect computation!')
         print(result.stdout)
