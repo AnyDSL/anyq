@@ -87,20 +87,20 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 	}
 }
 
-fn @cpu_atomic_load[T](location: &addrspace(1) T, _order: memory_order)
-	= atomic_load[T](bitcast[&T](location), builtin_memory_order(memory_order::seq_cst), "");
+fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
+	= atomic_load[T](bitcast[&T](location), builtin_memory_order(order), "");
 
-fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, _order: memory_order)
-	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(memory_order::seq_cst), "");
+fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
+	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(order), "");
 
 fn @cpu_atomic_rmw[T](op: u32) {
-	@|location:&mut addrspace(1) T, value:T, _order:memory_order| -> T {
-		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(memory_order::seq_cst), "")
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(order), "")
 	}
 }
 
-fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, _memory_order_succ: memory_order, _memory_order_fail: memory_order) -> T {
-	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order::seq_cst /* stronger_memory_order(memory_order_succ, memory_order_fail) */), "") {
+fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "") {
 		(old, _success) => old
 	}
 }
@@ -201,7 +201,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			old
 		},
 
-		memory_barrier = @|_order:memory_order| { /* fence(builtin_memory_order(memory_order::seq_cst), ""); */ },
+		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
 
 		yield = @|| { do_once(@|_, _| { fibers_yield(); }); }
 	});
