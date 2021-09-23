@@ -318,7 +318,7 @@ if __name__ == "__main__":
 		args = sub_args.add_parser(name)
 		args.set_defaults(command=function)
 		args.add_argument("components", nargs="*")#, choices=dependency_name_map.keys())
-		args.add_argument("-cfg", "--config", action="append", dest="configs", default=["Debug", "Release"] if windows else ["Release"])
+		args.add_argument("-cfg", "--config", action="append", dest="configs", default=["Debug", "Release"] if windows else ["Debug"])
 		args.add_argument("--no-deps", action="store_true")
 		return args
 
