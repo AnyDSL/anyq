@@ -32,6 +32,7 @@ set(COMMON_TEST_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-concurrent-push-pop.art
 	${CMAKE_CURRENT_SOURCE_DIR}/demo.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils.art
+	${CMAKE_CURRENT_SOURCE_DIR}/random.art
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/test-suite.art)

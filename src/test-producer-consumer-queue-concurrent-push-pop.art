@@ -92,7 +92,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 					if thread_id as i32 < num_threads {
 						// make sure entire wave consistently either pushes or pops
 						// TODO: change queue interface to work on entire wave context
-						let mut rand_state = rand::xorseed32(wave.idx());
+						let mut rand_state = rng::xorseed32(wave.idx());
 
 						for n in range(0, attempts_per_thread) {
 							if rand_state as i32 > 0 {
@@ -102,7 +102,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 								pop(thread);
 							}
 
-							rand_state = rand::xorshift32(rand_state);
+							rand_state = rng::xorshift32(rand_state);
 						}
 					}
 				}
