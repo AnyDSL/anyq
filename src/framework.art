@@ -217,24 +217,33 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 		locals =  @|idx| { data(num_globals + idx) },
 
 		validate = @|validate_global: fn(i32,i32)->bool, validate_local: fn(i32,i32)->bool, stop_on_first_fail:bool| -> bool {
-			let mut result = true;
+			let result = (@|| -> bool {
+				let mut res = true;
 
-			for idx in range(0, num_globals) {
-					let check = validate_global(idx, data(idx));
-					if !check {
-						print_string("validation failed! global("); print_hex(idx, false); print_string(") = "); print_i32(data(idx)); print_char('\n');
-						if stop_on_first_fail { return(false) }
-					}
-					result &= check;
-			}
-			for idx in range(0, num_locals) {
-					let check = validate_local(idx, data(num_globals + idx));
-					if !check {
-						print_string("validation failed! local("); print_hex(idx, false); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
-						if stop_on_first_fail { return(false) }
-					}
-					result &= check;
-			}
+				for idx in range(0, num_globals) {
+						let check = validate_global(idx, data(idx));
+
+						res &= check;
+
+						if !check {
+							print_string("validation failed! global("); print_hex(idx, false); print_string(") = "); print_i32(data(idx)); print_char('\n');
+							if stop_on_first_fail { return(false) }
+						}
+				}
+
+				for idx in range(0, num_locals) {
+						let check = validate_local(idx, data(num_globals + idx));
+
+						res &= check;
+
+						if !check {
+							print_string("validation failed! local("); print_hex(idx, false); print_string(") = "); print_i32(data(num_globals + idx)); print_char('\n');
+							if stop_on_first_fail { return(false) }
+						}
+				}
+
+				res
+			})();
 
 			validation_result &= result;
 
