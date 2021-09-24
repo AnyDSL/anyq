@@ -1,0 +1,35 @@
+
+// inst_stats: fence(1)
+
+
+fn @setup_input(_num_globals: i32, num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|g: i32| match g { 0 => 1, 1 => 2, _ => 0 };
+	let local  = @|i: i32| 0;
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for thread in grid.threads() {
+		if thread.idx(0) == grid.num_threads(0) / 2 {
+			thread.atomic_store_global_i32(global(0), 10, memory_order::relaxed);
+			thread.memory_barrier(memory_order::acq_rel);
+			thread.atomic_store_global_i32(global(1), 20, memory_order::relaxed);
+			write(thread.idx(0) as i32, 1);
+		}
+		else {
+			let b = thread.atomic_load_global_i32(global(1), memory_order::relaxed);
+			thread.memory_barrier(memory_order::acq_rel);
+			let a = thread.atomic_load_global_i32(global(0), memory_order::relaxed);
+
+			let check = if (a == 1 && b == 2) || (a == 10 && b == 2) || (a == 10 && b == 20) { 1 } else { 0 };
+			write(thread.idx(0) as i32, check);
+		}
+	}
+}
+
+fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let values = |l: i32| 1;
+	let result = |g: i32| match g { 0 => 10, 1 => 20, _ => 0 };
+
+	(result, values)
+}
