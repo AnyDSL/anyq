@@ -121,14 +121,14 @@ set(TEST_SCHEDULE_FILES
 	test-basics.art
 	test-shuffles.art
 	test-barriers.art
-	test-producer-consumer-queue-push-and-then-pop-generic.art
-	test-producer-consumer-queue-push-and-then-pop-generic-struct.art
-	test-producer-consumer-queue-push-and-then-pop-generic-definite-array.art
-	test-producer-consumer-queue-push-and-then-pop-index.art
-	test-producer-consumer-queue-concurrent-push-pop-generic-small.art
-	test-producer-consumer-queue-concurrent-push-pop-generic-large.art
-	test-producer-consumer-queue-concurrent-push-pop-index-small.art
-	test-producer-consumer-queue-concurrent-push-pop-index-large.art
+	test-queue-sequential-generic.art
+	test-queue-sequential-generic-struct.art
+	test-queue-sequential-generic-array.art
+	test-queue-sequential-index.art
+	test-queue-concurrent-generic-small.art
+	test-queue-concurrent-generic-large.art
+	test-queue-concurrent-index-small.art
+	test-queue-concurrent-index-large.art
 )
 
 set(TEST_SUITE_FILES
