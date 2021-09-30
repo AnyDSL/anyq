@@ -169,3 +169,5 @@ endif()
 if (AnyQ_FIBER_SUPPORT)
 	add_subdirectory(fiber-test-suite)
 endif()
+
+offline_graph(repro ${CMAKE_CURRENT_SOURCE_DIR}/repro.art)
