@@ -42,10 +42,9 @@ function(add_anydsl_runtime target)
 endfunction()
 
 option(BUILD_TESTING OFF)
+
 if (BUILD_TESTING)
 	include(CTest)
 endif()
 
 add_subdirectory(src)
-
-# set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT minimal)

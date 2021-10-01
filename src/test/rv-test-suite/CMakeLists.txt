@@ -1,9 +1,7 @@
 
-file(GLOB _intrinsic_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "intrinsic-*-*.art" )
 file(GLOB _test_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "test-*-*.art" )
 
-source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES})
-source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
+source_group("/" REGULAR_EXPRESSION "test-*-*.art")
 
 if (Thorin_HAS_RV_SUPPORT)
 
@@ -17,7 +15,7 @@ if (Thorin_HAS_RV_SUPPORT)
 			get_filename_component(_test_name ${_test_filename} NAME_WE)
 			set(_target "rv-${_test_name}--${_test_impl_name}")
 
-			offline_graph(${_target} "${CMAKE_CURRENT_SOURCE_DIR}/main.art" ${_test_filename} ${_test_impl})
+			add_anydsl_executable(${_target} "${CMAKE_CURRENT_SOURCE_DIR}/main.art" ${_test_filename} ${_test_impl})
 			set_target_properties(${_target} PROPERTIES FOLDER "tests/rv" )
 			if (BUILD_TESTING)
 				add_testcase(${_target} ${_test_filename} cpu)
