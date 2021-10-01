@@ -5,10 +5,10 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "debug nvvm",
-			"type": "cppvsdbg",
+			"name": "debug",
+			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/build/bin/Debug/${fileBasenameNoExtension}-nvvm.exe",
+			"program": "${workspaceFolder}/build/bin/${fileBasenameNoExtension}-${config:backend}",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
@@ -17,43 +17,31 @@
 					"name": "Path",
 					"value": "${env:Path};${env:CUDA_PATH}/nvvm/bin"
 				},
-				{
-					"name": "ANYDSL_PROFILE",
-					"value": "FULL"
-				},
-				{
-					"name": "ANYDSL_DUMP_CUDA_BINARIES",
-					"value": "1"
-				}
-			],
-			"console": "internalConsole"
-		},
-		{
-			"name": "debug cuda",
-			"type": "cppvsdbg",
-			"request": "launch",
-			"program": "${workspaceFolder}/build/bin/Release/${fileBasenameNoExtension}-cuda.exe",
-			"args": [],
-			"stopAtEntry": false,
-			"cwd": "${workspaceFolder}",
-			"environment": [
-				{
-					"name": "ANYDSL_PROFILE",
-					"value": "FULL"
-				},
+				// {
+				// 	"name": "ANYDSL_PROFILE",
+				// 	"value": "FULL"
+				// },
 				{
 					"name": "ANYDSL_DUMP_CUDA_BINARIES",
 					"value": "1"
 				}
 			],
-			"console": "internalConsole"
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
 		},
 		{
 			"name": "Python: Current File",
 			"type": "python",
 			"request": "launch",
 			"program": "${file}",
-			//"args": ["-dep", "llvm"],
+			"args": [],
 			"console": "integratedTerminal"
 		}
 	]
