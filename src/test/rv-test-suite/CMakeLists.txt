@@ -1,5 +1,6 @@
 
 file(GLOB _test_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "test-*-*.art" )
+file(GLOB _intrinsic_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "intrinsic-*-*.art" )
 
 source_group("/" REGULAR_EXPRESSION "test-*-*.art")
 
@@ -7,7 +8,7 @@ if (Thorin_HAS_RV_SUPPORT)
 
 	foreach(_test_filename ${_test_sources})
 		string(REGEX REPLACE "^test-(.+)-.+\.art$" "\\1" _test_component ${_test_filename})
-		
+
 		set(_test_implementations ${_intrinsic_sources})
 		list(FILTER _test_implementations INCLUDE REGEX "^intrinsic-${_test_component}-.+\.art$")
 		foreach(_test_impl ${_test_implementations})
