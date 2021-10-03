@@ -1,0 +1,57 @@
+
+
+struct Benchmark {
+	run: fn(fn() -> ()) -> fn() -> (),
+	destroy: fn() -> ()
+}
+
+#[import(cc = "C")] fn benchmark_create() -> &mut u8;
+#[import(cc = "C")] fn benchmark_begin(&mut u8, i32) -> ();
+#[import(cc = "C")] fn benchmark_end(&mut u8, i32) -> ();
+#[import(cc = "C")] fn benchmark_destroy(&mut u8) -> ();
+
+fn create_benchmark() {
+	let ctx = benchmark_create();
+
+	let N = 10;
+
+	Benchmark {
+		run = @|body: fn() -> ()|@|| {
+			benchmark_begin(ctx, N);
+			for _ in range(0, N) {
+				@body();
+			}
+			benchmark_end(ctx, N);
+		},
+		destroy = @|| benchmark_destroy(ctx)
+	}
+}
+
+
+fn @upsweep_exponential(body: fn(i32) -> ()) {
+	fn @(?min & ?max & ?exp) loop(min: i32, max: i32, exp: i32) -> () {
+		if min < max {
+			@body(min);
+			loop(min * exp, max, exp);
+		}
+	}
+	loop
+}
+
+
+fn @sweep_num_threads_benchmark(num_threads_min: i32, num_threads_max: i32, body: fn(i32) -> ()) {
+	let benchmark = create_benchmark();
+
+	print_string("--------");
+
+	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
+		print_i32(num_threads);
+		print_char(';');
+
+		for benchmark.run() {
+			@body(num_threads);
+		}
+	}
+
+	0
+}
