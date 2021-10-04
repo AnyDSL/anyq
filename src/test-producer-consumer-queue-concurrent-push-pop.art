@@ -1,5 +1,4 @@
 
-
 fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_per_thread: i32, queue_size: i32, test_element: QueueTestElement[T]) -> i32 {
 	let device = createAccDevice();
 
@@ -14,17 +13,28 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		let num_not_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 3));
 		let num_left_in_push_buffer = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 4));
 
-		print_string("initialize debug pushed_buffer ...\n");
+		fn pushed_buffer_addr(idx: u32) -> &mut addrspace(1) i32 { &mut pushed_buffer(idx) };
+		fn set_pushed_buffer(thread: gpu_thread_context, idx: u32, value: i32) -> () {
+			//device.print_2xi32("pushed_buffer(%d) = %d\n", idx as i32, value);
+			thread.atomic_store_global_i32(pushed_buffer_addr(idx), value, memory_order::relaxed);
+			//*(pushed_buffer_addr(idx)) = value;
+		}
+		fn get_pushed_buffer(thread: gpu_thread_context, idx: u32) -> i32 {
+			thread.atomic_load_global_i32(pushed_buffer_addr(idx), memory_order::relaxed)
+			//*(pushed_buffer_addr(idx))
+		}
+
+		device.print_i32("initialize debug pushed_buffer with %d elements ...\n", pushed_buffer_size + 5);
 
 		for grid in device.launch_1d(div_up(pushed_buffer_size + 5, block_dim), block_dim) {
 			for thread in grid.threads() {
 				if thread.idx(0) as i32 >= pushed_buffer_size {
-					if thread.idx(0) as i32 < pushed_buffer_size + 5 {
-						pushed_buffer(thread.idx(0)) = 0;
+					if thread.idx(0) as i32 < (pushed_buffer_size + 5) {
+						set_pushed_buffer(thread, thread.idx(0), 0);
 					}
 				}
 				else {
-					pushed_buffer(thread.idx(0)) = -1;
+					set_pushed_buffer(thread, thread.idx(0), -2);
 				}
 			}
 		}
@@ -40,8 +50,10 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 					thread.atomic_or_global_u32(device_failed_flag, 1 << 0, memory_order::relaxed);
 				}
 
-				pushed_buffer(ref_value_slot) = i as i32;
+				set_pushed_buffer(thread, ref_value_slot as u32, i as i32);
 				thread.memory_barrier(memory_order::release);
+
+				device.print_2xi32("PUSH - element %d for slot %d\n", i as i32, ref_value_slot);
 
 				test_element.generateElement(ref_value_slot)
 			} > 0 {
@@ -54,6 +66,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 		let pop = @|thread: gpu_thread_context| {
 			if for el, i in queue.pop(thread) {
+
 				if i >= queue_size as u32 {
 					device.print_i32("ERROR: got queue element %d out of bounds to pop from!\n", i as i32);
 					thread.atomic_or_global_u32(device_failed_flag, 1 << 1, memory_order::relaxed);
@@ -61,15 +74,18 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 				let ref_value_slot = test_element.unpackRefValue(el);
 
+				device.print_2xi32("POP  - element %d for slot %d\n", i as i32, ref_value_slot);
+
 				if ref_value_slot >= 0 && ref_value_slot < pushed_buffer_size {
 					thread.memory_barrier(memory_order::acquire);
 
-					if pushed_buffer(ref_value_slot) != i as i32 {
-						device.print_3xi32("ERROR: popped queue element %d (at index %d) was corrupted (got back index %d)!\n", ref_value_slot, i as i32, pushed_buffer(ref_value_slot));
+					let pushed_buffer_value = get_pushed_buffer(thread, ref_value_slot as u32);
+					if pushed_buffer_value != i as i32 {
+						device.print_3xi32("ERROR: popped queue element %d (at index %d) was corrupted (got back index %d)!\n", ref_value_slot, i as i32, pushed_buffer_value);
 						thread.atomic_or_global_u32(device_failed_flag, 1 << 2, memory_order::relaxed);
 					}
 
-					pushed_buffer(ref_value_slot) = -1;
+					set_pushed_buffer(thread, ref_value_slot as u32, -1);
 					thread.memory_barrier(memory_order::release);
 				}
 				else {
@@ -79,22 +95,29 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 			} > 0 {
 				thread.atomic_add_global_i32(num_popped, 1, memory_order::relaxed);
 			}
-			else {
+			else { 
 				thread.atomic_add_global_i32(num_not_popped, 1, memory_order::relaxed);
 			}
 		};
 
+		// TODO: using multi-threading causes deadlock or atleast an extrem slowdown
+
 		for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 			for wave in grid.waves() {
+
+				// make sure entire wave consistently either pushes or pops
+				// TODO: change queue interface to work on entire wave context
+				let mut rand_state = wave.idx() % 2;
+				//let mut rand_state = rng::xorseed32(wave.idx());
+
 				for thread in wave.threads() {
 					let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
 
 					if thread_id as i32 < num_threads {
-						// make sure entire wave consistently either pushes or pops
-						// TODO: change queue interface to work on entire wave context
-						let mut rand_state = rng::xorseed32(wave.idx());
 
 						for n in range(0, attempts_per_thread) {
+							//device.print_2xi32("wave %d with state %d\n", wave.idx() as i32, rand_state as i32);
+							//let n = 0;
 							if rand_state as i32 > 0 {
 								push(thread, thread_id as i32 * attempts_per_thread + n);
 							}
@@ -102,9 +125,13 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 								pop(thread);
 							}
 
-							rand_state = rng::xorshift32(rand_state);
+							wave.barrier();
+
+							//rand_state = rng::xorshift32(rand_state);
+							thread.yield();
 						}
 					}
+
 				}
 			}
 		}
@@ -116,7 +143,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		for grid in device.launch_1d(div_up(pushed_buffer_size, block_dim), block_dim) {
 			for thread in grid.threads() {
 				if thread.idx(0) as i32 < pushed_buffer_size {
-					if pushed_buffer(thread.idx(0)) != -1 {
+					if pushed_buffer(thread.idx(0)) >= 0 {
 						thread.atomic_add_global_i32(num_left_in_push_buffer, 1, memory_order::relaxed);
 					}
 				}

@@ -159,6 +159,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 		atomic_cas_global_u64 = cpu_atomic_cas[u64],
 
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			/*
 			let ptr = bitcast[&mut u32](addr);
 
 			// this is the generic version
@@ -173,6 +174,17 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			old
+			*/
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
+			let atomic_and = cpu_atomic_rmw[u32](3);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+			if old > val {
+				atomic_and(addr, val, memory_order::relaxed);
+			}
+
+			(old & val)
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
@@ -383,7 +395,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 			// TODO: do we need a sync or yield here to ensure proper finalization of one block?
 			//       otherwise fibers may work on different blocks - does this cause issues?
 			//fibers_yield();
-			fibers_sync_block(block_id);
+			//fibers_sync_block(block_id);
 
 		}
 	}

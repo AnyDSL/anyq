@@ -18,11 +18,12 @@ fn @stronger_memory_order(a:memory_order, b:memory_order) -> memory_order {
 }
 
 fn @builtin_memory_order(order: memory_order) -> u32 {
-	match order {
+	/* match order {
 		memory_order::relaxed => 2,
 		memory_order::acquire => 4,
 		memory_order::release => 5,
 		memory_order::acq_rel => 6,
 		memory_order::seq_cst => 7,
-	}
+	} */
+	7
 }
