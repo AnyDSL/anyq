@@ -1,7 +1,8 @@
 #include <exception>
 #include <iostream>
+#include <iomanip>
 
-#include "instrumentation_cpu.h"
+#include <instrumentation.h>
 
 
 extern "C"
@@ -20,7 +21,8 @@ extern "C"
 
 	void benchmark_end(void* ctx, int N)
 	{
-		static_cast<Instrumentation*>(ctx)->end(N);
+		float dt = static_cast<Instrumentation*>(ctx)->end(N);
+		std::cout /*<< std::fixed << std::setprecision(2)*/ << dt << '\n' << std::flush;
 	}
 
 	void benchmark_destroy(void* ctx)

@@ -49,6 +49,7 @@ set(AnyQ_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(AnyQ_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
+	find_package(CUDAToolkit REQUIRED)
 	list(APPEND AnyQ_PLATFORMS cuda nvvm)
 endif()
 
