@@ -5,22 +5,40 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 
 	let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 
+
+	for grid in device.launch_1d(div_up(queue_size, block_size), block_size) {
+		queue.reset(grid);
+	}
+
 	@|num_threads: i32| {
 		for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 			for wave in grid.waves() {
 				for thread in grid.threads() {
 					let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
 
-					let mut rand_state = rng::xorseed32(wave.idx());
+					let mut rand_state = rng::xorseed32(thread_id);
 
 					let sample = @|p: f32| -> bool {
 						rand_state = rng::xorshift32(rand_state);
-						// TODO: turn random bits into float?
 						rand_state < ((-1 as u32) as f32 * p) as u32
 					};
 
 					for _ in range(0, attempts_per_thread) {
-						
+						if sample(p_enq) {
+							for _ in queue.push(thread) {
+								rand_state
+							};
+						}
+
+						wave.barrier();
+
+						if sample(p_deq) {
+							for _, _ in queue.pop(thread) {
+								rand_state = rng::xorshift32(rand_state);
+							};
+						}
+
+						wave.barrier();
 					}
 				}
 			}
