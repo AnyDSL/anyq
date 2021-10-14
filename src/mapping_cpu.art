@@ -30,7 +30,7 @@ fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_
 
 #[import(cc = "C", name = "anydsl_fibers_sync_block"              )] fn fibers_sync_block(i32) -> ();
 #[import(cc = "C", name = "anydsl_fibers_sync_block_with_result"  )] fn fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
-#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield() -> ();
+#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield(&[u8]) -> ();
 #[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
 
 
@@ -215,7 +215,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 
 		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
 
-		yield = @|| { do_once(@|_, _| { fibers_yield(); }); }
+		yield = @|msg| { do_once(@|_, _| { fibers_yield(msg); }); }
 	});
 }
 

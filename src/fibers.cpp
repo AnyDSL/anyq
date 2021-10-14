@@ -119,7 +119,12 @@ void anydsl_fibers_sync_block_with_result(int32_t* output, int32_t* result, int3
 	block_barriers[block].wait_for_result<int32_t>(output, result, reset);
 }
 
-void anydsl_fibers_yield() {
+void anydsl_fibers_yield(const char* msg) {
+#ifndef NDEBUG
+	std::stringstream msgstr;
+	msgstr << "fiber yield - " << msg << std::endl;
+	anyq_print_3xi32(msgstr.str().c_str(), 0, 0, 0);
+#endif // !NDEBUG
 	boost::this_fiber::yield();
 }
 

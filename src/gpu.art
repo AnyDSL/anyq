@@ -144,5 +144,5 @@ struct gpu_thread_context {
 
 	memory_barrier: fn(memory_order) -> (),
 
-	yield: fn() -> ()
+	yield: fn(&[u8]) -> ()
 }
