@@ -28,6 +28,6 @@ set(TEST_SUITE_FILES
 
 foreach(_test_case ${TEST_SUITE_FILES})
 	get_filename_component(_testname ${_test_case} NAME_WE)
-	add_schedule_test(${_test_case} cpu ${CMAKE_CURRENT_SOURCE_DIR}/fiber-test-suite.art)
+	add_test_executable(${_testname}-cpu cpu ${_test_case} ${CMAKE_CURRENT_SOURCE_DIR}/fiber-test-suite.art)
 	set_target_properties(${_testname}-cpu PROPERTIES FOLDER "tests/fibers")
 endforeach()
