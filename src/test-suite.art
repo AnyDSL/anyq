@@ -1,11 +1,14 @@
+
+static group_size = 128;
+static num_groups = 4;
+
+static num_globals = 4;
+
+
 #[export]
 fn main() -> i32 {
 	let device = createAccDevice();
 
-	let group_size = 128;
-	let num_groups = 4;
-
-	let num_globals = 4;
 	let num_locals = num_groups * group_size;
 
 	let (init_global, init_local) = setup_input(num_globals, num_locals);
