@@ -177,6 +177,16 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			*/
 
 			let atomic_add = cpu_atomic_rmw[u32](1);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+
+			(old % (val + 1))
+
+			// val == 2^n - 1
+			/*
+			assert(cpu_popcount_u32(val) == 1, "atomic_inc_global_u32() only supports power of two");
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
 			let atomic_and = cpu_atomic_rmw[u32](3);
 
 			let old = atomic_add(addr, 1, memory_order::relaxed);
@@ -185,6 +195,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			(old & val)
+			*/
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);

@@ -1,18 +1,24 @@
 
-// inst_stats: cmpxchg(4), extractelement(12), insertelement(14), shufflevector(6)
+// inst_stats: atomicrmw(8), extractelement(8), insertelement(18), shufflevector(7), cmpxchg(0)
 
+// reference: cmpxchg(4), extractelement(12), insertelement(14), shufflevector(6)
 // vec_width/active lanes: 3x extractelement (old, new, active lane), 1x cmpxchg, 2x insertelement (old, success)
 // 6x insertelement + 6x shufflevector for broadcasts
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_: i32| 0;
-	let local  = @|_: i32| 0xBEAF;
+	let local  = @|_: i32| 0xBEEF;
 	(global, local)
 }
 
 fn @wrap_around_value(value: i32) -> u32 {
-	(1 << (4 + value)) as u32
+	match value {
+		0 => 16, /* group_size / 8 */
+		1 => 32, /* group_size / 4 */
+		2 => 43, /* some prime number */
+		_ => 96  /* 3/4 of group_size */
+	}
 }
 
 fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
@@ -21,6 +27,7 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 			let bidx = block.idx(0) as i32;
 			let ptr = bitcast[&mut addrspace(1)u32](global(bidx));
 
+			// only every second thread increments the global counter
 			if (thread.idx(0) & 1) == 0 {
 				let newdata = thread.atomic_inc_global_u32(ptr, wrap_around_value(bidx) - 1) as i32;
 
@@ -30,21 +37,22 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 	}
 }
 
-fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let values = |l: i32| {
 		/* group_size == 128 */
 		let bidx = (l >> 7) & 0x3;
 		let tidx = l & 0x7f;
 		let wrap = wrap_around_value(bidx) as i32;
-		if (tidx < wrap) && (tidx < 64 /* group_size / 2 */) {
+		if (tidx < wrap) && (tidx < (group_size / 2)) {
 			-(1 << bidx)
 		} else {
-			0xBEAF
+			0xBEEF
 		}
 	};
 
-	// atmost the wrap around bit shall be set
-	let result = |g: i32| match g { 3 => 64, _ => 0 };
+	// we can not make any assumptions on the global
+	// hence, we just pass through their values
+	let result = |g: i32| global(g);
 
 	(result, values)
 }
