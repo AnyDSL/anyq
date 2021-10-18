@@ -53,7 +53,9 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 				set_pushed_buffer(thread, ref_value_slot as u32, i as i32);
 				thread.memory_barrier(memory_order::release);
 
-				device.print_3xi32("%d | PUSH - element %d for slot %d\n", thread.gid() as i32, i as i32, ref_value_slot);
+				for anyq_verbose() {
+					device.print_3xi32("%d | PUSH - element %d for slot %d\n", thread.gid() as i32, i as i32, ref_value_slot);
+				}
 
 				test_element.generateElement(ref_value_slot)
 			} > 0 {
@@ -74,7 +76,9 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 				let ref_value_slot = test_element.unpackRefValue(el);
 
-				device.print_3xi32("%d | POP  - element %d for slot %d\n", thread.gid() as i32, i as i32, ref_value_slot);
+				for anyq_verbose() {
+					device.print_3xi32("%d | POP  - element %d for slot %d\n", thread.gid() as i32, i as i32, ref_value_slot);
+				}
 
 				if ref_value_slot >= 0 && ref_value_slot < pushed_buffer_size {
 					thread.memory_barrier(memory_order::acquire);

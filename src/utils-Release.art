@@ -1,0 +1,8 @@
+
+fn @anyq_verbose(_body: fn()->()) -> fn()->() {
+	|| { }
+}
+
+fn @assert(_condition: bool, _msg: &[u8]) -> () {
+	// skip assertions in release
+}
