@@ -50,16 +50,16 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 			else {
 				let new_size = thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
 				// DEFECT: remove this line or the other below and it will not trigger the assertion
-				device.print_3xi32("%d | QUEUE: reserve for push %d -> %d\n", thread.idx(0) as i32, current_size1, new_size);
+				device.print_3xi32("%d | QUEUE: reserve for push %d -> %d\n", thread.gid() as i32, current_size1, new_size);
 
 				if new_size >= num_elements {
-					//device.print_2xi32("%d | QUEUE: reject push %d\n", thread.idx(0) as i32, new_size);
+					device.print_2xi32("%d | QUEUE: reject push %d\n", thread.gid() as i32, new_size);
 					thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
-					//device.print_2xi32("%d | QUEUE: move tail %d\n", thread.idx(0) as i32, i as i32);
+					device.print_2xi32("%d | QUEUE: move tail %d\n", thread.gid() as i32, i as i32);
 
 					buffer_element(i).store(@|| source(i), thread);
 
@@ -76,16 +76,16 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 			else {
 				let available = thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
 				// DEFECT: remove this line or the other above and it will not trigger the assertion
-				device.print_3xi32("%d | QUEUE: allocate for pop %d -> %d\n", thread.idx(0) as i32, current_size2, available);
+				device.print_3xi32("%d | QUEUE: allocate for pop %d -> %d\n", thread.gid() as i32, current_size2, available);
 
 				if available <= 0 {
-					//device.print_2xi32("%d | QUEUE: reject pop %d\n", thread.idx(0) as i32, available);
+					device.print_2xi32("%d | QUEUE: reject pop %d\n", thread.gid() as i32, available);
 					thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
-					//device.print_2xi32("%d | QUEUE: move head %d\n", thread.idx(0) as i32, i as i32);
+					device.print_2xi32("%d | QUEUE: move head %d\n", thread.gid() as i32, i as i32);
 
 					buffer_element(i).load(@|el:T| sink(el, i), thread);
 
