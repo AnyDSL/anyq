@@ -49,6 +49,11 @@ if (Boost_FOUND)
 	)
 	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
+	option(AnyQ_VERBOSE OFF)
+	if (AnyQ_VERBOSE)
+		target_compile_definitions(fiber-support PRIVATE ANYQ_VERBOSE)
+	endif()
+
 	set(AnyQ_FIBER_SUPPORT TRUE)
 	set(ADDITIONAL_LINK_DEPENDENCY_cpu fiber-support)
 else()
