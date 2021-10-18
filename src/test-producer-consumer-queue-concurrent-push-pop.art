@@ -128,7 +128,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 							wave.barrier();
 
 							//rand_state = rng::xorshift32(rand_state);
-							thread.yield();
+							thread.yield("wait for other waves before my next iteration");
 						}
 					}
 

@@ -166,7 +166,7 @@ fn @genericQueueElementType[T]() {
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
 					while thread.atomic_load_global_u32(lock, memory_order::acquire) != 2 {
-						thread.yield();
+						thread.yield("wait for element lock to read");
 					}
 					
 					let payload:T = *data;
@@ -176,7 +176,7 @@ fn @genericQueueElementType[T]() {
 				},
 				store = @|source, thread| {
 					while thread.atomic_cas_global_u32(lock, 0, 1, memory_order::acquire, memory_order::relaxed) != 0 {
-						thread.yield();
+						thread.yield("wait for element lock to write");
 					}
 
 					let payload:T = source();
@@ -215,13 +215,13 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 				};
 
 				while !tryDequeue() {
-					thread.yield();
+					thread.yield("wait for a successful indexQueueElementType.load()");
 				}
 			},
 			store = @|source, thread| {
 				let value = source();
 				while thread.atomic_cas_global_u32(element, FREE, value, memory_order::relaxed, memory_order::relaxed) != FREE {
-					thread.yield();
+					thread.yield("wait for a successful indexQueueElementType.store()");
 				}
 			},
 			debug_print = @|device| {
