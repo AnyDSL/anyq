@@ -1,4 +1,5 @@
 struct QueueElement[T] {
+	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. load/store) are thread-safe
 	clear: fn() -> (),
 	is_free: fn() -> bool,
 	store: fn(fn() -> T, gpu_thread_context) -> (),
@@ -13,6 +14,7 @@ struct QueueElementType[T] {
 }
 
 struct ProducerConsumerQueue[T] {
+	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. push/pop/size) are thread-safe
 	push: fn(fn(u32) -> T) -> fn(gpu_thread_context) -> i32,
 	pop: fn(fn(T, u32) -> ()) -> fn(gpu_thread_context) -> i32,
 	// pop_wave: fn(gpu_wave_context, i32, fn(i32, u32) -> ()) -> i32,
