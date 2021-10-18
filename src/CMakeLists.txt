@@ -27,6 +27,7 @@ set(COMMON_ARTIC_FILES
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 find_package(Boost 1.65 COMPONENTS fiber)
 

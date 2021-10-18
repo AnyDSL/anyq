@@ -1,5 +1,7 @@
 
 source_group("/" REGULAR_EXPRESSION "test-.+[.]art$")
+source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES} REGULAR_EXPRESSION "utils-(Debug|Release)[.]art$")
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 add_executable(fiber-test test-fibers.cpp)
 set_target_properties(fiber-test PROPERTIES

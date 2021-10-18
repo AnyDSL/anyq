@@ -3,6 +3,7 @@ file(GLOB _test_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "test-*-*.art" )
 file(GLOB _intrinsic_sources RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "intrinsic-*-*.art" )
 
 source_group("/" REGULAR_EXPRESSION "test-*-*.art")
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 if (Thorin_HAS_RV_SUPPORT)
 
