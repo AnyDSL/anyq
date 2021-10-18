@@ -37,6 +37,8 @@ fn @amdgpu_thread(idx: fn(i32)->u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {
         idx = idx,
 
+        gid = @|| /* TODO global unique identifiert */ 0xBEEF,
+
         atomic_load_global_i32 = amdgpu_atomic_load[i32],
         atomic_load_global_u32 = amdgpu_atomic_load[u32],
         atomic_load_global_u64 = amdgpu_atomic_load[u64],

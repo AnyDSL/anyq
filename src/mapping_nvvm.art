@@ -73,6 +73,8 @@ fn @nvvm_thread(idx: fn(i32) -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	@body(gpu_thread_context {
 		idx = idx,
 
+		gid = @|| /* TODO global unique identifiert */ 0xBEEF,
+
 		atomic_load_global_i32 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&addrspace(1) i32| { let mut res:i32; asm("ld.volatile.s32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u32 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&addrspace(1) u32| { let mut res:u32; asm("ld.volatile.u32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u64 = nvvm_legacy_atomic_memory_order_wrap_load(@|location:&addrspace(1) u64| { let mut res:u64; asm("ld.volatile.u64 $0, [$1];" : "=l"(res) : "l"(location) : "memory"); res }),
