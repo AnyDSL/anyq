@@ -34,17 +34,20 @@ def git_apply_patch(dir, patch):
 
 
 class CMakeBuild:
-	@staticmethod
-	def __definition_args(**options):
+	def __definition_args(self, **options):
+		yield from self.global_flags
 		for key, value in options.items():
 			if isinstance(value, pathlib.PurePath):
 				yield f"-D{key}:PATH={value}"
 			else:
 				yield f"-D{key}={value}"
 
+	def __init__(self, *, global_flags = []):
+		self.global_flags = global_flags
+
 	def configure(self, build_dir, src_dir, *args, **options):
 		build_dir.mkdir(parents=True, exist_ok=True)
-		if cmd("cmake", *args, *list(CMakeBuild.__definition_args(**options)), str(src_dir), cwd=build_dir) != 0:
+		if cmd("cmake", *args, *list(self.__definition_args(**options)), str(src_dir), cwd=build_dir) != 0:
 			raise Exception(f"CMake failed for {build_dir}")
 
 	def build(self, build_dir, config, *targets):
@@ -56,15 +59,15 @@ class CMakeBuild:
 
 class NinjaBuild(CMakeBuild):
 	def configure(self, build_dir, configs, src_dir, **options):
-		super().configure(build_dir, f"-DCMAKE_BUILD_TYPE={configs[-1]}", src_dir, "-G", "Ninja", **options)
+		super().configure(build_dir, src_dir, "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configs[-1]}", **options)
 
 class NinjaMultiConfigBuild(CMakeBuild):
 	def configure(self, build_dir, configs, src_dir, **options):
-		super().configure(build_dir, f"-DCMAKE_CONFIGURATION_TYPES={';'.join(configs)}", src_dir, "-G", "Ninja Multi-Config", **options)
+		super().configure(build_dir, src_dir, "-G", "Ninja Multi-Config", f"-DCMAKE_CONFIGURATION_TYPES={';'.join(configs)}", **options)
 
 # class VS2019Build(CMakeBuild):
 # 	def configure(self, build_dir, configs, src_dir, **options):
-# 		super().configure(build_dir, configs, src_dir, "-G", "Visual Studio 16 2019", "-A", "x64", **options)
+# 		super().configure(build_dir, src_dir, configs, "-G", "Visual Studio 16 2019", "-A", "x64", **options)
 
 
 def pull_git_dependency(dir, url, *args, branch = "master"):

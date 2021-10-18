@@ -16,40 +16,13 @@
 	},
 	"tasks": [
 		{
-			"label": "build nvvm",
+			"label": "build",
 			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-nvvm --config Debug",
+			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-${config:backend} --config Release",
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			},
-			"problemMatcher": [
-				"$msCompile"
-			]
-		},
-		{
-			"label": "build cuda",
-			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-cuda --config Release",
-			"group": "build",
-			"problemMatcher": [
-				"$msCompile"
-			]
-		},
-		{
-			"label": "build opencl",
-			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-opencl --config Release",
-			"group": "build",
-			"problemMatcher": [
-				"$msCompile"
-			]
-		},
-		{
-			"label": "build amdgpu",
-			"type": "shell",
-			"command": "cmake --build ${workspaceFolder}/build --target ${fileBasenameNoExtension}-amdgpu --config Release",
-			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
 			]

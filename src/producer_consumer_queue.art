@@ -180,7 +180,7 @@ fn @genericQueueElementType[T]() {
 					while thread.atomic_cas_global_u32(lock, 2, 3, memory_order::acquire, memory_order::relaxed) != 2 {
 						thread.yield("wait for element lock to read");
 					}
-					
+
 					let payload:T = *data;
 					sink(payload);
 

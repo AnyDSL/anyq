@@ -274,9 +274,9 @@ def lookup_dependency(name):
 		raise Exception(f"unknown component '{name}'")
 	return d
 
-def dependencies(dir, components):
+def dependencies(dir, components, buildsystem):
 	def create_component(C):
-		return C(dir, NinjaMultiConfigBuild() if windows else NinjaBuild())
+		return C(dir, buildsystem)
 
 	yield from instantiate_dependencies(create_component, components)
 
@@ -300,7 +300,17 @@ def remove(components, configs):
 
 def main(args):
 	this_dir = Path(__file__).parent
-	components = dependencies(this_dir, map(lookup_dependency, args.components) if args.components else [All])
+
+	# avoid passing -DNDEBUG for Release builds
+	global_flags = [
+		"-DCMAKE_C_FLAGS_RELEASE=/O2", "-DCMAKE_CXX_FLAGS_RELEASE=/O2"
+	] if windows else [
+		"-DCMAKE_C_FLAGS_RELEASE=-O3", "-DCMAKE_CXX_FLAGS_RELEASE=-O3"
+	]
+
+	buildsystem = NinjaMultiConfigBuild(global_flags=global_flags) if windows else NinjaBuild(global_flags=global_flags)
+
+	components = dependencies(this_dir, map(lookup_dependency, args.components) if args.components else [All], buildsystem)
 
 	def take_last(things):
 		for thing in things:
