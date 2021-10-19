@@ -2,7 +2,6 @@
 static inactive_groups = 1;
 static inactive_waves = 3;
 static inactive_threads = 2;
-static active_threads:i32 = (num_groups - inactive_groups - 1) * group_size + (group_size - inactive_waves*(warp_size as i32) - inactive_threads);
 
 static padding = 5;
 
@@ -14,6 +13,19 @@ fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->
 
 
 fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+
+	for group in grid.groups() {
+		for wave in group.waves() {
+			for thread in wave.threads() {
+				if wave.idx() == 0 && thread.idx(0) == 0 {
+					*global(1) = (num_groups - inactive_groups - 1) * group_size + (group_size - inactive_waves*(wave.num_threads() as i32) - inactive_threads);
+				}
+			}
+		}
+		group.barrier();
+	}
+
+	let active_threads = *global(1);
 
 	for thread in grid.threads() {
 			let tid = thread.idx(0) as i32; //(wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
@@ -44,8 +56,10 @@ fn @test_body(grid: gpu_grid_context, _read: ReadFn, write: WriteFn, global: Glo
 }
 
 
-fn @expected_result(_global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
-	let expected_global = |g: i32| match g { 0 => active_threads, _ => 0 };
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let active_threads = global(1);
+
+	let expected_global = |g: i32| match g { 0 => active_threads, 1 => active_threads, _ => 0 };
 	let expected_local = |l: i32| { if l < active_threads { -2 } else if (l < active_threads + padding) { 42 } else { 0xBEEF } };
 
 	(expected_global, expected_local)
