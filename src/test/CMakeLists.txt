@@ -110,6 +110,7 @@ set(TEST_SUITE_FILES
 	test-suite-memory_barrier.art
 	test-suite-scatter_writes.art
 	test-suite-shfl_bfly.art
+	test-suite-inactive-waves.art
 )
 
 
