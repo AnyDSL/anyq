@@ -317,7 +317,7 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		num_waves = num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads = @|_i:i32| num_threads(),
-		barrier = @|| -> () { if idx.local_id == 0 { fibers_sync_block(idx.block_id as i32); } },
+		barrier = @|| -> () { do_once(@|_, _| { fibers_sync_block(idx.block_id as i32); }); },
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if rv_all(predicate) { 1 } else {0 };
 			do_once(@|_, _| {
