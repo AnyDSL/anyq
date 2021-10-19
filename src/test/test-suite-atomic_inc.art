@@ -1,5 +1,10 @@
 
-// inst_stats: atomicrmw(8), extractelement(8), insertelement(18), shufflevector(7), cmpxchg(0)
+// inst_stats: atomicrmw(8), extractelement(8), insertelement(18), shufflevector(7), cmpxchg(0), urem(1)
+
+// wrap_around_value: 4x cascaded insertelement, 1x shufflevector
+// 6x various broadcasts (1x insertelement, 1x shufflevector)
+// vec_width: 8x extract of active lanes, 8x cascade of atomicrmw + insertelement of result
+// 1x urem
 
 // reference: cmpxchg(4), extractelement(12), insertelement(14), shufflevector(6)
 // vec_width/active lanes: 3x extractelement (old, new, active lane), 1x cmpxchg, 2x insertelement (old, success)
