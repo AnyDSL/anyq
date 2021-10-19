@@ -24,7 +24,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 			//*(pushed_buffer_addr(idx))
 		}
 
-		device.print_i32("initialize debug pushed_buffer with %d elements ...\n", pushed_buffer_size + 5);
+		print_string("initialize debug pushed_buffer with "); print_i32(pushed_buffer_size + 5); print_string(" elements ...\n");
 
 		for grid in device.launch_1d(div_up(pushed_buffer_size + 5, block_dim), block_dim) {
 			for thread in grid.threads() {
