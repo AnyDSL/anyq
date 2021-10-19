@@ -23,9 +23,11 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
+	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<CONFIG>.art
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 find_package(Boost 1.65 COMPONENTS fiber)
 
@@ -37,6 +39,11 @@ if (Boost_FOUND)
 		PRIVATE ${Boost_INCLUDE_DIRS}
 	)
 	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
+	option(AnyQ_VERBOSE OFF)
+	if (AnyQ_VERBOSE)
+		target_compile_definitions(fiber-support PRIVATE ANYQ_VERBOSE)
+	endif()
 
 	set(AnyQ_FIBER_SUPPORT TRUE)
 	set(ADDITIONAL_LINK_DEPENDENCY_cpu fiber-support)

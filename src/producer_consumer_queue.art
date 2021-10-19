@@ -1,4 +1,5 @@
 struct QueueElement[T] {
+	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. load/store) are thread-safe
 	clear: fn() -> (),
 	is_free: fn() -> bool,
 	store: fn(fn() -> T, gpu_thread_context) -> (),
@@ -13,6 +14,7 @@ struct QueueElementType[T] {
 }
 
 struct ProducerConsumerQueue[T] {
+	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. push/pop/size) are thread-safe
 	push: fn(fn(u32) -> T) -> fn(gpu_thread_context) -> i32,
 	pop: fn(fn(T, u32) -> ()) -> fn(gpu_thread_context) -> i32,
 	// pop_wave: fn(gpu_wave_context, i32, fn(i32, u32) -> ()) -> i32,
@@ -43,18 +45,28 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 	ProducerConsumerQueue[T] {
 		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
-			if thread.atomic_load_global_i32(size, memory_order::relaxed) >= num_elements {
+			let current_size1 = thread.atomic_load_global_i32(size, memory_order::relaxed);
+			if current_size1 >= num_elements {
 				0
 			}
 			else {
 				let new_size = thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
+				for anyq_verbose() {
+					device.print_3xi32("%d | QUEUE: reserve for push %d -> %d\n", thread.gid() as i32, current_size1, new_size);
+				}
 
 				if new_size >= num_elements {
+					for anyq_verbose() {
+						device.print_2xi32("%d | QUEUE: reject push %d\n", thread.gid() as i32, new_size);
+					}
 					thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
 					let i = thread.atomic_inc_global_u32(tail, (num_elements - 1) as u32);
+					for anyq_verbose() {
+						device.print_2xi32("%d | QUEUE: move tail %d\n", thread.gid() as i32, i as i32);
+					}
 
 					buffer_element(i).store(@|| source(i), thread);
 
@@ -64,18 +76,28 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 		},
 
 		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
-			if thread.atomic_load_global_i32(size, memory_order::relaxed) <= 0 {
+			let current_size2 = thread.atomic_load_global_i32(size, memory_order::relaxed);
+			if current_size2 <= 0 {
 				0
 			}
 			else {
 				let available = thread.atomic_sub_global_i32(size, 1, memory_order::relaxed);
+				for anyq_verbose() {
+					device.print_3xi32("%d | QUEUE: allocate for pop %d -> %d\n", thread.gid() as i32, current_size2, available);
+				}
 
 				if available <= 0 {
+					for anyq_verbose() {
+						device.print_2xi32("%d | QUEUE: reject pop %d\n", thread.gid() as i32, available);
+					}
 					thread.atomic_add_global_i32(size, 1, memory_order::relaxed);
 					0
 				}
 				else {
 					let i = thread.atomic_inc_global_u32(head, (num_elements - 1) as u32);
+					for anyq_verbose() {
+						device.print_2xi32("%d | QUEUE: move head %d\n", thread.gid() as i32, i as i32);
+					}
 
 					buffer_element(i).load(@|el:T| sink(el, i), thread);
 
@@ -93,9 +115,9 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 				let idx = thread.idx(0) as i32;
 
 				if idx == 0 {
-					*size = 0;
-					*head = 0;
-					*tail = 0;
+					thread.atomic_store_global_i32(size, 0, memory_order::relaxed);
+					thread.atomic_store_global_u32(head, 0, memory_order::relaxed);
+					thread.atomic_store_global_u32(tail, 0, memory_order::relaxed);
 				}
 
 				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
@@ -156,7 +178,7 @@ fn @genericQueueElementType[T]() {
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
 					while thread.atomic_cas_global_u32(lock, 2, 3, memory_order::acquire, memory_order::relaxed) != 2 {
-						thread.yield();
+						thread.yield("wait for element lock to read");
 					}
 
 					let payload:T = *data;
@@ -166,7 +188,7 @@ fn @genericQueueElementType[T]() {
 				},
 				store = @|source, thread| {
 					while thread.atomic_cas_global_u32(lock, 0, 1, memory_order::acquire, memory_order::relaxed) != 0 {
-						thread.yield();
+						thread.yield("wait for element lock to write");
 					}
 
 					let payload:T = source();
@@ -205,13 +227,13 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 				};
 
 				while !tryDequeue() {
-					thread.yield();
+					thread.yield("wait for a successful indexQueueElementType.load()");
 				}
 			},
 			store = @|source, thread| {
 				let value = source();
 				while thread.atomic_cas_global_u32(element, FREE, value, memory_order::relaxed, memory_order::relaxed) != FREE {
-					thread.yield();
+					thread.yield("wait for a successful indexQueueElementType.store()");
 				}
 			},
 			debug_print = @|device| {

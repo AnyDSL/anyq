@@ -119,7 +119,12 @@ void anydsl_fibers_sync_block_with_result(int32_t* output, int32_t* result, int3
 	block_barriers[block].wait_for_result<int32_t>(output, result, reset);
 }
 
-void anydsl_fibers_yield() {
+void anydsl_fibers_yield(const char* msg) {
+#ifdef ANYQ_VERBOSE
+	std::stringstream msgstr;
+	msgstr << "fiber yield - " << msg << std::endl;
+	anyq_print_3xi32(msgstr.str().c_str(), 0, 0, 0);
+#endif // ANYQ_VERBOSE
 	boost::this_fiber::yield();
 }
 
@@ -306,9 +311,21 @@ void anydsl_fibers_spawn(
 
 
 static std::mutex fiber_print_mtx{};
+static uint32_t log_counter = 0;
 
 int32_t anyq_print_3xi32(const char* format, int32_t val0, int32_t val1, int32_t val2) {
 	lock_type lk(fiber_print_mtx);
+
+#ifdef ANYQ_VERBOSE
+	std::thread::id my_thread = std::this_thread::get_id();
+	boost::fibers::fiber::id my_fiber = boost::this_fiber::get_id();
+
+	std::stringstream idstr;
+	idstr << my_thread << " | " << my_fiber;
+
+	fprintf(stdout, "%03u | %s > ", log_counter, idstr.str().c_str());
+	log_counter += 1;
+#endif // ANYQ_VERBOSE
 
 	fprintf(stdout, format, val0, val1, val2);
 	fflush(stdout);

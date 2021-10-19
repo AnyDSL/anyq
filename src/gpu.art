@@ -95,6 +95,8 @@ struct gpu_wave_context {
 struct gpu_thread_context {
 	idx: fn(i32) -> u32,
 
+	gid: fn() -> u32,
+
 	atomic_load_global_i32: fn(&addrspace(1) i32, memory_order) -> i32,
 	atomic_load_global_u32: fn(&addrspace(1) u32, memory_order) -> u32,
 	atomic_load_global_u64: fn(&addrspace(1) u64, memory_order) -> u64,
@@ -144,5 +146,5 @@ struct gpu_thread_context {
 
 	memory_barrier: fn(memory_order) -> (),
 
-	yield: fn() -> ()
+	yield: fn(&[u8]) -> ()
 }

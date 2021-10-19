@@ -30,7 +30,7 @@ fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_
 
 #[import(cc = "C", name = "anydsl_fibers_sync_block"              )] fn fibers_sync_block(i32) -> ();
 #[import(cc = "C", name = "anydsl_fibers_sync_block_with_result"  )] fn fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
-#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield() -> ();
+#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield(&[u8]) -> ();
 #[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
 
 
@@ -105,7 +105,7 @@ fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, me
 	}
 }
 
-fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
+fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
@@ -113,6 +113,8 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 
 	@body(gpu_thread_context {
 		idx = tid,
+
+		gid = @|| gid_offset + self,
 
 		atomic_load_global_i32 = cpu_atomic_load[i32],
 		atomic_load_global_u32 = cpu_atomic_load[u32],
@@ -159,6 +161,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 		atomic_cas_global_u64 = cpu_atomic_cas[u64],
 
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			/*
 			let ptr = bitcast[&mut u32](addr);
 
 			// this is the generic version
@@ -173,6 +176,28 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 			}
 
 			old
+			*/
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+
+			(old % (val + 1))
+
+			// val == 2^n - 1
+			/*
+			assert(cpu_popcount_u32(val) == 1, "atomic_inc_global_u32() only supports power of two");
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
+			let atomic_and = cpu_atomic_rmw[u32](3);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+			if old > val {
+				atomic_and(addr, val, memory_order::relaxed);
+			}
+
+			(old & val)
+			*/
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let ptr = bitcast[&mut u32](addr);
@@ -203,11 +228,11 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, idx: Index, body: 
 
 		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
 
-		yield = @|| { do_once(@|_, _| { fibers_yield(); }); }
+		yield = @|msg| { do_once(@|_, _| { fibers_yield(msg); }); }
 	});
 }
 
-fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(gpu_wave_context) -> ()) -> () {
+fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_wave_context) -> ()) -> () {
 
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
@@ -241,7 +266,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(
 		membermask = @|| membermask,
 
 		// TODO: return simd_lane
-		threads = @|body| @|| cpu_thread(@|_i:i32| self, num_threads, idx, body),
+		threads = @|body| @|| cpu_thread(@|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
 
 		num_threads = num_threads,
 
@@ -279,7 +304,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, idx: Index, body: fn(
 	});
 }
 
-fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
+fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(gpu_group_context) -> ()) -> () {
 
 	let vec_width = warp_size as i32;
 	let do_once = do_once_op(idx.local_id, vec_width);
@@ -287,8 +312,8 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 	@body(gpu_group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
-		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, idx, body),
-		threads = @|body| @|| cpu_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
+		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
+		threads = @|body| @|| cpu_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
 		num_waves = num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads = @|_i:i32| num_threads(),
@@ -370,9 +395,9 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 
 				let context = gpu_grid_context {
 					device = 0,
-					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
-					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
-					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, idx, body),
+					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
+					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size, idx, body),
 					num_groups = @|_i:i32| num_blocks,
 					num_waves = @|| num_warps,
 					num_threads = @|_i:i32| num_threads
@@ -383,7 +408,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 			// TODO: do we need a sync or yield here to ensure proper finalization of one block?
 			//       otherwise fibers may work on different blocks - does this cause issues?
 			//fibers_yield();
-			fibers_sync_block(block_id);
+			//fibers_sync_block(block_id);
 
 		}
 	}

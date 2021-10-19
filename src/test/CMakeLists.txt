@@ -16,7 +16,8 @@ set(COMMON_SCHEDULE_TEST_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-concurrent-push-pop.art
 )
 
-source_group("Source Files" FILES ${COMMON_TEST_FILES} ${COMMON_TEST_SUITE_FILES} ${COMMON_SCHEDULE_TEST_FILES})
+source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES} ${COMMON_TEST_SUITE_FILES} ${COMMON_SCHEDULE_TEST_FILES} REGULAR_EXPRESSION "utils-(Debug|Release)[.]art$")
+source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
 
 function(add_test_executable _target _mapping)

@@ -1,0 +1,14 @@
+
+static anyq_debug_verbose = false;
+
+fn @anyq_verbose(body: fn()->()) -> fn()->() {
+	|| if anyq_debug_verbose { body() }
+}
+
+fn @assert(condition: bool, msg: &[u8]) -> () {
+	if (!condition) {
+		print_string("Assertion failed! - ");
+		print_string(msg);
+		print_endl();
+	}
+}
