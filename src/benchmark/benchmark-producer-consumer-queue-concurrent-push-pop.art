@@ -13,7 +13,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 	@|num_threads: i32| {
 		for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 			for wave in grid.waves() {
-				for thread in grid.threads() {
+				for thread in wave.threads() {
 					let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
 
 					let mut rand_state = rng::xorseed32(thread_id);
