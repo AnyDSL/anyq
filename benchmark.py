@@ -57,10 +57,16 @@ def plot(results_dir, bin_dir, include):
 	ax = fig.add_subplot(1, 1, 1)
 
 	for f in result_files(results_dir, include):
+		platform = f.stem.split('-')[-1]
 		with open(f, "rt") as file:
 			arr = np.asarray([d for d in results(file)])
 
-			ax.plot(arr[:,0], arr[:,1])
+			ax.plot(arr[:,0], arr[:,1], label=platform)
+
+			ax.set_xlabel("number of threads")
+			ax.set_ylabel("average run time/ms")
+
+			ax.legend()
 
 	canvas.print_figure(results_dir/"results.pdf")
 
