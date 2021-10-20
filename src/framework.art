@@ -6,10 +6,6 @@ fn @get_member_mask_u64(size: u32) -> u64 {
 	if size == 64 { -1 } else { (1 << size as u64) - 1 }
 }
 
-fn @div_up(a: i32, b: i32) -> i32 {
-	(a + b - 1) / b
-}
-
 type index_wrapper = fn(fn(i32) -> u32) -> fn(i32) -> u32;
 type dim_wrapper = fn(fn(i32) -> u32) -> fn(i32) -> u32;
 

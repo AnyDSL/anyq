@@ -3,12 +3,18 @@ fn @min(a: i32, b: i32) -> i32 { if a < b { a } else { b } }
 fn @max(a: i32, b: i32) -> i32 { if a > b { a } else { b } }
 fn @abs(a: i32) -> i32 { if a < 0 { -a } else { a } }
 
+
+fn @div_up(a: i32, b: i32) -> i32 { (a + b - 1) / b }
+fn @div_up_u32(a: u32, b: u32) -> u32 { (a + b - 1) / b }
+fn @div_up_i64(a: i64, b: i64) -> i64 { (a + b - 1) / b }
+
 // nearest multiple of num
-fn @round_up(num: i32, multiple: i32) -> i32 { ((num + multiple - 1) / multiple) * multiple }
-fn @round_up_u32(num: u32, multiple: u32) -> u32 { ((num + multiple - 1) / multiple) * multiple }
-fn @round_up_i64(num: i64, multiple: i64) -> i64 { ((num + multiple - 1) / multiple) * multiple }
+fn @round_up(num: i32, multiple: i32) -> i32 { div_up(num, multiple) * multiple }
+fn @round_up_u32(num: u32, multiple: u32) -> u32 { div_up_u32(num, multiple) * multiple }
+fn @round_up_i64(num: i64, multiple: i64) -> i64 { div_up_i64(num, multiple) * multiple }
 fn @round_down(num: i32, multiple: i32) -> i32 { (num / multiple) * multiple }
 fn @round_down_u32(num: u32, multiple: u32) -> u32 { (num / multiple) * multiple }
+fn @round_down_i64(num: i64, multiple: i64) -> i64 { (num / multiple) * multiple }
 
 static mut total_kernel_timing: i64 = 0;
 static mut total_cpu_timing: i64 = 0;
