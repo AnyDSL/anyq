@@ -1,0 +1,85 @@
+
+#[export]
+fn main() {
+	let device = createAccDevice();
+
+	let block_size = 512;
+	let num_threads = 100000;
+	let num_iterations = 10000;
+
+	let device_alloc = device.alloc(33 * sizeof[u64]());
+	let global_histogram_device = bitcast[&mut addrspace(1) [u64]](device_alloc.data);
+	let failed_flag_device = &mut global_histogram_device(32);
+
+	let host_alloc = runtime_alloc(0, device_alloc.size);
+	let global_histogram_host = bitcast[&mut [u64]](host_alloc);
+	let failed_flag_host = &mut global_histogram_host(32);
+
+
+	for grid in device.launch_1d(1, 33) {
+		for thread in grid.threads() {
+			global_histogram_device(thread.idx(0)) = 0;
+		}
+	}
+
+	device.synchronize();
+
+	for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
+		for thread in grid.threads() {
+			let mut local_histogram:[i32 * 32] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+			let mut rand_state = rng::xorseed32(thread.idx(0));
+
+			for _ in range(0, num_iterations) {
+				rand_state = rng::xorshift32(rand_state);
+
+				let mut bits = rand_state;
+
+				for i in range(0, 32) {
+					if bits & 1 != 0 {
+						++local_histogram(i);
+					}
+					bits >>= 1;
+				}
+			}
+
+			for i in range(0, 32) {
+				let p = (local_histogram(i) as i64 * 100000 / num_iterations as i64) as i32;
+
+				if p < 47200 || p > 52800 {
+					thread.atomic_or_global_u64(failed_flag_device, 1 as u64 << i as u64, memory_order::relaxed);
+
+					device.print_3xi32("error: skewed distribution for bit %d seed %d, p = 0.%d\n", i, thread.idx(0) as i32, p);
+				}
+
+				thread.atomic_add_global_u64(&mut global_histogram_device(i), local_histogram(i) as u64, memory_order::relaxed);
+			}
+		}
+	}
+
+	device.synchronize();
+
+	runtime_copy(device.platform_device, device_alloc.data, 0, 0, host_alloc, 0, device_alloc.size);
+
+
+	for i in range(0, 32) {
+		let p = (global_histogram_host(i) * 1000000 / (num_threads as u64 * num_iterations as u64)) as i32;
+
+		if i < 10 { print_char(' '); }
+		print_i32(i);
+		print_string(": p = 0.");
+		print_i32(p);
+
+		if p < 498000 || p > 502000 {
+			*failed_flag_host |= 1 as u64 << (32 + i) as u64;
+			print_string("  <- error: skewed distribution");
+		}
+
+		print_char('\n');
+	}
+
+	release(device_alloc);
+	runtime_release(0, host_alloc);
+
+	if *failed_flag_host != 0 { -1 } else { 0 }
+}

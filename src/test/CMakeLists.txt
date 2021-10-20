@@ -1,5 +1,4 @@
 
-
 set(COMMON_TEST_FILES
 	${AnyQ_SOURCE_DIR}/framework.art
 	${AnyQ_SOURCE_DIR}/utils.art
@@ -60,6 +59,13 @@ function(add_test_with_emitted_instruction_check _target _mapping _testfile)
 	add_test(NAME "${_target}" COMMAND ${_test_command} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()
 
+function(add_framework_test _mapping _testfile)
+	get_filename_component(_testname ${_testfile} NAME_WE)
+	set(_target "${_testname}-${_mapping}")
+	add_test_executable(${_target} ${_mapping} ${_testfile})
+	add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+endfunction()
+
 function(add_test_suite_testcase _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 	set(_target "${_testname}-${_mapping}")
@@ -79,6 +85,10 @@ if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	find_package(Python3 COMPONENTS Interpreter)
 endif()
 
+
+set(TEST_FRAMEWORK_FILES
+	test-random-number-generator.art
+)
 
 set(TEST_SCHEDULE_FILES
 	test-basics.art
@@ -113,8 +123,11 @@ set(TEST_SUITE_FILES
 	test-suite-inactive-waves.art
 )
 
-
 foreach(_test_platform ${AnyQ_PLATFORMS})
+	foreach(_test_case ${TEST_FRAMEWORK_FILES})
+		add_framework_test(${_test_platform} ${_test_case})
+	endforeach()
+
 	foreach(_test_case ${TEST_SCHEDULE_FILES})
 		add_schedule_test(${_test_platform} ${_test_case})
 	endforeach()
