@@ -94,6 +94,7 @@ set(TEST_SCHEDULE_FILES
 	test-basics.art
 	test-shuffles.art
 	test-barriers.art
+	test-gid.art
 	test-queue-sequential-generic.art
 	test-queue-sequential-generic-struct.art
 	test-queue-sequential-generic-array.art

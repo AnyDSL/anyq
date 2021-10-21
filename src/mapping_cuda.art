@@ -73,11 +73,11 @@ fn @cuda_legacy_atomic_memory_order_wrap_cas[T](f: fn(&mut addrspace(1) T, T, T)
 	}
 }
 
-fn @cuda_thread(idx: fn(i32) -> u32, body: fn(gpu_thread_context) -> ()) -> () {
+fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	@body(gpu_thread_context {
 		idx = idx,
 
-		gid = @|| /* TODO global unique identifiert */ 0xBEEF,
+		gid = gid,
 
 		atomic_load_global_i32 = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location:&addrspace(1) i32| { let mut res:i32; asm("ld.volatile.s32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u32 = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location:&addrspace(1) u32| { let mut res:u32; asm("ld.volatile.u32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
@@ -132,7 +132,7 @@ fn @cuda_thread(idx: fn(i32) -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	});
 }
 
-fn @cuda_subwarp(idx: fn() -> u32, membermask: u32, num_threads: u32, body: fn(gpu_wave_context) -> ()) -> () {
+fn @cuda_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, body: fn(gpu_wave_context) -> ()) -> () {
 	let thread_idx = @|i: i32| match i { 0 => cuda_laneid(), _ => 0 };
 
 	@body(gpu_wave_context{
@@ -140,7 +140,7 @@ fn @cuda_subwarp(idx: fn() -> u32, membermask: u32, num_threads: u32, body: fn(g
 
 		membermask = @|| membermask as u64,
 
-		threads = @|body|@|| cuda_thread(thread_idx, body),
+		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads + thread_idx(0), body),
 
 		num_threads = @|| num_threads,
 
@@ -202,23 +202,24 @@ fn @cuda_subwarp(idx: fn() -> u32, membermask: u32, num_threads: u32, body: fn(g
 	});
 }
 
-fn @cuda_block(idx: fn(i32) -> u32, thread_idx: fn(i32) -> u32, num_threads: fn(i32) -> u32, warp_size: u32, body: fn(gpu_group_context) -> ()) -> () {
+fn @cuda_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, body: fn(gpu_group_context) -> ()) -> () {
 	let linear_thread_idx = @|| {
-		(thread_idx(2) * num_threads(1) + thread_idx(1)) * num_threads(0) + thread_idx(0)
+		(thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0)
 	};
 
 	let warp_idx = @|| {
 		linear_thread_idx() / warp_size
 	};
 
-	let num_warps = @|| ((num_threads(0) * num_threads(1) * num_threads(2)) + warp_size - 1) / warp_size;
+	let num_threads = @|| block_size(0) * block_size(1) * block_size(2);
+	let num_warps = @|| (num_threads() + warp_size - 1) / warp_size;
 
 	@body(gpu_group_context {
 		idx = idx,
-		waves = @|body|@|| cuda_subwarp(warp_idx, get_member_mask_u32(warp_size), warp_size, body),
-		threads = @|body|@|| cuda_thread(thread_idx, body),
+		waves = @|body|@|| cuda_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, body),
+		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), body),
 		num_waves = num_warps,
-		num_threads = num_threads,
+		num_threads = block_size,
 		barrier = cuda_block_sync,
 		barrier_all = @|predicate| cuda_block_sync_all(cuda_pred(predicate)) != 0,
 		barrier_any = @|predicate| cuda_block_sync_any(cuda_pred(predicate)) != 0,
@@ -230,7 +231,7 @@ fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
-	let num_threads_per_block = wrap_dim(@|i| {
+	let block_size = wrap_dim(@|i| {
 		match i {
 			0 => if ?block_dim_x { block_dim_x as u32 } else { cuda_blockDim_x() as u32 },
 			1 => if ?block_dim_y { block_dim_y as u32 } else { cuda_blockDim_y() as u32 },
@@ -238,8 +239,6 @@ fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 			_ => 1
 		}
 	});
-
-	let num_warps_per_block = @|| ((num_threads_per_block(0) * num_threads_per_block(1) * num_threads_per_block(2)) + warp_size - 1) / warp_size;
 
 	let num_blocks = wrap_dim(@|i| {
 		match i {
@@ -250,9 +249,13 @@ fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 		}
 	});
 
+	let num_threads_per_block = @|| block_size(0) * block_size(1) * block_size(2);
+
+	let num_warps_per_block = @|| (num_threads_per_block() + warp_size - 1) / warp_size;
+
 	let num_warps = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) * num_warps_per_block();
 
-	let num_threads = @|i: i32| num_blocks(i) * num_threads_per_block(i);
+	let num_threads = @|i: i32| num_blocks(i) * block_size(i);
 
 	let block_idx = wrap_index(@|i: i32| {
 		match i { 0 => cuda_blockIdx_x() as u32, 1 => cuda_blockIdx_y() as u32, 2 => cuda_blockIdx_z() as u32, _ => 0 }
@@ -264,17 +267,19 @@ fn @cuda_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 		match i { 0 => cuda_threadIdx_x() as u32, 1 => cuda_threadIdx_y() as u32, 2 => cuda_threadIdx_z() as u32, _ => 0 }
 	});
 
-	let global_thread_idx = @|i: i32| block_idx(i) * num_threads_per_block(i) + thread_idx(i);
+	let global_thread_idx = @|i: i32| block_idx(i) * block_size(i) + thread_idx(i);
 
-	let linear_thread_idx = @|| (thread_idx(2) * num_threads_per_block(1) + thread_idx(1)) * num_threads_per_block(0) + thread_idx(0);
+	let linear_thread_idx = @|| (thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0);
+
+	let global_linear_thread_idx = @|| linear_block_idx() * num_threads_per_block() + linear_thread_idx();
 
 	let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / warp_size;
 
 	cuda(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(gpu_grid_context {
 		device = device,
-		groups = @|body|@|| cuda_block(block_idx, thread_idx, num_threads_per_block, warp_size, body),
-		waves = @|body|@|| cuda_subwarp(global_warp_idx, get_member_mask_u32(warp_size), warp_size, body),
-		threads = @|body|@|| cuda_thread(global_thread_idx, body),
+		groups = @|body|@|| cuda_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, body),
+		waves = @|body|@|| cuda_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, body),
+		threads = @|body|@|| cuda_thread(global_thread_idx, global_linear_thread_idx, body),
 		num_groups = num_blocks,
 		num_waves = num_warps,
 		num_threads = num_threads

@@ -1,0 +1,90 @@
+
+#[export]
+fn main() -> i32 {
+	let device = createAccDevice();
+
+	let group_size = 256;
+	let num_groups = 1024;
+
+	let num_bits = (1 as i64 << 32) - 1;
+	let num_slots = div_up_i64(num_bits, 32);
+
+	let test = createBaseTest(device, num_slots * sizeof[u32]());
+
+	for device_memory, device_failed_flag in test.run_test() {
+		let buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
+
+		let clear_bits = @|| {
+			for grid in device.launch_1d(num_groups, group_size) {
+				for thread in grid.threads() {
+					for i in range_step(thread.idx(0) as i32, num_slots as i32, grid.num_threads(0) as i32) {
+						buffer(i) = 0;
+					}
+				}
+			}
+
+			device.synchronize();
+		};
+
+		let check_gid = @|thread: gpu_thread_context, fail_flag: u32| {
+			let gid = thread.gid();
+
+			let slot = gid / 32;
+			let mask = 1 << (gid % 32);
+
+			let old = thread.atomic_or_global_u32(buffer(slot), mask, memory_order::relaxed);
+
+			if old & mask != 0 {
+				device.print_2xi32("gid not unique: thread %d -> %d\n", thread.idx(0) as i32, gid as i32);
+
+				thread.atomic_or_global_u32(device_failed_flag, fail_flag, memory_order::relaxed);
+			}
+		};
+
+		clear_bits();
+
+		for grid in device.launch_1d(num_groups, group_size) {
+			for thread in grid.threads() {
+				check_gid(thread, 1 << 0);
+			}
+		}
+
+		clear_bits();
+
+		for grid in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for wave in group.waves() {
+					for thread in wave.threads() {
+						check_gid(thread, 1 << 1);
+					}
+				}
+			}
+		}
+
+		clear_bits();
+
+		for grid in device.launch_1d(num_groups, group_size) {
+			for group in grid.groups() {
+				for thread in group.threads() {
+					check_gid(thread, 1 << 2);
+				}
+			}
+		}
+
+		clear_bits();
+
+		for grid in device.launch_1d(num_groups, group_size) {
+			for wave in grid.waves() {
+				for thread in wave.threads() {
+					check_gid(thread, 1 << 3);
+				}
+			}
+		}
+
+		device.synchronize();
+
+		true
+	}
+
+	test.finish()
+}
