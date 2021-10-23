@@ -15,10 +15,12 @@ fn main() {
 	let global_histogram_host = bitcast[&mut [u64]](host_alloc);
 	let failed_flag_host = &mut global_histogram_host(32);
 
-
 	for grid in device.launch_1d(1, 33) {
 		for thread in grid.threads() {
-			global_histogram_device(thread.idx(0)) = 0;
+			// the block_size not beeing a multiple of wave size requires OOB check for inactive threads (on CPU)
+			if thread.idx(0) < 33 {
+				global_histogram_device(thread.idx(0)) = 0;
+			}
 		}
 	}
 
