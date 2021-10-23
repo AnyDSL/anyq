@@ -22,6 +22,7 @@ source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impa
 function(add_test_executable _target _mapping)
 	if (NOT TARGET test-${_mapping})
 		add_custom_target(test-${_mapping})
+		set_target_properties(test-${_mapping} PROPERTIES FOLDER "tests")
 	endif()
 
 	# message("add_test_executable ${_target} ${_mapping} ${ARGN}")

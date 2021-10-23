@@ -15,6 +15,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		CXX_STANDARD 17
 		CXX_STANDARD_REQUIRED ON
 		CXX_EXTENSIONS OFF
+		FOLDER "benchmarks"
 	)
 
 	# if (MSVC)
@@ -54,6 +55,7 @@ set(BENCHMARK_FILES
 
 foreach(_platform ${AnyQ_PLATFORMS})
 	add_custom_target(benchmark-${_platform})
+	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	foreach(_benchmark ${BENCHMARK_FILES})
 		add_benchmark(${_benchmark} ${_platform})
