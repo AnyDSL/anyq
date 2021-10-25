@@ -305,6 +305,7 @@ def main(args):
 	global_flags = [
 		"-DCMAKE_C_FLAGS_RELEASE=/O2", "-DCMAKE_CXX_FLAGS_RELEASE=/O2"
 	] if windows else [
+		"-DCMAKE_C_COMPILER=gcc-11", "-DCMAKE_CXX_COMPILER=g++-11",
 		"-DCMAKE_C_FLAGS_RELEASE=-O3", "-DCMAKE_CXX_FLAGS_RELEASE=-O3"
 	]
 
