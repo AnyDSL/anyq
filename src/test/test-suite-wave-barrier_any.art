@@ -1,0 +1,54 @@
+
+// inst_stats:
+
+
+// width must be the maximum warp_size of all platforms (currently GPU)
+//static width = 32;
+
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| {
+		//let i = l % width;
+		//let c = ((l - i) & (1 << i)) != 0;
+		if (l < 2*group_size) { l } else { 0 }
+	};
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for wave in grid.waves() {
+
+		if wave.idx() == 0 {
+			*global(0) = wave.num_threads() as i32;
+		}
+
+		for thread in wave.threads() {
+			let tid = (wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
+			/*
+			let wave_pred = wave.barrier_any(my_pred);
+			*/
+			let my_data = read(tid);
+			let mut my_result = true;
+
+			for i in range(0, wave.num_threads() as i32) {
+				let idx = wave.idx() as i32 * wave.num_threads() as i32 + i;
+				my_result = wave.barrier_any(my_data == idx);
+			}
+
+			write(tid, if my_result { 1 } else { 0 });
+		}
+	}
+}
+
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let wave_size = global(0);
+
+	//assert(wave_size <= width, "the wave size on this platform exceeds the test limits");
+
+	let values = |l: i32| {
+		if (l < 2*group_size) { 1 } else { 0 }
+	};
+	let result = |g: i32| match g { 0 => wave_size, _ => 0};
+
+	(result, values)
+}
