@@ -123,6 +123,7 @@ set(TEST_SUITE_FILES
 	test-suite-scatter_writes.art
 	test-suite-shfl_bfly.art
 	test-suite-inactive-waves.art
+	test-suite-wave-barrier_vote.art
 )
 
 foreach(_test_platform ${AnyQ_PLATFORMS})
