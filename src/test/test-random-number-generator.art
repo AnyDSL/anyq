@@ -40,9 +40,8 @@ fn main() {
 					let mut bits = rand_state;
 
 					for i in range(0, 32) {
-						if bits & 1 != 0 {
-							++local_histogram(i);
-						}
+						let a = if bits & 1 != 0 { 1 } else { 0 };
+						local_histogram(i) += a;
 						bits >>= 1;
 					}
 				}
