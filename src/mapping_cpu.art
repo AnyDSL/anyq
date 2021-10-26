@@ -271,10 +271,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx:
 		num_threads = num_threads,
 
 		barrier = @|| { },
-		barrier_all = @|predicate| rv_all(predicate),
-		barrier_any = @|predicate| rv_any(predicate),
-		barrier_count = @|predicate| cpu_popcount_u32(rv_ballot_u32(predicate)),
-		barrier_vote = @|predicate| rv_ballot_u32(predicate) as u64,
+		barrier_all = @|predicate:bool| -> bool { rv_all(predicate) },
+		barrier_any = @|predicate:bool| -> bool { rv_any(predicate) },
+		barrier_count = @|predicate:bool| -> i32 { cpu_popcount_u32(rv_ballot_u32(predicate)) },
+		barrier_vote = @|predicate:bool| -> u64 { rv_ballot_u32(predicate) as u64 },
 
 		/* TODO: assert width <= num_threads == warp_size */
 		/* TODO: assert width 2^n */
