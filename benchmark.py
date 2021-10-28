@@ -3,10 +3,6 @@
 import codecs
 import subprocess
 import re
-import numpy as np
-import plotutils
-import matplotlib.lines
-import matplotlib.legend
 from pathlib import Path
 import argparse
 
@@ -57,6 +53,8 @@ class Dataset:
 		return f"Dataset(queue={self.queue}, queue_size={self.queue_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}')"
 
 	def read(self):
+		import numpy as np
+
 		with open(self.filename, "rt") as file:
 			return np.asarray([d for d in results(file)])
 
@@ -72,6 +70,10 @@ def results(file):
 		yield int(num_threads), float(t)
 
 def plot(results_dir, bin_dir, include):
+	import plotutils
+	import matplotlib.lines
+	import matplotlib.legend
+
 	datasets = [d for d in collect_datasets(results_dir, include)]
 	platforms = sorted({d.platform for d in datasets})
 	p_enqs = sorted({d.p_enq for d in datasets})
