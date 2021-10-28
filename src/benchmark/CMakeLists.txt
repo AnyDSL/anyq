@@ -48,9 +48,27 @@ function(add_benchmark _testfile _mapping)
 	add_dependencies(benchmark-${_mapping} ${_target})
 endfunction()
 
+function(generate_benchmarks template_file platform)
+	get_filename_component(dest_dir ${template_file} DIRECTORY)
+	get_filename_component(dest_name ${template_file} NAME_WE)
+
+	foreach(queue_size 10000 100000 1000000)
+		foreach(p_enq 100 50 25)
+			foreach(p_deq 100 50 25)
+				foreach(workload_size 1 8 32)
+					set(dest_file "${dest_dir}/${dest_name}-IQ-${queue_size}-${p_enq}-${p_deq}-${workload_size}.art")
+					configure_file(${template_file} ${dest_file})
+					add_benchmark(${dest_file} ${platform})
+				endforeach()
+			endforeach()
+		endforeach()
+	endforeach()
+endfunction()
+
+
 
 set(BENCHMARK_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-small.art
+	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in
 )
 
 foreach(_platform ${AnyQ_PLATFORMS})
@@ -58,6 +76,6 @@ foreach(_platform ${AnyQ_PLATFORMS})
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	foreach(_benchmark ${BENCHMARK_FILES})
-		add_benchmark(${_benchmark} ${_platform})
+		generate_benchmarks(${_benchmark} ${_platform})
 	endforeach()
 endforeach()

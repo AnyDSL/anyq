@@ -1,0 +1,4 @@
+
+
+#[export]
+fn run_benchmark() = sweep_num_threads_benchmark(128, 1 << 18, producer_consumer_queue_concurrent_push_pop_benchmark(256, 20, @p_enq@, @p_deq@, @workload_size@, @queue_size@));

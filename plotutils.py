@@ -41,8 +41,12 @@ def getModifiedBaseColorsHSV(f):
 # 	return getModifiedColorsHSV(getBaseColors2(), f)
 
 
+def getBaseColorCycle():
+	return itertools.cycle(iter(getBaseColors()))
+
 def getBaseStyleCycle():
-	return itertools.cycle(iter(["o-", "^-", "s-", "p-", "h-", "x-"]))
+	return itertools.cycle(iter(['-', '--', '-.']))
+	# return itertools.cycle(iter(["o-", "^-", "s-", "p-", "h-", "x-"]))
 
 
 def getBoundingBoxes(filename):
