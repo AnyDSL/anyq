@@ -1,5 +1,7 @@
 
-// inst_stats: atomicrmw(8), extractelement(8), insertelement(18), shufflevector(7), cmpxchg(0), urem(1)
+// inst_stats: atomicrmw(4), extractelement(0), insertelement(10), shufflevector(3), cmpxchg(0), urem(1)
+
+// improved RV codegen in [f2ea517]: -4x cascaded extract & atomicrmw (PEed active lanes only), -4x broadcasts
 
 // wrap_around_value: 4x cascaded insertelement, 1x shufflevector
 // 6x various broadcasts (1x insertelement, 1x shufflevector)
