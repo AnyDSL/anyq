@@ -1,15 +1,14 @@
 
-// inst_stats:
+// inst_stats: insertelement(2), shufflevector(2), llvm.x86.avx.ptestz.256(1)
 
+// 1x broadcast of loop variable i
+// 1x voting using llvm.x86.avx.ptestz.256 of icmp eq
+// 1x broadcast of voting result
 
-// width must be the maximum warp_size of all platforms (currently GPU)
-//static width = 32;
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_: i32| 0;
 	let local  = @|l: i32| {
-		//let i = l % width;
-		//let c = ((l - i) & (1 << i)) != 0;
 		if (l < 2*group_size) { l } else { 0 }
 	};
 	(global, local)
@@ -24,9 +23,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 
 		for thread in wave.threads() {
 			let tid = (wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
-			/*
-			let wave_pred = wave.barrier_any(my_pred);
-			*/
+
 			let my_data = read(tid);
 			let mut my_result = true;
 
@@ -42,8 +39,6 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 
 fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let wave_size = global(0);
-
-	//assert(wave_size <= width, "the wave size on this platform exceeds the test limits");
 
 	let values = |l: i32| {
 		if (l < 2*group_size) { 1 } else { 0 }
