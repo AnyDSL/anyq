@@ -29,14 +29,15 @@ def benchmark_binaries(bin_dir, include):
 		if f.name.startswith("benchmark-") and include.match(f.name):
 			yield f
 
-def run(results_dir, bin_dir, include):
+def run(results_dir, bin_dir, include, rerun=False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
-	for b in benchmark_binaries(bin_dir, include):
-		results_file_path = results_dir/f"{b.stem}.csv"
-		with open(results_file_path, "wt") as file:
-			print(results_file_path)
-			run_benchmark(file, b)
+	for binary in benchmark_binaries(bin_dir, include):
+		results_file_path = results_dir/f"{binary.stem}.csv"
+		if rerun or results_file_path.stat().st_mtime <= binary.stat().st_mtime:
+			with open(results_file_path, "wt") as file:
+				print(results_file_path)
+				run_benchmark(file, binary)
 
 
 class Dataset:
@@ -69,7 +70,7 @@ def results(file):
 		num_threads, t = l.split(';')
 		yield int(num_threads), float(t)
 
-def plot(results_dir, bin_dir, include):
+def plot(results_dir, include, **_):
 	import plotutils
 	import matplotlib.lines
 	import matplotlib.legend
@@ -116,7 +117,7 @@ def main(args):
 	bin_dir = this_dir/"build"/"bin"
 	results_dir = this_dir/"results"
 
-	args.command(results_dir, bin_dir, re.compile(args.include))
+	args.command(results_dir, bin_dir, include=re.compile(args.include), rerun=args.rerun)
 
 
 if __name__ == "__main__":
@@ -130,6 +131,8 @@ if __name__ == "__main__":
 		return args
 
 	run_cmd = add_command("run", run)
+	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
+
 	plot_cmd = add_command("plot", plot)
 
 	main(args.parse_args())
