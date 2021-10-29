@@ -1,5 +1,9 @@
 
-// inst_stats:
+// inst_stats: insertelement(1), shufflevector(1), llvm.x86.avx.movmsk.ps.256(1), llvm.masked.store.v8i32.p1v8i32(2)
+
+// 1x voting using llvm.x86.avx.movmsk.ps.256 of icmp ne
+// 1x broadcast of voting result followed by some shifting
+// 2x masked stores according to diverging branches
 
 
 // width must be the minimum warp_size of all platforms (currently CPU)
@@ -43,9 +47,9 @@ fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32
 
 	let values = |l: i32| {
 		if (l < 2*group_size) {
-			if l % 8 == 0 { l } else { -1 }
+			if l % width == 0 { l } else { -1 }
 		} else {
-			if l % 8 == 0 { 0 } else { -1 }
+			if l % width == 0 { 0 } else { -1 }
 		}
 	};
 	let result = |g: i32| match g { 0 => wave_size, _ => 0};
