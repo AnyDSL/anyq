@@ -29,7 +29,7 @@ fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: Glob
 
 			for i in range(0, wave.num_threads() as i32) {
 				let idx = wave.idx() as i32 * wave.num_threads() as i32 + i;
-				my_result = wave.barrier_any(my_data == idx);
+				my_result &= wave.barrier_any(my_data == idx);
 			}
 
 			write(tid, if my_result { 1 } else { 0 });
