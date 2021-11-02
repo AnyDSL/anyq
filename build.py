@@ -258,7 +258,8 @@ class AnyQ(Build):
 			PNG_ROOT=libpng.install_dir,
 			Boost_ROOT=boost.build_dir,
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake",
-			BUILD_TESTING=True
+			BUILD_TESTING=True,
+			CMAKE_EXPORT_COMPILE_COMMANDS=True
 		)
 
 @component(depends_on=(AnyQ,))
