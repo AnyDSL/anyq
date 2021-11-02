@@ -1,0 +1,53 @@
+
+// inst_stats: llvm.x86.avx.movmsk.ps.256(8), llvm.ctpop.i32(8), insertelement(9), shufflevector(9)
+
+// 1x broadcast of computed idx in loop
+// 8x ballot + counting bits
+// 8x broadcast of result to all threads
+
+
+fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let global = @|_: i32| 0;
+	let local  = @|l: i32| {
+		if (l < 2*group_size) { l } else { 0 }
+	};
+	(global, local)
+}
+
+fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+	for wave in grid.waves() {
+
+		if wave.idx() == 0 {
+			*global(0) = wave.num_threads() as i32;
+		}
+
+		for thread in wave.threads() {
+			let tid = (wave.idx() * wave.num_threads() + thread.idx(0)) as i32;
+
+			let my_data = read(tid);
+			let mut my_result = 0;
+
+			for i in range(0, wave.num_threads() as i32) {
+				let idx = wave.idx() as i32 * wave.num_threads() as i32 + i;
+				my_result += wave.barrier_count(my_data == idx);
+			}
+
+			write(tid, my_result);
+		}
+	}
+}
+
+fn @expected_result(global: fn(i32)->i32, _local: fn(i32)->i32) -> (fn(i32)->i32, fn(i32)->i32) {
+	let wave_size = global(0);
+
+	let values = |l: i32| {
+		if (l < 2*group_size) {
+			wave_size
+		} else {
+			0
+		}
+	};
+	let result = |g: i32| match g { 0 => wave_size, _ => 0};
+
+	(result, values)
+}

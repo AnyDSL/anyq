@@ -124,6 +124,7 @@ set(TEST_SUITE_FILES
 	test-suite-shfl_bfly.art
 	test-suite-inactive-waves.art
 	test-suite-wave-barrier_any.art
+	test-suite-wave-barrier_count.art
 	test-suite-wave-barrier_vote.art
 )
 
