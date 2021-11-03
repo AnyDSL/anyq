@@ -70,7 +70,7 @@ def results(file):
 		num_threads, t = l.split(';')
 		yield int(num_threads), float(t)
 
-def plot(results_dir, include, **_):
+def plot(results_dir, include):
 	import plotutils
 	import matplotlib.lines
 	import matplotlib.legend
@@ -117,7 +117,12 @@ def main(args):
 	bin_dir = this_dir/"build"/"bin"
 	results_dir = this_dir/"results"
 
-	args.command(results_dir, bin_dir, include=re.compile(args.include), rerun=args.rerun)
+	include = re.compile(args.include)
+
+	if args.command == run:
+		run(results_dir, bin_dir, include, args.rerun)
+	elif args.command == plot:
+		plot(results_dir, include)
 
 
 if __name__ == "__main__":
