@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.9
 
+import sys
 import codecs
 import subprocess
 import re
@@ -9,15 +10,26 @@ import argparse
 
 def capture_output(p):
 	for l in p.stdout:
-		if l == b'--------\n':
+		sys.stdout.write(codecs.decode(l))
+		if l.isspace():
 			break
+
+	sys.stdout.write(codecs.decode(next(p.stdout)))
 
 	for l in p.stdout:
 		num_threads, t = codecs.decode(l).split(';')
 		yield int(num_threads), float(t)
 
-def run_benchmark(dest, binary):
-	p = subprocess.Popen([binary.as_posix()], stdout=subprocess.PIPE)
+def run_benchmark(dest, binary, *, num_threads_min = 128, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
+	p = subprocess.Popen([
+		binary.as_posix(),
+		str(num_threads_min),
+		str(num_threads_max),
+		str(block_size),
+		str(p_enq),
+		str(p_deq),
+		str(workload_size)
+		], stdout=subprocess.PIPE)
 	for num_threads, t in capture_output(p):
 		print(num_threads, t)
 		dest.write(f"{num_threads};{t}\n")
@@ -32,12 +44,22 @@ def benchmark_binaries(bin_dir, include):
 def run(results_dir, bin_dir, include, rerun=False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
+	def result_outdated(results_file, binary):
+		try:
+			return results_file.stat().st_mtime <= binary.stat().st_mtime
+		except:
+			return True
+
 	for binary in benchmark_binaries(bin_dir, include):
-		results_file_path = results_dir/f"{binary.stem}.csv"
-		if rerun or results_file_path.stat().st_mtime <= binary.stat().st_mtime:
-			with open(results_file_path, "wt") as file:
-				print(results_file_path)
-				run_benchmark(file, binary)
+		for p_enq in (0.25, 0.5, 1.0):
+			for p_deq in (0.25, 0.5, 1.0):
+				for workload_size in (1, 8, 32):
+					test_name_parts = binary.stem.split('-')
+					results_file_path = results_dir/f"{'-'.join(test_name_parts[:-1])}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{test_name_parts[-1]}.csv"
+					if rerun or result_outdated(results_file_path, binary):
+						with open(results_file_path, "wt") as file:
+							print(results_file_path)
+							run_benchmark(file, binary, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
 
 
 class Dataset:

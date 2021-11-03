@@ -42,7 +42,7 @@ fn @upsweep_exponential(body: fn(i32) -> ()) {
 fn @sweep_num_threads_benchmark(num_threads_min: i32, num_threads_max: i32, body: fn(i32) -> ()) {
 	let benchmark = create_benchmark();
 
-	print_string("--------\n");
+	print_string("num_threads;t_avg/ms\n");
 
 	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
 		print_i32(num_threads);

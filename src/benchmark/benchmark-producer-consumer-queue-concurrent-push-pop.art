@@ -1,6 +1,8 @@
 
+#[import(cc = "device")] fn magic_p_id(u32) -> u32;  // HACK to force evaluation of expression on the host
 
-fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attempts_per_thread: i32, p_enq: i32, p_deq: i32, workload_size: i32, queue_size: i32) {
+
+fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attempts_per_thread: i32, p_enq: f32, p_deq: f32, workload_size: i32, queue_size: i32) {
 	let device = createAccDevice();
 
 	let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
@@ -10,6 +12,10 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 		queue.reset(grid);
 	}
 
+	let rand_mask = @|p: f32| (((-1 as u32) as f64 * p as f64) as u32);
+	let c_enq = magic_p_id(rand_mask(p_enq));
+	let c_deq = magic_p_id(rand_mask(p_deq));
+
 	@|num_threads: i32| {
 		for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 			for wave in grid.waves() {
@@ -18,14 +24,8 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 
 					let mut rand_state = rng::xorseed32(thread_id);
 
-					let sample = @|p: i32| -> bool {
-						if p < 100 {
-							rand_state = rng::xorshift32(rand_state);
-							rand_state < (((-1 as u64) * p as u64) / 100) as u32
-						}
-						else {
-							true
-						}
+					let sample = @|c: u32| -> bool {
+							rng::xorshift32(rand_state) < c
 					};
 
 					let simulate_workload = @|| {
@@ -35,7 +35,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 					};
 
 					for _ in range(0, attempts_per_thread) {
-						if sample(p_enq) {
+						if sample(c_enq) {
 							for _ in queue.push(thread) {
 								simulate_workload();
 								rand_state
@@ -44,7 +44,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(block_size: i32, attemp
 
 						wave.barrier();
 
-						if sample(p_deq) {
+						if sample(c_deq) {
 							for _, _ in queue.pop(thread) {
 								simulate_workload();
 							};
