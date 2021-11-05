@@ -1,9 +1,9 @@
 
-// inst_stats: insertelement(2), shufflevector(2), llvm.x86.avx.ptestz.256(1)
+// inst_stats: insertelement(9), shufflevector(9), llvm.x86.avx.ptestz.256(8)
 
 // 1x broadcast of loop variable i
-// 1x voting using llvm.x86.avx.ptestz.256 of icmp eq
-// 1x broadcast of voting result
+// 8x voting using llvm.x86.avx.ptestz.256 of icmp eq
+// 8x broadcast of voting result
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
