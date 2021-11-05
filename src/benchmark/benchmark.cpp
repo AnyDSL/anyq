@@ -60,6 +60,30 @@ namespace
 
 		return value;
 	}
+#if defined(__GNUC__) && __GNUC__ < 11
+// WORKAROUND for lack of std::from_chars support in GCC < 11
+}
+#include <cerrno>
+#include <cstdlib>
+namespace
+{
+	template <>
+	float parse_argument<float>(std::string_view arg)
+	{
+		char* end;
+		float value = std::strtof(&arg[0], &end);
+		//                           ^ HACK!
+
+		if (end == &arg[0])
+			throw usage_error("argument must be a number");
+		else if (errno == ERANGE)
+			errno = 0, throw usage_error("argument out of range");
+		else if (end != &arg[0] + arg.length())
+			throw usage_error("invalid argument");
+
+		return value;
+	}
+#endif
 }
 
 int main(int argc, char* argv[])
