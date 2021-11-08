@@ -13,11 +13,16 @@ using namespace std::literals;
 
 extern "C"
 {
-	int run_queue_benchmark(std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
+	int run_queue_benchmark(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
 
 	void* benchmark_create()
 	{
 		return new Instrumentation;
+	}
+
+	void benchmark_print_device_info(void* ctx)
+	{
+		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';');
 	}
 
 	void benchmark_begin(void* ctx, std::int32_t N)
@@ -43,7 +48,7 @@ namespace
 
 	std::ostream& print_usage(std::ostream& out)
 	{
-		return out << "usage: benchmark <num-threads-min> <num-threads-max> <block-size> <p-enq> <p-deq> <workload-size>\n"sv;
+		return out << "usage: benchmark <device> <num-threads-min> <num-threads-max> <block-size> <p-enq> <p-deq> <workload-size>\n"sv;
 	}
 
 	template <typename T>
@@ -90,25 +95,18 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc != 7)
-			throw usage_error("expected 6 arguments");
+		if (argc != 8)
+			throw usage_error("expected 7 arguments");
 
-		int num_threads_min = parse_argument<int>(argv[1]);
-		int num_threads_max = parse_argument<int>(argv[2]);
-		int block_size = parse_argument<int>(argv[3]);
-		float p_enq = parse_argument<float>(argv[4]);
-		float p_deq = parse_argument<float>(argv[5]);
-		int workload_size = parse_argument<int>(argv[6]);
+		int device = parse_argument<int>(argv[1]);
+		int num_threads_min = parse_argument<int>(argv[2]);
+		int num_threads_max = parse_argument<int>(argv[3]);
+		int block_size = parse_argument<int>(argv[4]);
+		float p_enq = parse_argument<float>(argv[5]);
+		float p_deq = parse_argument<float>(argv[6]);
+		int workload_size = parse_argument<int>(argv[7]);
 
-		std::cout << "num_threads_min;num_threads_max;block_size;p_enq;p_deq;workload_size\n"sv
-		          << num_threads_min << ';'
-		          << num_threads_max << ';'
-		          << block_size << ';'
-		          << p_enq << ';'
-		          << p_deq << ';'
-		          << workload_size << '\n' << '\n';
-
-		return run_queue_benchmark(num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
+		return run_queue_benchmark(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
 	}
 	catch (const usage_error& e)
 	{

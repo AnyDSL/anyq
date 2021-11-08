@@ -1,16 +1,16 @@
-static amdgpu_device = 1;
-
 #[import(cc = "device", name = "llvm.trap")] fn trap() -> ();
 
-fn @createAccDevice() = AccDevice {
-    launch_1d = @|body| @|num_groups, group_size| amdgpu_launch_1d(amdgpu_device, num_groups, group_size, body),
-    synchronize = || synchronize_hsa(amdgpu_device),
-    alloc = |size| alloc_hsa(amdgpu_device, size),
-    platform_device = runtime_device(3, amdgpu_device),
+fn @createAccDevice(device: i32) = AccDevice {
+    launch_1d = @|body| @|num_groups, group_size| amdgpu_launch_1d(device, num_groups, group_size, body),
+    synchronize = || synchronize_hsa(device),
+    alloc = |size| alloc_hsa(device, size),
+    platform_device = runtime_device(3, device),
     print_i32 = @|_format: &[u8], _arg: i32| { /*trap()*/ },
     print_2xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32| { /*trap()*/ },
     print_3xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32, _arg3: i32| { /*trap()*/ }
 };
+
+fn @createDefaultAccDevice() = createAccDevice(1);
 
 
 fn @amdgpu_pred(b: bool) -> i32 {

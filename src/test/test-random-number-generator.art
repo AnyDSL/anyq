@@ -1,7 +1,7 @@
 
 #[export]
 fn main() {
-	let device = createAccDevice();
+	let device = createDefaultAccDevice();
 
 	let block_size = 512;
 	let num_threads = 100000;

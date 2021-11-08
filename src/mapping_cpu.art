@@ -3,13 +3,13 @@ static cpu_threads = 0;
 static warp_size:u32 = 8;
 static num_blocks_in_flight:i32 = 32;
 
-fn @createAccDevice() = AccDevice {
+fn @createAccDevice(device: i32) = AccDevice {
 	launch_1d = @|body|@|num_groups, group_size| {
 		cpu_launch_1d(num_groups, group_size, body)
 	},
 	synchronize = @|| { },
 	alloc = @|size| alloc_cpu(size),
-	platform_device = runtime_device(0, 0),
+	platform_device = runtime_device(0, device),
 
 	print_i32 = @|msg: &[u8], i: i32| {
 		anyq_print_3xi32(msg, i, 0, 0);
@@ -23,6 +23,8 @@ fn @createAccDevice() = AccDevice {
 		anyq_print_3xi32(format, a1, a2, a3);
 	}
 };
+
+fn @createDefaultAccDevice() = createAccDevice(0);
 
 
 #[import(cc = "thorin", name = "fibers")] fn thorin_fibers(_num_threads: i32, _num_blocks: i32, _num_warps: i32, _body: fn(i32, i32) -> ()) -> ();

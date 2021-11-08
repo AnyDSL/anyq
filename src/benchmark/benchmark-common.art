@@ -1,11 +1,13 @@
 
 
 struct Benchmark {
+	print_device_info: fn() -> (),
 	run: fn(fn() -> ()) -> fn() -> (),
 	destroy: fn() -> ()
 }
 
 #[import(cc = "C")] fn benchmark_create() -> &mut u8;
+#[import(cc = "C")] fn benchmark_print_device_info(&mut u8) -> ();
 #[import(cc = "C")] fn benchmark_begin(&mut u8, i32) -> ();
 #[import(cc = "C")] fn benchmark_end(&mut u8, i32) -> ();
 #[import(cc = "C")] fn benchmark_destroy(&mut u8) -> ();
@@ -16,6 +18,7 @@ fn create_benchmark() {
 	let N = 10;
 
 	Benchmark {
+		print_device_info = @|| benchmark_print_device_info(ctx),
 		run = @|body: fn() -> ()|@|| {
 			benchmark_begin(ctx, N);
 			for _ in range(0, N) {
@@ -39,8 +42,13 @@ fn @upsweep_exponential(body: fn(i32) -> ()) {
 }
 
 
-fn @sweep_num_threads_benchmark(num_threads_min: i32, num_threads_max: i32, body: fn(i32) -> ()) {
+fn @sweep_num_threads_benchmark(num_threads_min: i32, num_threads_max: i32, body: fn(i32) -> ()) -> i32 {
 	let benchmark = create_benchmark();
+
+	print_string("platform;device_name\n");
+	benchmark.print_device_info();
+	print_char('\n');
+	print_char('\n');
 
 	print_string("num_threads;t_avg/ms\n");
 

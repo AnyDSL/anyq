@@ -1,7 +1,7 @@
 
 #[export]
 fn main() -> i32 {
-	let device = createAccDevice();
+	let device = createDefaultAccDevice();
 
 	let num_elements = (100 * 1024 * 1024) as u32;
 	let queue_size = 1024 * 1024;

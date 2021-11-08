@@ -1,8 +1,10 @@
 #ifndef INCLUDED_INSTRUMENTATION_CUDA
 #define INCLUDED_INSTRUMENTATION_CUDA
 
-#include <CUDA/error.h>
-#include <CUDA/event.h>
+#include <iosfwd>
+
+#include "CUDA/error.h"
+#include "CUDA/event.h"
 
 
 class Instrumentation
@@ -11,6 +13,8 @@ class Instrumentation
 	CU::unique_event event_end = CU::create_event();
 
 public:
+	std::ostream& print_device_info(std::ostream&);
+
 	void begin(int N)
 	{
 		throw_error(cuEventRecord(event_begin, nullptr));

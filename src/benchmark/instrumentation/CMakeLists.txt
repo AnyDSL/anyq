@@ -1,7 +1,12 @@
 
 
 if (cpu IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_cpu INTERFACE)
+	add_library(instrumentation_cpu STATIC)
+	if (WIN32)
+		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_win32.cpp)
+	else()
+		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_linux.cpp)
+	endif()
 	target_include_directories(instrumentation_cpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cpu)
 endif()
 
@@ -9,6 +14,7 @@ if (cuda IN_LIST AnyQ_PLATFORMS)
 	add_library(instrumentation_cuda STATIC
 		${CMAKE_CURRENT_SOURCE_DIR}/cuda/CUDA/error.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/cuda/CUDA/event.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/cuda/instrumentation.cpp
 	)
 	target_include_directories(instrumentation_cuda INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
 	target_link_libraries(instrumentation_cuda PUBLIC CUDA::cuda_driver)
@@ -20,6 +26,8 @@ if (nvvm IN_LIST AnyQ_PLATFORMS)
 endif()
 
 if (amdgpu IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_amdgpu INTERFACE)
+	add_library(instrumentation_amdgpu STATIC
+		${CMAKE_CURRENT_SOURCE_DIR}/amdgpu/instrumentation.cpp
+	)
 	target_include_directories(instrumentation_amdgpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/amdgpu)
 endif()

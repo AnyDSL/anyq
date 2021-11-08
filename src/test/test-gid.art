@@ -1,7 +1,7 @@
 
 #[export]
 fn main() -> i32 {
-	let device = createAccDevice();
+	let device = createDefaultAccDevice();
 
 	let group_size = 256;
 	let num_groups = 1024;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.9
 
 import sys
+import io
 import codecs
 import subprocess
 import re
@@ -8,21 +9,35 @@ from pathlib import Path
 import argparse
 
 
-def capture_output(p):
-	for l in p.stdout:
+def device_id(name):
+	return name.translate(str.maketrans(" \t\n\v@-/\\?", "_________"))
+
+def capture_benchmark_output(dest, p):
+	def write(l):
 		sys.stdout.write(codecs.decode(l))
+		dest.write(l)
+
+	for l in p.stdout:
+		write(l)
 		if l.isspace():
 			break
 
-	sys.stdout.write(codecs.decode(next(p.stdout)))
+	device_name = ""
+	for l in p.stdout:
+		write(l)
+		if l.isspace():
+			break
+		device_name = codecs.decode(l).strip()
 
 	for l in p.stdout:
-		num_threads, t = codecs.decode(l).split(';')
-		yield int(num_threads), float(t)
+		write(l)
 
-def run_benchmark(dest, binary, *, num_threads_min = 128, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
+	return device_name.split(';')
+
+def run_benchmark(dest, binary, *, device = 0, num_threads_min = 128, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
 	p = subprocess.Popen([
 		binary.as_posix(),
+		str(device),
 		str(num_threads_min),
 		str(num_threads_max),
 		str(block_size),
@@ -30,18 +45,22 @@ def run_benchmark(dest, binary, *, num_threads_min = 128, num_threads_max = 1 <<
 		str(p_deq),
 		str(workload_size)
 		], stdout=subprocess.PIPE)
-	for num_threads, t in capture_output(p):
-		print(num_threads, t)
-		dest.write(f"{num_threads};{t}\n")
-	p.wait()
+
+	platform, device_name = capture_benchmark_output(dest, p)
+
+	if p.wait() != 0:
+		raise Exception("benchmark failed to run")
+
+	return platform, device_name
 
 
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
 		if f.name.startswith("benchmark-") and include.match(f.name):
-			yield f
+			test_name, _, platform = f.stem.rpartition('-')
+			yield f, test_name, platform
 
-def run(results_dir, bin_dir, include, rerun=False):
+def run(results_dir, bin_dir, include, devices, rerun = False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -50,47 +69,83 @@ def run(results_dir, bin_dir, include, rerun=False):
 		except:
 			return True
 
-	for binary in benchmark_binaries(bin_dir, include):
-		for p_enq in (0.25, 0.5, 1.0):
-			for p_deq in (0.25, 0.5, 1.0):
-				for workload_size in (1, 8, 32):
-					test_name_parts = binary.stem.split('-')
-					results_file_path = results_dir/f"{'-'.join(test_name_parts[:-1])}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{test_name_parts[-1]}.csv"
-					if rerun or result_outdated(results_file_path, binary):
-						with open(results_file_path, "wt") as file:
-							print(results_file_path)
-							run_benchmark(file, binary, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
+	device_name_map = dict()
+
+	for binary, test_name, platform in benchmark_binaries(bin_dir, include):
+		for device in devices.get(platform):
+			for p_enq in (0.25, 0.5, 1.0):
+				for p_deq in (0.25, 0.5, 1.0):
+					for workload_size in (1, 8, 32):
+						num_threads_min = 128
+						num_threads_max = 1 << 18
+						block_size = 256
+
+						def results_file_path(device_name):
+							return results_dir/f"{test_name}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{platform}-{device_id(device_name)}.csv"
+
+						device_name = device_name_map.get((platform, device))
+
+						if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
+							with io.BytesIO() as buffer:
+								print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
+								platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
+
+								if platform_reported != platform:
+									raise Exception("benchmark platform doesn't match binary name")
+
+								if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
+									raise Exception("device name doesn't match previously reported device name")
+
+								results_file = results_file_path(device_name_reported)
+
+								if rerun or result_outdated(results_file, binary):
+									with open(results_file, "wb") as file:
+										file.write(buffer.getbuffer())
+						else:
+							print("skipping", results_file_path(device_name))
 
 
 class Dataset:
-	def __init__(self, queue, queue_size, p_enq, p_deq, workload_size, platform, filename):
+	def __init__(self, queue, queue_size, block_size, p_enq, p_deq, workload_size, platform, device, filename, data_offset):
 		self.queue = queue
 		self.queue_size = queue_size
+		self.block_size = block_size
 		self.p_enq = p_enq
 		self.p_deq = p_deq
 		self.workload_size = workload_size
 		self.platform = platform
+		self.device = device
 		self.filename = filename
+		self.data_offset = data_offset
 
 	def __repr__(self):
-		return f"Dataset(queue={self.queue}, queue_size={self.queue_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}')"
+		return f"Dataset(queue={self.queue}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}')"
 
 	def read(self):
 		import numpy as np
 
+		def results(file):
+			for l in file:
+				num_threads, t = l.split(';')
+				yield int(num_threads), float(t)
+
 		with open(self.filename, "rt") as file:
+			file.seek(self.data_offset)
 			return np.asarray([d for d in results(file)])
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
 		if f.suffix == ".csv" and include.match(f.name):
-			parts = f.stem.split('-')
-			yield Dataset(parts[-6], int(parts[-5]), int(parts[-4])/100, int(parts[-3])/100, int(parts[-2]), parts[-1], f)
+			with open(f, "rb") as file:
+				next(file)
+				parts = codecs.decode(next(file)).strip().split(';')
+				next(file)
+				next(file)
+				platform, device = codecs.decode(next(file)).strip().split(';')
+				next(file)
+				next(file)
+				yield Dataset(parts[0], int(parts[1]), int(parts[2]), float(parts[3]), float(parts[4]), int(parts[5]), platform, device, f, file.tell())
 
-def results(file):
-	for l in file:
-		num_threads, t = l.split(';')
-		yield int(num_threads), float(t)
 
 def plot(results_dir, include):
 	import plotutils
@@ -98,13 +153,13 @@ def plot(results_dir, include):
 	import matplotlib.legend
 
 	datasets = [d for d in collect_datasets(results_dir, include)]
-	platforms = sorted({d.platform for d in datasets})
+	platforms = sorted({(d.platform, d.device) for d in datasets})
 	p_enqs = sorted({d.p_enq for d in datasets})
 	p_deqs = sorted({d.p_deq for d in datasets})
 	queue_sizes = sorted({d.queue_size for d in datasets})
 	workload_sizes = sorted({d.workload_size for d in datasets})
 
-	for platform in platforms:
+	for platform, device in platforms:
 		for p_enq in p_enqs:
 			for p_deq in p_deqs:
 				print(platform, p_enq, p_deq)
@@ -115,7 +170,7 @@ def plot(results_dir, include):
 
 				ax = fig.add_subplot(1, 1, 1)
 
-				ax.set_title(f"{platform}  $p_{{enq}}={p_enq}$  $p_{{deq}}={p_deq}$")
+				ax.set_title(f"{device} ({platform})  $p_{{enq}}={p_enq}$  $p_{{deq}}={p_deq}$")
 
 				for queue_size, color in zip(queue_sizes, plotutils.getBaseColorCycle()):
 					for workload_size, style in zip(workload_sizes, plotutils.getBaseStyleCycle()):
@@ -130,7 +185,7 @@ def plot(results_dir, include):
 				ax.add_artist(matplotlib.legend.Legend(parent=ax, handles=[matplotlib.lines.Line2D([], [], color=color) for _, color in zip(queue_sizes, plotutils.getBaseColorCycle())], labels=[f"queue size = {queue_size}" for queue_size in queue_sizes], loc="upper left", bbox_to_anchor=(0.0, 1.0)))
 				ax.add_artist(matplotlib.legend.Legend(parent=ax, handles=[matplotlib.lines.Line2D([], [], linestyle=style) for _, style in zip(workload_sizes, plotutils.getBaseStyleCycle())], labels=[f"workload = {workload_size}" for workload_size in workload_sizes], loc="upper left", bbox_to_anchor=(0.0, 0.8)))
 
-				canvas.print_figure(results_dir/f"{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
+				canvas.print_figure(results_dir/f"{device_id(device)}-{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
 
 
 
@@ -142,7 +197,18 @@ def main(args):
 	include = re.compile(args.include)
 
 	if args.command == run:
-		run(results_dir, bin_dir, include, args.rerun)
+		def device_list(args):
+			return args if args else [0]
+
+		devices = {
+			"cpu": [0],
+			"cuda": device_list(args.cuda_device),
+			"nvvm": device_list(args.cuda_device),
+			"amdgpu": device_list(args.amdgpu_device)
+		}
+
+		run(results_dir, bin_dir, include, devices, args.rerun)
+
 	elif args.command == plot:
 		plot(results_dir, include)
 
@@ -158,6 +224,8 @@ if __name__ == "__main__":
 		return args
 
 	run_cmd = add_command("run", run)
+	run_cmd.add_argument("-dev-cuda", "--cuda-device", type=int, action="append")
+	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
 
 	plot_cmd = add_command("plot", plot)

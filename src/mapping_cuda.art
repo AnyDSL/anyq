@@ -1,10 +1,9 @@
-static cuda_device = 0;
 
-fn @createAccDevice() = AccDevice {
-	launch_1d = @|body|@|num_groups, group_size| cuda_launch_1d(cuda_device, num_groups, group_size, body),
-	synchronize = || synchronize_cuda(cuda_device),
-	alloc = |size| alloc_cuda(cuda_device, size),
-	platform_device = runtime_device(1, cuda_device),
+fn @createAccDevice(device: i32) = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| cuda_launch_1d(device, num_groups, group_size, body),
+	synchronize = || synchronize_cuda(device),
+	alloc = |size| alloc_cuda(device, size),
+	platform_device = runtime_device(1, device),
 
 	print_i32 = @|format: &[u8], arg: i32| {
 		cuda_vprintf(format, bitcast[&[u8]](&arg));
@@ -20,6 +19,9 @@ fn @createAccDevice() = AccDevice {
 		cuda_vprintf(format, bitcast[&[u8]](args));
 	}
 };
+
+fn @createDefaultAccDevice() = createAccDevice(0);
+
 
 fn @cuda_pred(b: bool) -> i32 {
 	if b {1} else {0}

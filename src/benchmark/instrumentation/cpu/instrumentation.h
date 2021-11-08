@@ -2,6 +2,7 @@
 #define INCLUDED_INSTRUMENTATION_CPU
 
 #include <chrono>
+#include <iosfwd>
 
 
 class Instrumentation
@@ -9,6 +10,8 @@ class Instrumentation
 	std::chrono::steady_clock::time_point t_begin;
 
 public:
+	std::ostream& print_device_info(std::ostream&);
+
 	void begin(int N)
 	{
 		t_begin = std::chrono::steady_clock::now();
