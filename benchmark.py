@@ -122,16 +122,11 @@ class Dataset:
 		return f"Dataset(queue_type={self.queue_type}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}')"
 
 	def read(self):
-		import numpy as np
-
-		def results(file):
+		with open(self.filename, "rt") as file:
+			file.seek(self.data_offset)
 			for l in file:
 				num_threads, t = l.split(';')
 				yield int(num_threads), float(t)
-
-		with open(self.filename, "rt") as file:
-			file.seek(self.data_offset)
-			return np.asarray([d for d in results(file)])
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
@@ -147,6 +142,7 @@ def collect_datasets(results_dir, include):
 				yield Dataset(parts[0], int(parts[1]), int(parts[2]), float(parts[3]), float(parts[4]), int(parts[5]), platform, device, f, file.tell())
 
 def plot(results_dir, include):
+	import numpy as np
 	import plotutils
 	import matplotlib.lines
 	import matplotlib.legend
@@ -175,7 +171,7 @@ def plot(results_dir, include):
 					for workload_size, style in zip(workload_sizes, plotutils.getBaseStyleCycle()):
 						for d in filter(lambda d: d.queue_size == queue_size and d.workload_size == workload_size, plot_datasets):
 							print(d)
-							t = d.read()
+							t = np.asarray([e for e in d.read()])
 							ax.plot(t[:,0], t[:,1], color=color, linestyle=style)
 
 				ax.set_xlabel("number of threads")
@@ -186,86 +182,32 @@ def plot(results_dir, include):
 
 				canvas.print_figure(results_dir/f"{device_id(device)}-{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
 
+def export(file, results_dir, include):
+	datasets = [d for d in collect_datasets(results_dir, include)]
 
-class ScopeWriter:
-	def __init__(self, file):
-		self.file = file
+	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
+	datasets.sort(key=lambda d: d.workload_size)
+	datasets.sort(key=lambda d: d.p_deq)
+	datasets.sort(key=lambda d: d.p_enq)
+	datasets.sort(key=lambda d: d.block_size)
+	datasets.sort(key=lambda d: d.queue_size)
+	datasets.sort(key=lambda d: d.queue_type)
+	datasets.sort(key=lambda d: d.device)
+	datasets.sort(key=lambda d: d.platform)
 
-	def open_scope(self, file):
-		pass
+	file.write("""class LineParams {
+	constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
+		this.device = device;
+		this.queue_type = queue_type;
+		this.queue_size = queue_size;
+		this.block_size = block_size;
+		this.p_enq = p_enq;
+		this.p_deq = p_deq;
+		this.workload_size = workload_size;
+	}
+};
 
-	def close_scope(self, file):
-		pass
-
-	def __enter__(self):
-		self.open_scope(self.file)
-		return self
-
-	def __exit__(self, exc_type, exc_value, traceback):
-		self.close_scope(self.file)
-
-class JSObjectScope(ScopeWriter):
-	def __init__(self, file, key = None):
-		super().__init__(file)
-		self.key = key
-
-	def open_scope(self, file):
-		if self.key:
-			file.write(f"{self.key}:")
-		file.write('{')
-
-	def close_scope(self, file):
-		file.write("},")
-
-	def object(self, key = None):
-		return JSObjectScope(self.file, key)
-
-	def array(self, key = None):
-		return JSArrayScope(self.file, key)
-
-class JSArrayScope(ScopeWriter):
-	def __init__(self, file, key = None):
-		super().__init__(file)
-		self.key = key
-
-	def open_scope(self, file):
-		if self.key:
-			file.write(f"{self.key}:")
-		file.write('[')
-
-	def close_scope(self, file):
-		file.write("],")
-
-	def object(self, key = None):
-		return JSObjectScope(self.file, key)
-
-	def array(self, key = None):
-		return JSArrayScope(self.file, key)
-
-class JSWriter(ScopeWriter):
-	def open_scope(self, file):
-		file.write('{')
-		return self
-
-	def close_scope(self, file):
-		file.write("};\n")
-		return
-
-	def object(self, key):
-		return JSObjectScope(self.file, key)
-
-def export(results_dir, include):
-		datasets = [d for d in collect_datasets(results_dir, include)]
-		platforms = sorted({(d.platform, d.device) for d in datasets})
-		queue_types = sorted({d.queue_type for d in datasets})
-		queue_sizes = sorted({d.queue_size for d in datasets})
-		p_enqs = sorted({d.p_enq for d in datasets})
-		p_deqs = sorted({d.p_deq for d in datasets})
-		workload_sizes = sorted({d.workload_size for d in datasets})
-
-	# with open("data.txt", "wt") as file:
-		file = sys.stdout
-		file.write("""class Result {
+class Result {
 	constructor(num_threads, t) {
 		this.num_threads = num_threads;
 		this.t = t;
@@ -273,38 +215,22 @@ def export(results_dir, include):
 };
 
 class LineData {
-	constructor(device, queue_type, queue_size, p_enq, p_deq, workload_size, data) {
-		this.device = device;
-		this.queue_type = queue_type;
-		this.queue_size = queue_size;
-		this.p_enq = p_enq;
-		this.p_deq = p_deq;
-		this.workload_size = workload_size;
-		this.data = data;
+	constructor(params, results) {
+		this.params = params;
+		this.results = results;
 	}
 };
 
-// platform > device > queue_size > p_enq > p_deq > workload_size
-const data = """)
+const data = [""")
 
-		with JSWriter(file) as writer:
-			for platform, device in platforms:
-				with writer.object(f"\"{device_id(device)}-{platform}\"") as platform_scope:
-					for queue_type in queue_types:
-						with platform_scope.object(f"\"{queue_type}\"") as queue_type_scope:
-							for queue_size in queue_sizes:
-								with queue_type_scope.object(queue_size) as queue_size_scope:
-									for p_enq in p_enqs:
-										with queue_size_scope.object(p_enq) as p_enq_scope:
-											for p_deq in p_deqs:
-												with p_enq_scope.object(p_deq) as p_deq_scope:
-													plot_datasets = [d for d in filter(lambda d: d.platform == platform and d.p_enq == p_enq and d.p_deq == p_deq, datasets)]
+	for d in datasets:
+		file.write(f"""
+	new LineData(new LineParams("{d.device}-{d.platform}","{d.queue_type}",{d.queue_size},{d.block_size},{d.p_enq},{d.p_deq},{d.workload_size}),[""")
+		for n, t in d.read():
+			file.write(f"new Result({n},{t}),")
+		file.write("]),")
 
-													for workload_size in workload_sizes:
-														with p_deq_scope.array(workload_size) as workload_size_scope:
-															for d in filter(lambda d: d.queue_size == queue_size and d.workload_size == workload_size, plot_datasets):
-																for n, t in d.read():
-																	file.write(f"new Result({n},{t}),")
+	file.write("\n];\n")
 
 
 
@@ -328,8 +254,10 @@ def main(args):
 
 		run(results_dir, bin_dir, include, devices, args.rerun)
 
-	elif args.command in (plot, export):
-		args.command(results_dir, include)
+	elif args.command == plot:
+		plot(results_dir, include)
+	elif args.command == export:
+		export(sys.stdout, results_dir, include)
 
 
 if __name__ == "__main__":
