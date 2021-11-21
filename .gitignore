@@ -1,2 +1,3 @@
 build*
 src/benchmark/benchmark-queue-concurrent-*.art
+/data.js
