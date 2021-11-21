@@ -19,7 +19,7 @@ public:
 
 	float end(int N)
 	{
-		return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t_begin).count() * 0.001 / N;
+		return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t_begin).count() * 0.001f / N;
 	}
 };
 
