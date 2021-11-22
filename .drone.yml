@@ -1,0 +1,21 @@
+kind: pipeline
+name: plots
+type: docker
+
+steps:
+  - name: export
+    image: python:3
+    commands:
+      - python benchmark.py export > data.js
+
+  - name: upload
+    image: plugins/sftp
+    host: 134.96.220.231
+    port: 443
+    user: lemme
+    password:
+      from_secret: EGON_PASSWORD
+    destination_path: /anyq/
+    files:
+      - index.html
+      - data.js
