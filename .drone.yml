@@ -19,3 +19,6 @@ steps:
     files:
       - index.html
       - data.js
+
+node:
+  env: cguds-warrior
