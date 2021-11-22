@@ -12,7 +12,7 @@ steps:
     image: plugins/drone-sftp
     host: 134.96.220.231
     port: 443
-    user: lemme
+    username: lemme
     password:
       from_secret: EGON_PASSWORD
     destination_path: /anyq
