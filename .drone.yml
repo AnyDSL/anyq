@@ -9,13 +9,13 @@ steps:
       - python benchmark.py export > data.js
 
   - name: upload
-    image: plugins/sftp
+    image: plugins/drone-sftp
     host: 134.96.220.231
     port: 443
     user: lemme
     password:
       from_secret: EGON_PASSWORD
-    destination_path: /anyq/
+    destination_path: /anyq
     files:
       - index.html
       - data.js
