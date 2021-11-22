@@ -9,21 +9,18 @@ steps:
       - python benchmark.py export > data.js
 
   - name: upload
-    image: cupcakearmy/drone-deploy
+    image: alpine/drone-plugin-sftp
     settings:
       host: 134.96.220.231
       port: 443
-      user:
+      username:
         from_secret: EGON_USERNAME
       password:
         from_secret: EGON_PASSWORD
-      target: /anyq
-      sources:
+      destination_path: /anyq
+      files:
         - index.html
         - data.js
-      commands:
-        - ls -al
-        - ls -al /anyq
 
 node:
   env: cguds-warrior
