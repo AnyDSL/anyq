@@ -9,7 +9,7 @@ steps:
       - python benchmark.py export > data.js
 
   - name: upload
-    image: alpine/drone-plugin-sftp
+    image: beeblebrox.cg.uni-saarland.de/alpine/drone-plugin-sftp
     settings:
       host: 134.96.220.231
       port: 443
@@ -24,3 +24,6 @@ steps:
 
 node:
   env: cguds-warrior
+
+image_pull_secrets:
+  - REGISTRY_AUTH_CREDENTIALS
