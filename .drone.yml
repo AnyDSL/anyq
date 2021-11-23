@@ -1,0 +1,29 @@
+kind: pipeline
+name: plots
+type: docker
+
+steps:
+  - name: export
+    image: python:3
+    commands:
+      - python benchmark.py export > data.js
+
+  - name: upload
+    image: beeblebrox.cg.uni-saarland.de/alpine/drone-plugin-sftp
+    settings:
+      host: 134.96.220.231
+      port: 443
+      username:
+        from_secret: EGON_USERNAME
+      password:
+        from_secret: EGON_PASSWORD
+      destination_path: /anyq
+      files:
+        - index.html
+        - data.js
+
+node:
+  env: cguds-warrior
+
+image_pull_secrets:
+  - REGISTRY_AUTH_CREDENTIALS
