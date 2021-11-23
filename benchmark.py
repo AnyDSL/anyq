@@ -9,6 +9,9 @@ from pathlib import Path
 import argparse
 
 
+default_bin_dir = Path(__file__).parent / "build" / "bin"
+
+
 def device_id(name):
 	return name.translate(str.maketrans(" \t\n\v@-/\\?", "_________"))
 
@@ -236,12 +239,15 @@ const data = [""")
 
 def main(args):
 	this_dir = Path(__file__).parent.absolute()
-	bin_dir = this_dir/"build"/"bin"
+	bin_dir = args.bin_dir
 	results_dir = this_dir/"results"
 
 	include = re.compile(args.include)
 
 	if args.command == run:
+		if not bin_dir.is_dir():
+			raise IOError("Could not find path {} - please specify --bin-dir pointing to the location of benchmark binaries.".format(bin_dir))
+
 		def device_list(args):
 			return args if args else [0]
 
@@ -262,15 +268,16 @@ def main(args):
 
 if __name__ == "__main__":
 	args = argparse.ArgumentParser()
-	sub_args = args.add_subparsers(required=True)
+	sub_args = args.add_subparsers(dest='command', required=True)
 
 	def add_command(name, function):
 		args = sub_args.add_parser(name)
+		args.add_argument("include", nargs="?", type=str, default=".*")
 		args.set_defaults(command=function)
-		args.add_argument("include", nargs="?", default=".*")
 		return args
 
 	run_cmd = add_command("run", run)
+	run_cmd.add_argument("--bin-dir", type=Path, default=default_bin_dir)
 	run_cmd.add_argument("-dev-cuda", "--cuda-device", type=int, action="append")
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
@@ -279,4 +286,8 @@ if __name__ == "__main__":
 
 	plot_cmd = add_command("export", export)
 
-	main(args.parse_args())
+	try:
+		main(args.parse_args())
+	except Exception as e:
+		print(e)
+		sys.exit(-1)
