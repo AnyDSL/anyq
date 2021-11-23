@@ -6,8 +6,8 @@
 		<script src="data.js"></script>
 		<script>
 			let line_styles = new Map([
-				["device", { attr: "stroke", values: ["red", "green", "blue"]}],
-				// ["device", { attr: "stroke", values: ["#8DD3C7", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F"]}],
+				// ["device", { attr: "stroke", values: ["red", "green", "blue"]}],
+				["device", { attr: "stroke", values: ["#8DD3C7", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F"]}],
 				["workload_size", { attr: "stroke-dasharray", values: [null, "12", "9 5 5 5"]}],
 				["queue_size", { attr: "stroke-width", values: [1.5, 2.25, 3.0]}]
 			]);
@@ -104,6 +104,8 @@
 					             .attr("height", this.height)
 					             .attr("class", "plot");
 
+					this.x_min = 1;
+					this.y_min = 0.005;
 					this.x_max = 0;
 					this.y_max = 0;
 
@@ -145,12 +147,13 @@
 					this.x_max = new_x_max;
 					this.y_max = new_y_max;
 
-					this.x = d3.scaleLinear()
-					           .domain([0, this.x_max])
+					this.x = d3.scaleLog()
+					           .base(2)
+					           .domain([this.x_min, this.x_max])
 					           .range([this.margin_left, this.width - this.margin_right]);
 
-					this.y = d3.scaleLinear()
-					           .domain([0, 1.1 * this.y_max])
+					this.y = d3.scaleLog()
+					           .domain([this.y_min, 1.1 * this.y_max])
 					           .range([this.height - this.margin_bottom, this.margin_top]);
 
 					if (this.x_axis) {
@@ -163,18 +166,23 @@
 						this.y_label.remove();
 					}
 
-					this.x_axis = this.svg.append("g").call(d3.axisBottom(this.x)).attr("transform", `translate(0, ${this.y(0)})`);
+					this.x_axis = this.svg.append("g")
+					                      .call(d3.axisBottom(this.x))
+					                      .attr("transform", `translate(0, ${this.y(this.y_min)})`);
 					this.x_label = this.svg.append("text")
 					                       .text("number of threads")
 					                       .attr("text-anchor", "middle")
-					                       .attr("transform", `translate(${this.x(this.x_max / 2)}, ${this.y(0) + 38})`)
+					                       .attr("transform", `translate(${(this.x(this.x_min) + this.x(this.x_max)) / 2}, ${this.y(this.y_min) + 38})`)
 					                       .attr("class", "axis_label");
 
-					this.y_axis = this.svg.append("g").call(d3.axisLeft(this.y)).attr("transform", `translate(${this.x(0)}, 0)`);
+					this.y_axis = this.svg.append("g")
+					                      .call(d3.axisLeft(this.y)
+					                      .ticks(10, v => { if (!Number.isInteger(Math.log10(v))) return; return `${v}`; }))
+					                      .attr("transform", `translate(${this.x(1)}, 0)`);
 					this.y_label = this.svg.append("text")
 					                       .text("run time/ms")
 					                       .attr("text-anchor", "middle")
-					                       .attr("transform", `translate(${this.x(0) - 34}, ${this.y(this.y_max / 2)})rotate(-90)`)
+					                       .attr("transform", `translate(${this.x(this.x_min) - 34}, ${(this.y(this.y_min) + this.y(this.y_max)) / 2})rotate(-90)`)
 					                       .attr("class", "axis_label");
 
 
