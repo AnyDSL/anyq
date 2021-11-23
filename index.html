@@ -57,6 +57,11 @@
 							}
 						}
 					}
+					else {
+						this.path.attr("stroke", "black");
+					}
+
+					this.stroke_width = this.path.attr("stroke-width");
 				}
 
 				is_visible() {
@@ -86,6 +91,18 @@
 
 				unhide() {
 					++this.vis;
+				}
+
+				highlight() {
+					if (this.path) {
+						this.path.attr("stroke-width", 5.0);
+					}
+				}
+
+				unhighlight() {
+					if (this.path) {
+						this.path.attr("stroke-width", this.stroke_width);
+					}
 				}
 			};
 
@@ -315,8 +332,19 @@
 							if (!plot.update_axes())
 								plot.update_lines();
 						});
+
 						label.appendChild(checkbox);
 						label.append(entry);
+						label.addEventListener("mouseenter", e => {
+							for (let line of lines) {
+								line.highlight();
+							}
+						});
+						label.addEventListener("mouseleave", e => {
+							for (let line of lines) {
+								line.unhighlight();
+							}
+						});
 						el.appendChild(label);
 					}
 
