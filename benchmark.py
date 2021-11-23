@@ -239,12 +239,12 @@ const data = [""")
 
 def main(args):
 	this_dir = Path(__file__).parent.absolute()
-	bin_dir = args.bin_dir
 	results_dir = this_dir/"results"
 
 	include = re.compile(args.include)
 
 	if args.command == run:
+		bin_dir = args.bin_dir
 		if not bin_dir.is_dir():
 			raise IOError("Could not find path {} - please specify --bin-dir pointing to the location of benchmark binaries.".format(bin_dir))
 
