@@ -67,8 +67,22 @@ set(BENCHMARK_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in
 )
 
+option(AnyQ_BENCHMARK_AUTO OFF)
+
+if(AnyQ_BENCHMARK_AUTO)
+	find_package(Python3 COMPONENTS Interpreter)
+endif()
+
 foreach(_platform ${AnyQ_PLATFORMS})
-	add_custom_target(benchmark-${_platform})
+	if(AnyQ_BENCHMARK_AUTO)
+		set(AnyQ_BENCHMARK_ARGS_${_platform} "" CACHE STRING "additional arguments for the benchmark script")
+		string(REPLACE " " ";" BENCHMARK_ARGS "${AnyQ_BENCHMARK_ARGS_${_platform}}")
+		set(BENCHMARK_COMMAND COMMAND Python3::Interpreter ${AnyQ_ROOT_DIR}/benchmark.py run
+			--bin-dir ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_CFG_INTDIR}
+			${BENCHMARK_ARGS} ".*-${_platform}")
+	endif()
+
+	add_custom_target(benchmark-${_platform} ${BENCHMARK_COMMAND} WORKING_DIRECTORY ${AnyQ_ROOT_DIR} VERBATIM COMMAND_EXPAND_LISTS)
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	foreach(_benchmark ${BENCHMARK_FILES})
