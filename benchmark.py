@@ -34,7 +34,7 @@ def capture_benchmark_output(dest, p):
 
 	return device_name.split(';')
 
-def run_benchmark(dest, binary, *, device = 0, num_threads_min = 128, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
+def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
 	p = subprocess.Popen([
 		binary.as_posix(),
 		str(device),
@@ -76,7 +76,7 @@ def run(results_dir, bin_dir, include, devices, rerun = False):
 			for p_enq in (0.25, 0.5, 1.0):
 				for p_deq in (0.25, 0.5, 1.0):
 					for workload_size in (1, 8, 32):
-						num_threads_min = 128
+						num_threads_min = 1
 						num_threads_max = 1 << 18
 						block_size = 256
 
