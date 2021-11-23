@@ -2,7 +2,7 @@
 // reduction and a single atomic adding the aggregated value
 // following an assembly of the resulting vector using base atomic value and constants
 
-// inst_stats: llvm.vector.reduce.add.v8i32(1), atomicrmw(1), extractelement(7), insertelement(8)
+// inst_stats[x86_64]: llvm.vector.reduce.add.v8i32(1), atomicrmw(1), extractelement(7), insertelement(8)
 
 
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {

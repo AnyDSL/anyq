@@ -1,5 +1,5 @@
 
-// inst_stats: insertelement(9), shufflevector(9), llvm.x86.avx.ptestz.256(8)
+// inst_stats[x86_64]: insertelement(9), shufflevector(9), llvm.x86.avx.ptestz.256(8)
 
 // 1x broadcast of loop variable i
 // 8x voting using llvm.x86.avx.ptestz.256 of icmp eq

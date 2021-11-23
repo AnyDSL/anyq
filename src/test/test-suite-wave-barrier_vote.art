@@ -1,5 +1,5 @@
 
-// inst_stats: insertelement(1), shufflevector(1), llvm.x86.avx.movmsk.ps.256(1), llvm.masked.store.v8i32.p1v8i32(2)
+// inst_stats[x86_64]: insertelement(1), shufflevector(1), llvm.x86.avx.movmsk.ps.256(1), llvm.masked.store.v8i32.p1v8i32(2)
 
 // 1x voting using llvm.x86.avx.movmsk.ps.256 of icmp ne
 // 1x broadcast of voting result followed by some shifting

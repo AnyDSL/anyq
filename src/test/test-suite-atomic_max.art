@@ -1,5 +1,5 @@
 
-// inst_stats: atomicrmw(4), extractelement(8)
+// inst_stats[x86_64]: atomicrmw(4), extractelement(8)
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {

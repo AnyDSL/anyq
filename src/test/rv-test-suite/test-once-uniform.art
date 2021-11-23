@@ -1,6 +1,6 @@
 
 
-// inst_stats: llvm.x86.avx.movmsk.ps.256(1), insertelement(1), shufflevector(1), xpowf_avx2(1), llvm.masked.store.v8i32.p0v8i32(1)
+// inst_stats[x86_64]: llvm.x86.avx.movmsk.ps.256(1), insertelement(1), shufflevector(1), xpowf_avx2(1), llvm.masked.store.v8i32.p0v8i32(1)
 
 // 1x rv_ballot: llvm.x86.avx.movmsk.ps.256, insertelement + shufflevector for broadcast
 // 1x call to math function

@@ -1,5 +1,5 @@
 
-// inst_stats: shufflevector(3)
+// inst_stats[x86_64]: shufflevector(3)
 
 
 // width must be less or equal to wave.num_threads() and match the num of calls to shfl_bfly()

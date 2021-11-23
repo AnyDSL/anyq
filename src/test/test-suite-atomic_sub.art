@@ -1,5 +1,5 @@
 
-// inst_stats: llvm.vector.reduce.add.v8i32(2), atomicrmw(2)
+// inst_stats[x86_64]: llvm.vector.reduce.add.v8i32(2), atomicrmw(2)
 
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {

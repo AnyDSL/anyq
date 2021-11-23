@@ -1,5 +1,5 @@
 
-// inst_stats: llvm.vector.reduce.add.v8i32(2), atomicrmw(3), extractelement(1), shufflevector(1), insertelement(1)
+// inst_stats[x86_64]: llvm.vector.reduce.add.v8i32(2), atomicrmw(3), extractelement(1), shufflevector(1), insertelement(1)
 
 // 1x atomicrmw add [ok]
 // 1x extract, shufflevector, atomicrmw xchg, insert [perfect]

@@ -1,7 +1,7 @@
 
 // cascade of atomic operations
 
-// inst_stats: extractelement(8), atomicrmw(8), insertelement(8)
+// inst_stats[x86_64]: extractelement(8), atomicrmw(8), insertelement(8)
 
 
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {

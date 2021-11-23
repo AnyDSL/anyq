@@ -1,7 +1,7 @@
 
 // 2x extract, 1x cmpxchg, 2x insert per lane
 
-// inst_stats: cmpxchg(8), extractelement(16), insertelement(16)
+// inst_stats[x86_64]: cmpxchg(8), extractelement(16), insertelement(16)
 
 
 fn @loop_body(lane: i32, vec_width: i32, _read: fn(i32)->i32, _write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {

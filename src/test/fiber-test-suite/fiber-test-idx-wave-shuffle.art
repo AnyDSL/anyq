@@ -1,5 +1,5 @@
 
-// inst_stats: shufflevector(3), extractelement(1), insertelement(1)
+// inst_stats[x86_64]: shufflevector(3), extractelement(1), insertelement(1)
 
 fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->i32) {
 	let global = @|_g: i32| 0;

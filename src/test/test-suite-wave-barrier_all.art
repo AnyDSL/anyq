@@ -1,5 +1,5 @@
 
-// inst_stats: llvm.x86.avx.ptestz.256(1), insertelement(1), shufflevector(1)
+// inst_stats[x86_64]: llvm.x86.avx.ptestz.256(1), insertelement(1), shufflevector(1)
 
 // 1x voting using llvm.x86.avx.ptestz.256 of icmp ne
 // 1x broadcast of voting result

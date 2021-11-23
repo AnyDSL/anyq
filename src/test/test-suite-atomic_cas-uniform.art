@@ -1,5 +1,5 @@
 
-// inst_stats: extractelement(32), cmpxchg(8), insertelement(9), shufflevector(1), llvm.x86.avx.movmsk.ps.256(1)
+// inst_stats[x86_64]: extractelement(32), cmpxchg(8), insertelement(9), shufflevector(1), llvm.x86.avx.movmsk.ps.256(1)
 
 // vec_width: 3x extractelement (cmp, new, lane active), 1x cmpxchg, 1x insertelement
 // 8x extractelement, 1x insertelement + 1x shufflevector for masked fiber_yield
