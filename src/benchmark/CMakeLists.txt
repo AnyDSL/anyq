@@ -80,9 +80,11 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		set(BENCHMARK_COMMAND COMMAND Python3::Interpreter ${AnyQ_ROOT_DIR}/benchmark.py run
 			--bin-dir ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_CFG_INTDIR}
 			${BENCHMARK_ARGS} ".*-${_platform}")
+		add_custom_target(benchmark-${_platform} ${BENCHMARK_COMMAND} WORKING_DIRECTORY ${AnyQ_ROOT_DIR} VERBATIM COMMAND_EXPAND_LISTS)
+	else()
+		add_custom_target(benchmark-${_platform})
 	endif()
 
-	add_custom_target(benchmark-${_platform} ${BENCHMARK_COMMAND} WORKING_DIRECTORY ${AnyQ_ROOT_DIR} VERBATIM COMMAND_EXPAND_LISTS)
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	foreach(_benchmark ${BENCHMARK_FILES})
