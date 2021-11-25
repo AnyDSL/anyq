@@ -2,9 +2,14 @@
 function(add_anydsl_executable _target)
 	set(_infiles ${ARGN})
 	list(FILTER _infiles INCLUDE REGEX "[.]art$")
+	if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+		set(ARCH_FLAG "-mcpu=native")
+	else()
+		set(ARCH_FLAG "-march=native")
+	endif()
 	anydsl_runtime_wrap(_${_target}_PROGRAM
 		FRONTEND artic
-		CLANG_FLAGS -march=native
+		CLANG_FLAGS ${ARCH_FLAG}
 		ARTIC_FLAGS --log-level info --max-errors 5
 		NAME ${_target}
 		FILES ${_infiles})
