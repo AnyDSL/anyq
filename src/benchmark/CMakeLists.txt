@@ -51,11 +51,10 @@ function(add_benchmark _testfile _mapping)
 endfunction()
 
 function(generate_benchmarks template_file platform)
-	get_filename_component(dest_dir ${template_file} DIRECTORY)
 	get_filename_component(dest_name ${template_file} NAME_WE)
 
 	foreach(queue_size 10000 100000 1000000)
-		set(dest_file "${dest_dir}/${dest_name}-IQ-${queue_size}.art")
+		set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${dest_name}-IQ-${queue_size}.art")
 		configure_file(${template_file} ${dest_file})
 		add_benchmark(${dest_file} ${platform})
 	endforeach()
