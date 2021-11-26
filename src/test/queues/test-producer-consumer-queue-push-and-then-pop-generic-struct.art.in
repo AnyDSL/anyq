@@ -1,0 +1,3 @@
+
+#[export]
+fn main() = push_and_then_pop_queue_test[GenericElementStruct](100000, 256, @queue_size@, genericTestElementStruct());

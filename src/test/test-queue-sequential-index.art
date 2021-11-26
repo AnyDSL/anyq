@@ -1,3 +1,0 @@
-
-#[export]
-fn main() = push_and_then_pop_queue_test[u32](100000, 256, 1000000, indexTestElement());

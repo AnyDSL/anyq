@@ -10,9 +10,12 @@ set(COMMON_TEST_SUITE_FILES
 )
 
 set(COMMON_SCHEDULE_TEST_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-common.art
-	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-push-and-then-pop.art
-	${CMAKE_CURRENT_SOURCE_DIR}/test-producer-consumer-queue-concurrent-push-pop.art
+)
+
+set(COMMON_QUEUE_TEST_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-common.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop.art
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES} ${COMMON_TEST_SUITE_FILES} ${COMMON_SCHEDULE_TEST_FILES} REGULAR_EXPRESSION "utils-(debug|release)[.]art$")
@@ -81,6 +84,18 @@ function(add_schedule_test _mapping _testfile)
 	add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()
 
+function(add_queue_tests _mapping _testfile)
+	get_filename_component(_testname ${_testfile} NAME_WE)
+
+	foreach(queue_size 10000 1000000)
+		set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${_testname}-IQ-${queue_size}.art")
+		configure_file(${_testfile} ${dest_file})
+		set(_target "${_testname}-IQ-${queue_size}-${_mapping}")
+		add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
+		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+	endforeach()
+endfunction()
+
 
 if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 	find_package(Python3 COMPONENTS Interpreter)
@@ -96,14 +111,6 @@ set(TEST_SCHEDULE_FILES
 	test-shuffles.art
 	test-barriers.art
 	test-gid.art
-	test-queue-sequential-generic.art
-	test-queue-sequential-generic-struct.art
-	test-queue-sequential-generic-array.art
-	test-queue-sequential-index.art
-	test-queue-concurrent-generic-small.art
-	test-queue-concurrent-generic-large.art
-	test-queue-concurrent-index-small.art
-	test-queue-concurrent-index-large.art
 )
 
 set(TEST_SUITE_FILES
@@ -129,6 +136,15 @@ set(TEST_SUITE_FILES
 	test-suite-wave-barrier_vote.art
 )
 
+set(TEST_QUEUE_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop-index.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop-generic.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-index.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic-struct.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic-array.art.in
+)
+
 foreach(_test_platform ${AnyQ_PLATFORMS})
 	foreach(_test_case ${TEST_FRAMEWORK_FILES})
 		add_framework_test(${_test_platform} ${_test_case})
@@ -140,6 +156,10 @@ foreach(_test_platform ${AnyQ_PLATFORMS})
 
 	foreach(_test_case ${TEST_SUITE_FILES})
 		add_test_suite_testcase(${_test_platform} ${_test_case})
+	endforeach()
+
+	foreach(_test_case ${TEST_QUEUE_FILES})
+		add_queue_tests(${_test_platform} ${_test_case})
 	endforeach()
 endforeach()
 
