@@ -63,7 +63,7 @@ def benchmark_binaries(bin_dir, include):
 			test_name, _, platform = f.stem.rpartition('-')
 			yield f, test_name, platform
 
-def run(results_dir, bin_dir, include, devices, rerun = False):
+def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -101,7 +101,7 @@ def run(results_dir, bin_dir, include, devices, rerun = False):
 
 								results_file = results_file_path(device_name_reported)
 
-								if rerun or result_outdated(results_file, binary):
+								if (rerun or result_outdated(results_file, binary)) and not dryrun:
 									with open(results_file, "wb") as file:
 										file.write(buffer.getbuffer())
 						else:
@@ -258,7 +258,7 @@ def main(args):
 			"amdgpu": device_list(args.amdgpu_device)
 		}
 
-		run(results_dir, bin_dir, include, devices, args.rerun)
+		run(results_dir, bin_dir, include, devices, args.rerun, args.dryrun)
 
 	elif args.command == plot:
 		plot(results_dir, include)
@@ -281,6 +281,7 @@ if __name__ == "__main__":
 	run_cmd.add_argument("-dev-cuda", "--cuda-device", type=int, action="append")
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
+	run_cmd.add_argument("-dryrun", "--dryrun", dest="dryrun", action="store_true")
 
 	plot_cmd = add_command("plot", plot)
 
