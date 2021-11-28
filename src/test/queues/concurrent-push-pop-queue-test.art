@@ -1,9 +1,9 @@
 
-fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_per_thread: i32, queue_size: i32, test_element: QueueTestElement[T]) -> i32 {
+fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_per_thread: i32, queue_size: i32, create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[T], test_element: QueueTestElement[T]) -> i32 {
 	let device = createDefaultAccDevice();
 
 	let pushed_buffer_size = num_threads * attempts_per_thread;
-	let queue_test = createQueueTest(device, test_element.element_type, (pushed_buffer_size as i64 + 5) * sizeof[u32]());
+	let queue_test = createQueueTest(device, create_queue, (pushed_buffer_size as i64 + 5) * sizeof[u32]());
 
 	for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
 		let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);

@@ -3,13 +3,13 @@ struct QueueTest[T] {
 	finish: fn() -> i32
 }
 
-fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], additional_mem: i64) -> QueueTest[T] {
+fn createQueueTest[T](device: AccDevice, create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[T], additional_mem: i64) -> QueueTest[T] {
 	let test = createBaseTest(device, additional_mem);
 
 	QueueTest[T] {
 		run_test = @|body|@|queue_size| {
 			for device_memory, device_failed_flag in test.run_test() {
-				let queue = createConcurrentProducerConsumerQueue[T](device, element_type, queue_size);
+				let queue = create_queue(device, queue_size);
 
 				let block_dim = 256;
 				let num_blocks = (queue_size + block_dim - 1) / block_dim;
@@ -39,48 +39,40 @@ fn createQueueTest[T](device: AccDevice, element_type: QueueElementType[T], addi
 
 
 struct QueueTestElement[T] {
-	element_type: QueueElementType[T],
 	generateElement: fn(i32) -> T,
 	unpackRefValue: fn (T) -> i32
 }
 
 
 fn @indexTestElement() = QueueTestElement[u32] {
-	element_type = indexQueueElementType(),
 	generateElement = @|ref_value:i32| ref_value as u32,
 	unpackRefValue = @|el:u32| el as i32
 };
 
 
-fn @genericTestElement[T](generateElement: fn(i32) -> T, unpackRefValue: fn (T) -> i32) = QueueTestElement[T] {
-	element_type = genericQueueElementType[T](),
-	generateElement = generateElement,
-	unpackRefValue = unpackRefValue
-};
-
 type GenericElementSimple = i64;
 
-fn genericTestElementSimple() = genericTestElement[GenericElementSimple](
-	@|ref_value:i32| -> GenericElementSimple { ref_value as GenericElementSimple },
-	@|el:GenericElementSimple| el as i32
-);
+fn genericTestElementSimple() = QueueTestElement[GenericElementSimple] {
+	generateElement = @|ref_value:i32| -> GenericElementSimple { ref_value as GenericElementSimple },
+	unpackRefValue = @|el:GenericElementSimple| el as i32
+};
 
 struct GenericElementStruct {
 	payload: bool,
 	ref_value: i32
 }
 
-fn genericTestElementStruct() = genericTestElement[GenericElementStruct] (
-	@|ref_value:i32| GenericElementStruct { payload = ref_value % 3 == 0, ref_value = ref_value },
-	@|el:GenericElementStruct| el.ref_value
-);
+fn genericTestElementStruct() = QueueTestElement[GenericElementStruct] {
+	generateElement = @|ref_value:i32| GenericElementStruct { payload = ref_value % 3 == 0, ref_value = ref_value },
+	unpackRefValue = @|el:GenericElementStruct| el.ref_value
+};
 
 struct GenericElementComplexStruct {
 	payload: [u32 * 7],
 	ref_value: i32
 }
 
-fn genericTestElementComplexStruct() = genericTestElement[GenericElementComplexStruct] (
-	@|ref_value:i32| GenericElementComplexStruct { payload = [0; 7], ref_value = ref_value },
-	@|el:GenericElementComplexStruct| el.ref_value
-);
+fn genericTestElementComplexStruct() = QueueTestElement[GenericElementComplexStruct] {
+	generateElement = @|ref_value:i32| GenericElementComplexStruct { payload = [0; 7], ref_value = ref_value },
+	unpackRefValue = @|el:GenericElementComplexStruct| el.ref_value
+};

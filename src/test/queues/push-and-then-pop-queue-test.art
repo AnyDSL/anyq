@@ -1,9 +1,9 @@
 
 
-fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size: i32, test_element: QueueTestElement[T]) -> i32 {
+fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size: i32, create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[T], test_element: QueueTestElement[T]) -> i32 {
 	let device = createDefaultAccDevice();
 
-	let queue_test = createQueueTest(device, test_element.element_type, (queue_size + 2) as i64 * sizeof[u32]());
+	let queue_test = createQueueTest(device, create_queue, (queue_size + 2) as i64 * sizeof[u32]());
 
 	for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
 		let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);

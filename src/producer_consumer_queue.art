@@ -244,3 +244,4 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 };
 
 fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue[u32](device, indexQueueElementType(), num_elements);
+fn @createConcurrentProducerConsumerQueueGeneric[T](device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue[T](device, genericQueueElementType[T](), num_elements);

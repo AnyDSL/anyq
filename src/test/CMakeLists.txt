@@ -14,8 +14,8 @@ set(COMMON_SCHEDULE_TEST_FILES
 
 set(COMMON_QUEUE_TEST_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-common.art
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop.art
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/push-and-then-pop-queue-test.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/concurrent-push-pop-queue-test.art
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES} ${COMMON_TEST_FILES} ${COMMON_TEST_SUITE_FILES} ${COMMON_SCHEDULE_TEST_FILES} REGULAR_EXPRESSION "utils-(debug|release)[.]art$")
@@ -87,12 +87,48 @@ endfunction()
 function(add_queue_tests _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 
-	foreach(queue_size 10000 1000000)
-		set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${_testname}-IQ-${queue_size}.art")
-		configure_file(${_testfile} ${dest_file})
-		set(_target "${_testname}-IQ-${queue_size}-${_mapping}")
-		add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
-		add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+	set(ConcurrentProducerConsumerQueue_short_name CPCQ)
+	set(MichaelScottQueue_short_name MSQ)
+
+	set(indexTestElement_element_type u32)
+	set(genericTestElementSimple_element_type GenericElementSimple)
+	set(genericTestElementStruct_element_type GenericElementStruct)
+	set(genericTestElementComplexStruct_element_type GenericElementComplexStruct)
+
+	set(indexTestElement_short_name index)
+	set(genericTestElementSimple_short_name generic)
+	set(genericTestElementStruct_short_name generic-struct)
+	set(genericTestElementComplexStruct_short_name generic-array)
+
+	set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
+	set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
+
+	foreach(queue_type ConcurrentProducerConsumerQueue MichaelScottQueue)
+		foreach(test_element indexTestElement genericTestElementSimple genericTestElementStruct genericTestElementComplexStruct)
+			foreach(queue_size 10000 1000000)
+				set(variant_name "${_testname}-${${queue_type}_short_name}-${queue_size}-${${test_element}_short_name}")
+				set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${variant_name}.art")
+
+				set(element_type "${${test_element}_element_type}")
+
+				if (DEFINED ${queue_type}_constructor_${test_element})
+					set(queue_constructor ${${queue_type}_constructor_${test_element}})
+				else()
+					if (DEFINED ${queue_type}_constructor)
+						set(queue_constructor_name ${${queue_type}_constructor})
+					else()
+						set(queue_constructor_name "create${queue_type}")
+					endif()
+					set(queue_constructor "${queue_constructor_name}[${element_type}]")
+				endif()
+
+				configure_file(${_testfile} ${dest_file})
+
+				set(_target "${variant_name}-${_mapping}")
+				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
+				add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+			endforeach()
+		endforeach()
 	endforeach()
 endfunction()
 
@@ -137,12 +173,8 @@ set(TEST_SUITE_FILES
 )
 
 set(TEST_QUEUE_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop-index.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop-generic.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-index.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic-struct.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop-generic-array.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop.art.in
 )
 
 foreach(_test_platform ${AnyQ_PLATFORMS})
