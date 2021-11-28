@@ -20,7 +20,7 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 					}
 				}
 				else {
-					thread.atomic_store_global_i32(&mut pushed_buffer(thread.idx(0)), -1, memory_order::relaxed);
+					pushed_buffer(thread.idx(0)) = -1;
 				}
 			}
 		}

@@ -12,7 +12,7 @@ struct MichaelScottQueueNode[T] {
 }
 
 fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
-	let buffer_size = pool_size as i64 * sizeof[MichaelScottQueueNode[T]]();
+	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScottQueueNode[T]]();
 	let buffer_alignment = alignof[MichaelScottQueueNode[T]]();
 
 	let buffer_data_offset = round_up_i64(sizeof[MichaelScottQueue](), buffer_alignment);
@@ -34,6 +34,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 			new_node
 		}
 		else {
+			thread.atomic_sub_global_u32(queue.alloc_next, 1, memory_order::relaxed);
 			nil
 		}
 	};
@@ -58,13 +59,15 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 
 					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::relaxed) {
 						if next == nil {
-							if thread.atomic_cas_global_u32(node(tail).next, next, new_node, memory_order::/*release*/seq_cst, memory_order::relaxed) == next {
-								thread.atomic_cas_global_u32(queue.tail, tail, new_node, memory_order::relaxed, memory_order::relaxed);
+							if thread.atomic_cas_global_u32/*_weak*/(node(tail).next, next, new_node, memory_order::/*release*/seq_cst, memory_order::relaxed) == next {
+								//                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+								//                                                            TODO: fix CAS fail memory order
+								thread.atomic_cas_global_u32/*_strong*/(queue.tail, tail, new_node, memory_order::relaxed, memory_order::relaxed);
 								break()
 							}
 						}
 						else {
-							thread.atomic_cas_global_u32(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
+							thread.atomic_cas_global_u32/*_weak*/(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
 						}
 					}
 				}
@@ -80,7 +83,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 			while true {
 				let head = thread.atomic_load_global_u32(queue.head, memory_order::relaxed);
 				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::relaxed);
-				let next = thread.atomic_load_global_u32(node(head).next, memory_order::relaxed);
+				let next = thread.atomic_load_global_u32(node(head).next, memory_order::acquire);
 
 				if head == thread.atomic_load_global_u32(queue.head, memory_order::relaxed) {
 					if head == tail {
@@ -88,19 +91,21 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 							return(0)
 						}
 
-						thread.atomic_cas_global_u32(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
+						thread.atomic_cas_global_u32/*_weak*/(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
 					}
 					else {
 						let payload = node(next).payload;
-						
-						if thread.atomic_cas_global_u32(queue.head, head, next, memory_order::/*acquire*/seq_cst, memory_order::relaxed) == head {
+
+						if thread.atomic_cas_global_u32/*_weak*/(queue.head, head, next, memory_order::acquire, memory_order::relaxed) == head {
 							free_node(head, thread);
-							sink(payload, head);
+							sink(payload, next);
 							break()
 						}
 					}
 				}
 			}
+
+			thread.atomic_sub_global_i32(queue.size, 1, memory_order::relaxed);
 
 			1
 		},
@@ -115,12 +120,12 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 
 				if idx == 0 {
 					queue.size = 0;
+					queue.alloc_next = 0;
 
 					// set up dummy node
-					queue.head = 0;
-					queue.tail = 0;
-					queue.alloc_next = 1;
-					node(0).next = nil;
+					queue.head = pool_size as u32;
+					queue.tail = pool_size as u32;
+					node(pool_size as u32).next = nil;
 				}
 			}
 		},
