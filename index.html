@@ -2,6 +2,7 @@
 <html>
 	<head>
 		<meta charset="utf-8">
+		<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
 		<script src="https://d3js.org/d3.v7.min.js"></script>
 		<script src="data.js"></script>
 		<script>
@@ -30,23 +31,20 @@
 
 
 			class Line {
-				constructor(params, data) {
+				constructor(graph, params, data) {
 					this.params = params;
 					this.data = data;
-					this.path = null;
+					this.path = $(graph.append("path").node());
 					this.vis = 0;
+					this.path.css("visibility", "visible");
 					this.x_max = d3.max(data, d => d.num_threads);
 					this.y_max = d3.max(data, d => d.t);
 				}
 
-				generate(svg, x, y, line_style_map) {
-					if (this.path)
-						return;
-
+				update(x, y, line_style_map) {
 					const line = d3.line().x(d => x(d.num_threads)).y(d => y(d.t));
 
-					this.path = svg.append("path")
-					               .attr("d", line(this.data));
+					this.path.attr("d", line(this.data));
 
 					if (line_style_map) {
 						for (const [param, style] of line_style_map) {
@@ -65,61 +63,53 @@
 				}
 
 				is_visible() {
-					return this.vis == 0;
-				}
-
-				remove() {
-					if (this.path != null) {
-						this.path.remove();
-						this.path = null;
-					}
-				}
-
-				update(svg, x, y, line_style_map) {
-					if (this.vis != 0) {
-						this.remove();
-						return false;
-					}
-
-					this.generate(svg, x, y, line_style_map);
-					return true;
+					return this.path.css("visibility") == "visible";
 				}
 
 				hide() {
 					--this.vis;
+					this.path.css("visibility", "hidden");
 				}
 
-				unhide() {
+				show() {
+					// lines need to match all previously deselected features to become visible again
 					++this.vis;
+					if (this.vis == 0)
+						this.path.css("visibility", "visible");
 				}
 
 				highlight() {
-					if (this.path) {
-						this.path.attr("stroke-width", 5.0);
-					}
+					this.path.attr("stroke-width", 5.0);
 				}
 
 				unhighlight() {
-					if (this.path) {
-						this.path.attr("stroke-width", this.stroke_width);
-					}
+					this.path.attr("stroke-width", this.stroke_width);
 				}
 			};
 
 
 			class Plot {
-				constructor(width, heith, margin_top, margin_right, margin_bottom, margin_left) {
-					this.width = width;
-					this.height = heith;
-					this.margin_left = margin_left;
-					this.margin_right = margin_right;
-					this.margin_top = margin_top;
-					this.margin_bottom = margin_bottom;
+				constructor(svg, margin) {
+					this.svg = svg;
+					this.width = () => svg.width();
+					this.height = () => svg.height();
+					this.margin = margin;
 
-					this.svg = d3.create("svg")
-					             .attr("width", this.width)
-					             .attr("height", this.height)
-					             .attr("class", "plot");
+					this.graph = d3.select(this.svg[0]);
+					this.axis = {
+						x: this.graph.append("g"),
+						y: this.graph.append("g")
+					};
+					this.label = {
+						x: this.graph.append("text")
+					        .text("number of threads")
+					        .attr("text-anchor", "middle")
+							.attr("class", "axis_label"),
+						y: this.graph.append("text")
+					        .text("run time/ms")
+					        .attr("text-anchor", "middle")
+					        .attr("class", "axis_label")
+					};
 
 					this.x_min = 1;
 					this.y_min = 0.005;
@@ -129,12 +119,6 @@
 					this.x = null;
 					this.y = null;
 
-					this.x_axis = null;
-					this.x_label = null;
-
-					this.y_axis = null;
-					this.y_label = null;
-
 					this.lines = [];
 				}
 
@@ -142,114 +126,47 @@
 					let line_map = new DefaultMap();
 
 					for (let {params, results} of data) {
-						let line = new Line(params, results, this);
+						let line = new Line(this.graph, params, results);
 
 						for (let key of Object.getOwnPropertyNames(params)) {
 							line_map.get(key, () => new DefaultMap()).get(params[key], () => new Set()).add(line);
 						}
 
 						this.lines.push(line);
+						//this.graph.append(line.path);
 					}
 
 					return line_map;
 				}
 
-				update_axes() {
-					let new_x_max = d3.max(this.lines, l => l.is_visible() ? l.x_max : 0);
-					let new_y_max = d3.max(this.lines, l => l.is_visible() ? l.y_max : 0);
-
-					if (new_x_max == this.x_max && new_y_max == this.y_max)
-						return false;
-
-					this.x_max = new_x_max;
-					this.y_max = new_y_max;
+				update() {
+					this.x_max = d3.max(this.lines, l => l.is_visible() ? l.x_max : this.x_min);
+					this.y_max = d3.max(this.lines, l => l.is_visible() ? l.y_max : this.y_min);
 
 					this.x = d3.scaleLog()
 					           .base(2)
 					           .domain([this.x_min, this.x_max])
-					           .range([this.margin_left, this.width - this.margin_right]);
+					           .range([this.margin.left, this.width() - this.margin.right]);
 
 					this.y = d3.scaleLog()
 					           .domain([this.y_min, 1.1 * this.y_max])
-					           .range([this.height - this.margin_bottom, this.margin_top]);
+					           .range([this.height() - this.margin.bottom, this.margin.top]);
 
-					if (this.x_axis) {
-						this.x_axis.remove();
-						this.x_label.remove();
-					}
 
-					if (this.y_axis) {
-						this.y_axis.remove();
-						this.y_label.remove();
-					}
-
-					this.x_axis = this.svg.append("g")
-					                      .call(d3.axisBottom(this.x))
-					                      .attr("transform", `translate(0, ${this.y(this.y_min)})`);
-					this.x_label = this.svg.append("text")
-					                       .text("number of threads")
-					                       .attr("text-anchor", "middle")
-					                       .attr("transform", `translate(${(this.x(this.x_min) + this.x(this.x_max)) / 2}, ${this.y(this.y_min) + 38})`)
-					                       .attr("class", "axis_label");
-
-					this.y_axis = this.svg.append("g")
-					                      .call(d3.axisLeft(this.y)
-					                      .ticks(10, v => { if (!Number.isInteger(Math.log10(v))) return; return `${v}`; }))
-					                      .attr("transform", `translate(${this.x(1)}, 0)`);
-					this.y_label = this.svg.append("text")
-					                       .text("run time/ms")
-					                       .attr("text-anchor", "middle")
-					                       .attr("transform", `translate(${this.x(this.x_min) - 34}, ${(this.y(this.y_min) + this.y(this.y_max)) / 2})rotate(-90)`)
-					                       .attr("class", "axis_label");
-
+					this.axis.x.call(d3.axisBottom(this.x))
+					           .attr("transform", `translate(0, ${this.y(this.y_min)})`);
+					this.axis.y.call(d3.axisLeft(this.y).ticks(10, v => { if (!Number.isInteger(Math.log10(v))) return; return `${v}`; }))
+					           .attr("transform", `translate(${this.x(1)}, 0)`);
+					this.label.x.attr("transform", `translate(${(this.x(this.x_min) + this.x(this.x_max)) / 2}, ${this.y(this.y_min) + 38})`);
+					this.label.y.attr("transform", `translate(${this.x(this.x_min) - 34}, ${(this.y(this.y_min) + this.y(this.y_max)) / 2})rotate(-90)`);
 
 					for (let l of this.lines) {
-						l.remove();
-						l.update(this.svg, this.x, this.y, this.line_style_map);
+						l.update(this.x, this.y, this.line_style_map);
 					}
 
 					return true;
 				}
-
-				update_lines() {
-					for (let l of this.lines) {
-						l.update(this.svg, this.x, this.y, this.line_style_map);
-					}
-				}
 			}
-
-
-			let plot = new Plot(800, 600, 8, 48, 48, 48);
-
-			const line_map = plot.add_lines(data);
-
-
-			const line_style_map = new Map();
-
-			for (const [param, values] of line_map) {
-				const style = line_styles.get(param);
-
-				if (style) {
-					const style_map = new Map();
-
-					let i = 0;
-					for (const value of values.keys()) {
-						let style_attr = style.attr;
-						let style_value = style.values[i % style.values.length];
-
-						style_map.set(value, path => {
-							path.attr(style_attr, style_value);
-							path.attr("fill", "none");
-						});
-
-						++i;
-					}
-
-					line_style_map.set(param, style_map);
-				}
-			}
-
-			plot.line_style_map = line_style_map;
 
 
 			// const bisect_num_threads = d3.bisector(d => d.num_threads).center;
@@ -266,33 +183,92 @@
 			// 	cursor.attr("cx", e.offsetX).attr("cy", e.offsetY);
 			// });
 
+			function slugify(str) {
+				str = str.trim();
+				str = str.toLowerCase();
 
-			window.onload = () => {
-				document.body.appendChild(plot.svg.node());
+				// remove accents, swap ñ for n, etc
+				var from = "åàáãäâèéëêìíïîòóöôùúüûñç·/_,:;";
+				var to   = "aaaaaaeeeeiiiioooouuuunc------";
 
-				plot.update_axes();
-
-				let button_table = document.createElement("table");
-				button_table.className = "button_table";
-
-				let header_row = document.createElement("tr");
-
-				for (const [col_name, entries] of line_map.entries()) {
-					let el = document.createElement("th");
-					el.append(col_name);
-					header_row.appendChild(el);
+				for (var i = 0, l = from.length; i < l; i++) {
+					str = str.replace(new RegExp(from.charAt(i), "g"), to.charAt(i));
 				}
 
-				button_table.appendChild(header_row);
+				str = str
+					.replace(/\.+/g, "-") // replace dots
+					.replace(/[^a-z0-9 -]/g, "") // remove invalid chars
+					.replace(/\s+/g, "-") // collapse whitespace and replace by -
+					.replace(/-+/g, "-") // collapse dashes
+					.replace(/^-+/, "") // trim - from start of text
+					.replace(/-+$/, ""); // trim - from end of text
 
-				let values_row = document.createElement("tr");
+				return str;
+			}
+
+			$.ready.then(() => {
+
+				let plot_elem = $("div.plot");
+				let svg = plot_elem.find("svg");
+
+				plot = new Plot(svg, { top: 8, right: 48, bottom: 48, left: 48});
+
+				const line_map = plot.add_lines(data);
+
+
+				const line_style_map = new Map();
+
+				for (const [param, values] of line_map) {
+					const style = line_styles.get(param);
+
+					if (style) {
+						const style_map = new Map();
+
+						let i = 0;
+						for (const value of values.keys()) {
+							let style_attr = style.attr;
+							let style_value = style.values[i % style.values.length];
+
+							style_map.set(value, path => {
+								path.attr(style_attr, style_value);
+								path.attr("fill", "none");
+							});
+
+							++i;
+						}
+
+						line_style_map.set(param, style_map);
+					}
+				}
+
+				plot.line_style_map = line_style_map;
+				plot.update();
+
+				let button_table = $("<table/>", {
+					"class": "button_table"
+				});
+				button_table.appendTo(svg.next("div.plot-menu"));
+
+				let header_row = $("<tr/>").appendTo(button_table);
 
 				for (const [col_name, entries] of line_map.entries()) {
-					let el = document.createElement("td");
+					$("<th/>").text(col_name).appendTo(header_row);
+				}
+
+				let values_row = $("<tr/>").appendTo(button_table);
+
+
+				for (const [col_name, entries] of line_map.entries()) {
+					let col = $("<td/>")
+						.attr("data-category", col_name)
+						.appendTo(values_row);
 
 					for (const [entry, lines] of entries) {
-						let label = document.createElement("label");
-						label.className = "checkbox";
+						let label = $("<label/>")
+							.addClass("checkbox")
+							.attr("data-category", col_name)
+							.attr("data-value", slugify(String(entry)))
+							.appendTo(col);
 
 						let style = line_style_map.get(col_name);
 
@@ -312,52 +288,79 @@
 
 								stylist(line);
 
-								svg.node().appendChild(line.node());
-
-								label.appendChild(svg.node());
+								label.append(svg.node());
 							}
 						}
 
-						let checkbox = document.createElement("input");
-						checkbox.setAttribute("type", "checkbox");
-						checkbox.setAttribute("checked", true);
-						checkbox.addEventListener("click", e => {
+						let checkbox = $("<input/>", {
+							"type": "checkbox",
+							"checked": true
+						});
+						checkbox.on("change", function() {
 							for (let line of lines) {
-								if (!checkbox.checked)
+								//console.log(this, lines);
+								if (this.checked) {
+									line.show();
+									//$.each(lines, function(i, line) { line.show(); });
+								} else {
 									line.hide();
-								else
-									line.unhide();
+									//$.each(lines, function(i, line) { line.hide(); });
+								}
 							}
 
-							if (!plot.update_axes())
-								plot.update_lines();
+							plot.update();
 						});
+						checkbox.appendTo(label);
 
-						label.appendChild(checkbox);
-						label.append(entry);
-						label.addEventListener("mouseenter", e => {
+						$("<span/>").text(entry).appendTo(label);
+
+						label.mouseenter(e => {
 							for (let line of lines) {
 								line.highlight();
 							}
 						});
-						label.addEventListener("mouseleave", e => {
+						label.mouseleave(e => {
 							for (let line of lines) {
 								line.unhighlight();
 							}
 						});
-						el.appendChild(label);
 					}
-
-					values_row.appendChild(el);
 				}
 
-				button_table.appendChild(values_row);
+				let url = new window.URL(document.location);
+				let params = url.searchParams;
 
-				document.body.appendChild(button_table);
-			};
+				for (key of new Set(params.keys())) {
+					let boxes = $("td[data-category=" + key + "]").find("label.checkbox").click();
+					$.each(params.getAll(key), function(i, val) {
+						boxes.filter("[data-value=" + val + "]").click();
+					});
+				}
+
+				$(".button-share a").click(function() {
+
+					share = new window.URLSearchParams();
+
+					let active = $("label.checkbox").filter(function(idx, label) {
+						return $(label).find("input[type='checkbox']").prop("checked");
+					});
+
+					active.each(function (idx, elem) {
+						let label = $(elem);
+						share.append(label.attr("data-category"), label.attr("data-value"));
+					});
+
+					let target = new window.URL(url);
+					target.search = "?" + share.toString();
+					document.location = target.href;
+				});
+			});
 		</script>
 		<style type="text/css">
-			.plot {
+			body {
+				margin-bottom: 40px;
+			}
+			.plot svg.plot-graph {
 				display: block;
 				margin: auto
 			}
@@ -376,7 +379,7 @@
 				vertical-align: top
 			}
 
-			.button_table {
+			.button_table, .button-share {
 				margin: 3ex auto 0
 			}
 
@@ -385,10 +388,16 @@
 			}
 
 			.button_table .checkbox {
+				white-space: nowrap;
 				display: block;
 			}
 		</style>
 	</head>
 	<body>
+		<div class="plot">
+			<svg width="800" height="600" class="plot-graph"></svg>
+			<div class="plot-menu"></div>
+			<div class="button-share"><a href="#">Go to preconfigured page</a></div>
+		</div>
 	</body>
 </html>
