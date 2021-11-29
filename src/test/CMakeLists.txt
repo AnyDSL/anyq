@@ -105,7 +105,7 @@ function(add_queue_tests _mapping _testfile)
 
 	foreach(queue_type ConcurrentProducerConsumerQueue MichaelScottQueue)
 		foreach(test_element indexTestElement genericTestElementSimple genericTestElementStruct genericTestElementComplexStruct)
-			foreach(queue_size 10000 1000000)
+			foreach(queue_size 1000 1000000)
 				set(variant_name "${_testname}-${${queue_type}_short_name}-${queue_size}-${${test_element}_short_name}")
 				set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${variant_name}.art")
 
