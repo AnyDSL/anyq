@@ -89,6 +89,7 @@ function(add_queue_tests _mapping _testfile)
 
 	set(ConcurrentProducerConsumerQueue_short_name CPCQ)
 	set(MichaelScottQueue_short_name MSQ)
+	set(MoodyCamelQueue_short_name MOQ)
 
 	set(indexTestElement_element_type u32)
 	set(genericTestElementSimple_element_type GenericElementSimple)
@@ -103,7 +104,9 @@ function(add_queue_tests _mapping _testfile)
 	set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
 	set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
 
-	foreach(queue_type ConcurrentProducerConsumerQueue MichaelScottQueue)
+	set(MoodyCamelQueue_link_LIBRARIES moodycamel)
+
+	foreach(queue_type ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
 		foreach(test_element indexTestElement genericTestElementSimple genericTestElementStruct genericTestElementComplexStruct)
 			foreach(queue_size 1000 1000000)
 				set(variant_name "${_testname}-${${queue_type}_short_name}-${queue_size}-${${test_element}_short_name}")
@@ -126,6 +129,9 @@ function(add_queue_tests _mapping _testfile)
 
 				set(_target "${variant_name}-${_mapping}")
 				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
+				if (DEFINED ${queue_type}_link_LIBRARIES)
+					target_link_libraries(${_target} PRIVATE ${${queue_type}_link_LIBRARIES})
+				endif()
 				add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 			endforeach()
 		endforeach()

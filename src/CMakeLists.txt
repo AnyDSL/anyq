@@ -27,6 +27,7 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/atomic.art
 	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.art
 	${CMAKE_CURRENT_SOURCE_DIR}/queues/michael_scott.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/moodycamel.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<LOWER_CASE:$<CONFIG>>.art
@@ -80,3 +81,5 @@ if (BUILD_TESTING)
 endif()
 
 add_subdirectory(benchmark)
+
+add_subdirectory(queues)
