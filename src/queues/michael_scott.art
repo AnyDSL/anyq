@@ -20,12 +20,10 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
 	let queue_device_memory = bitcast[&mut addrspace(1) [u8]](queue_device_state_alloc.data);
 
-	let queue =  bitcast[&mut addrspace(1) MichaelScottQueue](&mut queue_device_memory(0));
-	let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_device_memory(buffer_data_offset));
+	let queue = bitcast[&mut addrspace(1) MichaelScottQueue](&mut queue_device_memory(0));
+	let node = bitcast[&mut addrspace(1) [MichaelScottQueueNode[T]]](&mut queue_device_memory(buffer_data_offset));
 
 	let nil:u32 = -1;
-
-	let node = @|i:u32| -> &mut addrspace(1) MichaelScottQueueNode[T] { bitcast[&mut addrspace(1) [MichaelScottQueueNode[T]]](buffer)(i) };
 
 	let alloc_node = @|thread:gpu_thread_context| {
 		let new_node = thread.atomic_add_global_u32(queue.alloc_next, 1, memory_order::relaxed);
@@ -60,8 +58,8 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::relaxed) {
 						if next == nil {
 							if thread.atomic_cas_global_u32/*_weak*/(node(tail).next, next, new_node, memory_order::/*release*/seq_cst, memory_order::relaxed) == next {
-								//                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-								//                                                            TODO: fix CAS fail memory order
+								//                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+								//                                                                     TODO: fix CAS fail memory order
 								thread.atomic_cas_global_u32/*_strong*/(queue.tail, tail, new_node, memory_order::relaxed, memory_order::relaxed);
 								break()
 							}
