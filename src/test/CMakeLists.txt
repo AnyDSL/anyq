@@ -122,7 +122,7 @@ function(add_queue_tests _mapping _testfile)
 					set(queue_constructor "${queue_constructor_name}[${element_type}]")
 				endif()
 
-				configure_file(${_testfile} ${dest_file})
+				configure_file(${_testfile} ${dest_file} @ONLY)
 
 				set(_target "${variant_name}-${_mapping}")
 				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
@@ -173,8 +173,8 @@ set(TEST_SUITE_FILES
 )
 
 set(TEST_QUEUE_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-concurrent-push-pop.art.in
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-producer-consumer-queue-push-and-then-pop.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-queue-concurrent.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-queue-sequential.art.in
 )
 
 foreach(_test_platform ${AnyQ_PLATFORMS})
