@@ -84,6 +84,11 @@ function(add_schedule_test _mapping _testfile)
 	add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()
 
+set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
+set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
+set(queue_types_nvvm ${queue_types_cuda})
+set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
+
 function(add_queue_tests _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 
@@ -106,7 +111,7 @@ function(add_queue_tests _mapping _testfile)
 
 	set(MoodyCamelQueue_link_LIBRARIES moodycamel)
 
-	foreach(queue_type ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
+	foreach(queue_type ${queue_types_${_mapping}})
 		foreach(test_element indexTestElement genericTestElementSimple genericTestElementStruct genericTestElementComplexStruct)
 			foreach(queue_size 1000 1000000)
 				set(variant_name "${_testname}-${${queue_type}_short_name}-${queue_size}-${${test_element}_short_name}")
