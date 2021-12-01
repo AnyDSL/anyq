@@ -76,6 +76,18 @@ if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
 endif()
 
 
+set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
+set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
+set(queue_types_nvvm ${queue_types_cuda})
+set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
+
+set(ConcurrentProducerConsumerQueue_short_name CPCQ)
+set(MichaelScottQueue_short_name MSQ)
+set(MoodyCamelQueue_short_name MOQ)
+
+set(MoodyCamelQueue_link_LIBRARIES moodycamel)
+
+
 if (BUILD_TESTING)
 	add_subdirectory(test)
 endif()

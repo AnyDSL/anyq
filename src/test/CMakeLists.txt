@@ -84,32 +84,21 @@ function(add_schedule_test _mapping _testfile)
 	add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()
 
-set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
-set(queue_types_nvvm ${queue_types_cuda})
-set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
+set(indexTestElement_element_type u32)
+set(genericTestElementSimple_element_type GenericElementSimple)
+set(genericTestElementStruct_element_type GenericElementStruct)
+set(genericTestElementComplexStruct_element_type GenericElementComplexStruct)
+
+set(indexTestElement_short_name index)
+set(genericTestElementSimple_short_name generic)
+set(genericTestElementStruct_short_name generic-struct)
+set(genericTestElementComplexStruct_short_name generic-array)
+
+set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
+set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
 
 function(add_queue_tests _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)
-
-	set(ConcurrentProducerConsumerQueue_short_name CPCQ)
-	set(MichaelScottQueue_short_name MSQ)
-	set(MoodyCamelQueue_short_name MOQ)
-
-	set(indexTestElement_element_type u32)
-	set(genericTestElementSimple_element_type GenericElementSimple)
-	set(genericTestElementStruct_element_type GenericElementStruct)
-	set(genericTestElementComplexStruct_element_type GenericElementComplexStruct)
-
-	set(indexTestElement_short_name index)
-	set(genericTestElementSimple_short_name generic)
-	set(genericTestElementStruct_short_name generic-struct)
-	set(genericTestElementComplexStruct_short_name generic-array)
-
-	set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
-	set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
-
-	set(MoodyCamelQueue_link_LIBRARIES moodycamel)
 
 	foreach(queue_type ${queue_types_${_mapping}})
 		foreach(test_element indexTestElement genericTestElementSimple genericTestElementStruct genericTestElementComplexStruct)

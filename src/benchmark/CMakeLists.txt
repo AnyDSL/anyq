@@ -37,9 +37,7 @@ set(COMMON_BENCHMARK_FILES
 
 source_group("Source Files" FILES ${COMMON_BENCHMARK_FILES})
 
-function(add_benchmark _testfile _mapping)
-	get_filename_component(_testname ${_testfile} NAME_WE)
-	set(_target "${_testname}-${_mapping}")
+function(add_benchmark _target _testfile _mapping)
 	add_anydsl_executable(${_target} ${COMMON_BENCHMARK_FILES} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "benchmarks/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
@@ -50,13 +48,37 @@ function(add_benchmark _testfile _mapping)
 	add_dependencies(benchmark-${_mapping} ${_target})
 endfunction()
 
-function(generate_benchmarks template_file platform)
-	get_filename_component(dest_name ${template_file} NAME_WE)
+set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
+set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
+set(queue_types_nvvm ${queue_types_cuda})
+set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
 
-	foreach(queue_size 10000 100000 1000000)
-		set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${dest_name}-IQ-${queue_size}.art")
-		configure_file(${template_file} ${dest_file})
-		add_benchmark(${dest_file} ${platform})
+set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerIndexQueue")
+
+function(generate_benchmarks template_file platform)
+	get_filename_component(benchmark_name ${template_file} NAME_WE)
+
+	foreach(queue_type ${queue_types_${platform}})
+		foreach(queue_size 10000 100000 1000000)
+			set(queue_short_name "${${queue_type}_short_name}")
+			set(variant_name "${benchmark_name}-${${queue_type}_short_name}-${queue_size}")
+			set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${variant_name}.art")
+
+			if (DEFINED ${queue_type}_constructor)
+				set(queue_constructor_name ${${queue_type}_constructor})
+			else()
+				set(queue_constructor_name "create${queue_type}[u32]")
+			endif()
+
+			configure_file(${template_file} ${dest_file})
+
+			set(target_name "${variant_name}-${platform}")
+			add_benchmark(${target_name} ${dest_file} ${platform})
+
+			if (DEFINED ${queue_type}_link_LIBRARIES)
+				target_link_libraries(${target_name} PRIVATE ${${queue_type}_link_LIBRARIES})
+			endif()
+		endforeach()
 	endforeach()
 endfunction()
 
