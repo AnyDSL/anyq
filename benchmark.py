@@ -37,6 +37,9 @@ def capture_benchmark_output(dest, p):
 
 	return device_name.split(';')
 
+class BenchmarkError(Exception):
+	pass
+
 def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
 	p = subprocess.Popen([
 		binary.as_posix(),
@@ -52,7 +55,7 @@ def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_
 	platform, device_name = capture_benchmark_output(dest, p)
 
 	if p.wait() != 0:
-		raise Exception("benchmark failed to run")
+		raise BenchmarkError("benchmark failed to run")
 
 	return platform, device_name
 
@@ -88,24 +91,27 @@ def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
 
 						device_name = device_name_map.get((platform, device))
 
-						if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
-							with io.BytesIO() as buffer:
-								print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
-								platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
+						try:
+							if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
+								with io.BytesIO() as buffer:
+									print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
+									platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
 
-								if platform_reported != platform:
-									raise Exception("benchmark platform doesn't match binary name")
+									if platform_reported != platform:
+										raise Exception("benchmark platform doesn't match binary name")
 
-								if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
-									raise Exception("device name doesn't match previously reported device name")
+									if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
+										raise Exception("device name doesn't match previously reported device name")
 
-								results_file = results_file_path(device_name_reported)
+									results_file = results_file_path(device_name_reported)
 
-								if (rerun or result_outdated(results_file, binary)) and not dryrun:
-									with open(results_file, "wb") as file:
-										file.write(buffer.getbuffer())
-						else:
-							print("skipping", results_file_path(device_name))
+									if (rerun or result_outdated(results_file, binary)) and not dryrun:
+										with open(results_file, "wb") as file:
+											file.write(buffer.getbuffer())
+							else:
+								print("skipping", results_file_path(device_name))
+						except BenchmarkError:
+							print("FAILED", results_file_path(device_name))
 
 
 class Dataset:
