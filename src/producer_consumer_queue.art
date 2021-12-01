@@ -132,7 +132,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 				if idx == 0 {
 					if (*size != 0) {
-						device.print_i32("queue size (%d) is not zero!\n", *size);
+						device.print_i32("VALIDATION ERROR: queue size (%d) is not zero!\n", *size);
 						thread.atomic_store_global_u32(corrupted, 1, memory_order::relaxed);
 					}
 				}
@@ -197,7 +197,7 @@ fn @genericQueueElementType[T]() {
 					thread.atomic_store_global_u32(lock, 2, memory_order::release);
 				},
 				debug_print = @|device| {
-					device.print_2xi32("inconsistent queue state: buffer[%d] = %d\n", i as i32, *lock as i32);
+					device.print_2xi32("VALIDATION ERROR: inconsistent queue state: buffer[%d] = %d\n", i as i32, *lock as i32);
 				}
 			}
 		}
@@ -237,7 +237,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 				}
 			},
 			debug_print = @|device| {
-				device.print_2xi32("inconsistent queue state: buffer[%d] = %d\n", i as i32, *element as i32);
+				device.print_2xi32("VALIDATION ERROR: inconsistent queue state: buffer[%d] = %d\n", i as i32, *element as i32);
 			}
 		}
 	}

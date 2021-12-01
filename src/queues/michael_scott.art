@@ -114,9 +114,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 
 		reset = @|grid| {
 			for thread in grid.threads() {
-				let idx = thread.idx(0) as i32;
-
-				if idx == 0 {
+				if thread.idx(0) == 0 {
 					queue.size = 0;
 					queue.alloc_next = 0;
 
@@ -128,9 +126,27 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 			}
 		},
 
-		validate = @|_corrupted: &mut addrspace(1) u32, grid| {
-			for _thread in grid.threads() {
-				// TODO
+		validate = @|corrupted: &mut addrspace(1) u32, grid| {
+			for thread in grid.threads() {
+				if thread.idx(0) == 0 {
+					let mut size = 0;
+					let mut n = queue.head;
+
+					while node(n).next != nil {
+						n = node(n).next;
+						++size;
+					}
+
+					if size != queue.size {
+						thread.atomic_store_global_u32(corrupted, 1, memory_order::relaxed);
+						device.print_2xi32("VALIDATION ERROR: size of queue (%d) does not match queue size (%d)!\n", size, queue.size);
+					}
+
+					if queue.tail != n {
+						thread.atomic_store_global_u32(corrupted, 2, memory_order::relaxed);
+						device.print_2xi32("VALIDATION ERROR: tail (%u) does not match last node (%u)!\n", queue.tail as i32, n as i32);
+					}
+				}
 			}
 		},
 
