@@ -1,3 +1,7 @@
+// implementation of queue algorithm described in
+// Maged M. Michael, Michael L. Scott, 1996. Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms
+// PODC '96: Proceedings of the fifteenth annual ACM symposium on Principles of distributed computing, pages 267–275
+// https://doi.org/10.1145/248052.248106
 
 struct MichaelScottQueue {
 	size: i32,
