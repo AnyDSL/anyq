@@ -28,7 +28,7 @@ fn @amdgpu_atomic_rmw[T](op: u32) {
 }
 
 fn @amdgpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-    match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "agent") {
+    match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent") {
         (old, _success) => old
     }
 }

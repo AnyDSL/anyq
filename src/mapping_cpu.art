@@ -102,7 +102,7 @@ fn @cpu_atomic_rmw[T](op: u32) {
 }
 
 fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(stronger_memory_order(memory_order_succ, memory_order_fail)), "") {
+	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "") {
 		(old, _success) => old
 	}
 }
@@ -172,7 +172,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 
 			while(!cmp) {
 				let new = if old >= val { 0 } else { old + 1 };
-				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), "");
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), builtin_memory_order(memory_order::relaxed), "");
 				old = res_old;
 				cmp = res_cmp;
 			}
@@ -209,7 +209,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 			let mut cmp:bool = false;
 			while(!cmp) {
 				let new = if (old == 0) || (old > val) { val } else { old - 1 };
-				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), "");
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), builtin_memory_order(memory_order::relaxed), "");
 				old = res_old;
 				cmp = res_cmp;
 			}
