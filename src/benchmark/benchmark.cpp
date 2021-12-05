@@ -13,7 +13,7 @@ using namespace std::literals;
 
 extern "C"
 {
-	int run_queue_benchmark(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
+	int run(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
 
 	void* benchmark_create()
 	{
@@ -25,14 +25,14 @@ extern "C"
 		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';');
 	}
 
-	void benchmark_begin(void* ctx, std::int32_t N)
+	void benchmark_begin(void* ctx)
 	{
-		static_cast<Instrumentation*>(ctx)->begin(N);
+		static_cast<Instrumentation*>(ctx)->begin();
 	}
 
-	void benchmark_end(void* ctx, std::int32_t N)
+	void benchmark_end(void* ctx)
 	{
-		float dt = static_cast<Instrumentation*>(ctx)->end(N);
+		float dt = static_cast<Instrumentation*>(ctx)->end();
 		std::cout /*<< std::fixed << std::setprecision(2)*/ << dt << '\n' << std::flush;
 	}
 
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
 		float p_deq = parse_argument<float>(argv[6]);
 		int workload_size = parse_argument<int>(argv[7]);
 
-		return run_queue_benchmark(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
+		return run(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
 	}
 	catch (const usage_error& e)
 	{

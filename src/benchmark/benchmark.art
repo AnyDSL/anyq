@@ -1,0 +1,27 @@
+
+
+struct Benchmark {
+	print_device_info: fn() -> (),
+	run: fn(fn() -> ()) -> fn() -> (),
+	destroy: fn() -> ()
+}
+
+#[import(cc = "C")] fn benchmark_create() -> &mut u8;
+#[import(cc = "C")] fn benchmark_print_device_info(&mut u8) -> ();
+#[import(cc = "C")] fn benchmark_begin(&mut u8) -> ();
+#[import(cc = "C")] fn benchmark_end(&mut u8) -> ();
+#[import(cc = "C")] fn benchmark_destroy(&mut u8) -> ();
+
+fn create_benchmark() {
+	let ctx = benchmark_create();
+
+	Benchmark {
+		print_device_info = @|| benchmark_print_device_info(ctx),
+		run = @|body: fn() -> ()|@|| {
+			benchmark_begin(ctx);
+			@body();
+			benchmark_end(ctx);
+		},
+		destroy = @|| benchmark_destroy(ctx)
+	}
+}

@@ -1,0 +1,36 @@
+
+fn @upsweep_exponential(body: fn(i32) -> ()) {
+	fn @(?min & ?max & ?exp) loop(min: i32, max: i32, exp: i32) -> () {
+		if min < max {
+			@body(min);
+			loop(min * exp, max, exp);
+		}
+	}
+	loop
+}
+
+fn @run_queue_benchmark(num_threads_min: i32, num_threads_max: i32, body: fn(i32) -> ()) -> i32 {
+	let benchmark = create_benchmark();
+
+	print_string("platform;device_name\n");
+	benchmark.print_device_info();
+	print_char('\n');
+	print_char('\n');
+
+	print_string("num_threads;t/ms\n");
+
+	let N = 10;
+
+	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
+		for _ in range(0, N) {
+			print_i32(num_threads);
+			print_char(';');
+
+			for benchmark.run() {
+				@body(num_threads);
+			}
+		}
+	}
+
+	0
+}

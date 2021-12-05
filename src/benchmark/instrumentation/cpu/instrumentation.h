@@ -12,14 +12,14 @@ class Instrumentation
 public:
 	std::ostream& print_device_info(std::ostream&);
 
-	void begin(int N)
+	void begin()
 	{
 		t_begin = std::chrono::steady_clock::now();
 	}
 
-	float end(int N)
+	float end()
 	{
-		return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t_begin).count() * 0.001f / N;
+		return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t_begin).count() * 0.001f;
 	}
 };
 

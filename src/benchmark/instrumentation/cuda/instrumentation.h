@@ -15,12 +15,12 @@ class Instrumentation
 public:
 	std::ostream& print_device_info(std::ostream&);
 
-	void begin(int N)
+	void begin()
 	{
 		throw_error(cuEventRecord(event_begin, nullptr));
 	}
 
-	float end(int N)
+	float end()
 	{
 		throw_error(cuEventRecord(event_end, nullptr));
 		throw_error(cuEventSynchronize(event_end));
@@ -28,7 +28,7 @@ public:
 		float dt;
 		throw_error(cuEventElapsedTime(&dt, event_begin, event_end));
 
-		return dt / N;
+		return dt;
 	}
 };
 

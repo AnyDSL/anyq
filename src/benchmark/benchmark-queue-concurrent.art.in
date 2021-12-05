@@ -1,8 +1,8 @@
 
 
 #[export]
-fn run_queue_benchmark(device: i32, num_threads_min: i32, num_threads_max: i32, block_size: i32, p_enq: f32, p_deq: f32, workload_size: i32) {
-	sweep_num_threads_benchmark(
+fn run(device: i32, num_threads_min: i32, num_threads_max: i32, block_size: i32, p_enq: f32, p_deq: f32, workload_size: i32) {
+	run_queue_benchmark(
 		num_threads_min,
 		num_threads_max,
 		producer_consumer_queue_concurrent_push_pop_benchmark(device, block_size, 20, p_enq, p_deq, workload_size, @queue_size@, "@queue_short_name@", @queue_constructor_name@))

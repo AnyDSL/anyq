@@ -31,7 +31,8 @@ set(COMMON_BENCHMARK_FILES
 	${AnyQ_SOURCE_DIR}/framework.art
 	${AnyQ_SOURCE_DIR}/utils.art
 	${AnyQ_SOURCE_DIR}/random.art
-	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-common.art
+	${CMAKE_CURRENT_SOURCE_DIR}/benchmark.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queue-benchmark.art
 	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art
 )
 
