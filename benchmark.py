@@ -252,7 +252,9 @@ def export(file, results_dir, include):
 class Result {
 	constructor(num_threads, t_avg, t_min, t_max) {
 		this.num_threads = num_threads;
-		this.t = t;
+		this.t_avg = t_avg;
+		this.t_min = t_min;
+		this.t_max = t_max;
 	}
 };
 

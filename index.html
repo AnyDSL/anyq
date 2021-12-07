@@ -38,7 +38,7 @@
 					this.vis = 0;
 					this.path.css("visibility", "visible");
 					this.x_max = d3.max(data, d => d.num_threads);
-					this.y_max = d3.max(data, d => d.t);
+					this.y_max = d3.max(data, d => d.t_avg);
 				}
 
 				update(x, y, line_style_map) {
