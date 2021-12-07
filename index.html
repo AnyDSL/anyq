@@ -42,7 +42,7 @@
 				}
 
 				update(x, y, line_style_map) {
-					const line = d3.line().x(d => x(d.num_threads)).y(d => y(d.t));
+					const line = d3.line().x(d => x(d.num_threads)).y(d => y(d.t_avg));
 
 					this.path.attr("d", line(this.data));
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.9
 
+from os import stat
 import sys
 import io
 import codecs
@@ -194,6 +195,35 @@ def plot(results_dir, include):
 
 				canvas.print_figure(results_dir/f"{device_id(device)}-{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
 
+class Statistics:
+	def reset(self, t):
+		self.t_avg = self.t_min = self.t_max = t
+		self.n = 1
+
+	def get(self):
+		return self.t_avg / self.n, self.t_min, self.t_max, self.n
+
+	def add(self, t):
+		self.t_avg += t
+		self.t_min = min(self.t_min, t)
+		self.t_max = max(self.t_max, t)
+		self.n += 1
+
+def results(data):
+	stats = Statistics()
+	cur_num_threads, t = next(data)
+	stats.reset(t)
+
+	for num_threads, t in data:
+		if num_threads != cur_num_threads:
+			yield cur_num_threads, *stats.get()
+			cur_num_threads = num_threads
+			stats.reset(t)
+
+		stats.add(t)
+
+	yield cur_num_threads, *stats.get()
+
 def export(file, results_dir, include):
 	datasets = [d for d in collect_datasets(results_dir, include)]
 
@@ -220,7 +250,7 @@ def export(file, results_dir, include):
 };
 
 class Result {
-	constructor(num_threads, t) {
+	constructor(num_threads, t_avg, t_min, t_max) {
 		this.num_threads = num_threads;
 		this.t = t;
 	}
@@ -238,8 +268,8 @@ const data = [""")
 	for d in datasets:
 		file.write(f"""
 	new LineData(new LineParams("{d.device}-{d.platform}","{d.queue_type}",{d.queue_size},{d.block_size},{d.p_enq},{d.p_deq},{d.workload_size}),[""")
-		for n, t in d.read():
-			file.write(f"new Result({n},{t}),")
+		for n, t_avg, t_min, t_max, _ in results(d.read()):
+			file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
 		file.write("]),")
 
 	file.write("\n];\n")
@@ -299,6 +329,7 @@ if __name__ == "__main__":
 
 	try:
 		main(args.parse_args())
-	except Exception as e:
-		print(e)
-		sys.exit(-1)
+	except Exception:
+		import traceback
+		traceback.print_exc()
+		exit(-1)
