@@ -15,28 +15,28 @@ extern "C"
 {
 	int run(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
 
-	void* benchmark_create()
+	void* instrumentation_create()
 	{
 		return new Instrumentation;
 	}
 
-	void benchmark_print_device_info(void* ctx)
+	void instrumentation_print_device_info(void* ctx)
 	{
 		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';');
 	}
 
-	void benchmark_begin(void* ctx)
+	void instrumentation_begin(void* ctx)
 	{
 		static_cast<Instrumentation*>(ctx)->begin();
 	}
 
-	void benchmark_end(void* ctx)
+	void instrumentation_end(void* ctx)
 	{
 		float dt = static_cast<Instrumentation*>(ctx)->end();
-		std::cout /*<< std::fixed << std::setprecision(2)*/ << dt << '\n' << std::flush;
+		std::cout /*<< std::fixed << std::setprecision(2)*/ << dt; // << '\n' << std::flush;
 	}
 
-	void benchmark_destroy(void* ctx)
+	void instrumentation_destroy(void* ctx)
 	{
 		delete static_cast<Instrumentation*>(ctx);
 	}

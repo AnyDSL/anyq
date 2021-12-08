@@ -1,27 +1,27 @@
 
 
-struct Benchmark {
+struct Instrumentation {
 	print_device_info: fn() -> (),
-	run: fn(fn() -> ()) -> fn() -> (),
+	time: fn(fn() -> ()) -> fn() -> (),
 	destroy: fn() -> ()
 }
 
-#[import(cc = "C")] fn benchmark_create() -> &mut u8;
-#[import(cc = "C")] fn benchmark_print_device_info(&mut u8) -> ();
-#[import(cc = "C")] fn benchmark_begin(&mut u8) -> ();
-#[import(cc = "C")] fn benchmark_end(&mut u8) -> ();
-#[import(cc = "C")] fn benchmark_destroy(&mut u8) -> ();
+#[import(cc = "C")] fn instrumentation_create() -> &mut u8;
+#[import(cc = "C")] fn instrumentation_print_device_info(&mut u8) -> ();
+#[import(cc = "C")] fn instrumentation_begin(&mut u8) -> ();
+#[import(cc = "C")] fn instrumentation_end(&mut u8) -> ();
+#[import(cc = "C")] fn instrumentation_destroy(&mut u8) -> ();
 
-fn create_benchmark() {
-	let ctx = benchmark_create();
+fn create_instrumentation() {
+	let ctx = instrumentation_create();
 
-	Benchmark {
-		print_device_info = @|| benchmark_print_device_info(ctx),
-		run = @|body: fn() -> ()|@|| {
-			benchmark_begin(ctx);
+	Instrumentation {
+		print_device_info = @|| instrumentation_print_device_info(ctx),
+		time = @|body: fn() -> ()|@|| {
+			instrumentation_begin(ctx);
 			@body();
-			benchmark_end(ctx);
+			instrumentation_end(ctx);
 		},
-		destroy = @|| benchmark_destroy(ctx)
+		destroy = @|| instrumentation_destroy(ctx)
 	}
 }
