@@ -71,12 +71,16 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 	list(APPEND AnyQ_PLATFORMS amdgpu)
 endif()
 
-if (Thorin_HAS_RV_SUPPORT AND AnyQ_FIBER_SUPPORT)
-	list(APPEND AnyQ_PLATFORMS cpu)
+if (Thorin_HAS_RV_SUPPORT)
+	list(APPEND AnyQ_PLATFORMS fiberless)
+	if (AnyQ_FIBER_SUPPORT)
+		list(APPEND AnyQ_PLATFORMS cpu)
+	endif()
 endif()
 
 
 set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
+set(queue_types_fiberless ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
 set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
 set(queue_types_nvvm ${queue_types_cuda})
 set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)

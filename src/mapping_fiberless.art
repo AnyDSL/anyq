@@ -1,0 +1,299 @@
+static cpu_threads = 0;
+static warp_size:u32 = 8;
+
+fn @createAccDevice(device: i32) = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| {
+		fiberless_launch_1d(num_groups, group_size, body)
+	},
+	synchronize = @|| { },
+	alloc = @|size| alloc_cpu(size),
+	platform_device = runtime_device(0, device),
+
+	print_i32 = @|_msg: &[u8], _i: i32| {
+		//anyq_print_3xi32(msg, i, 0, 0);
+	},
+
+	print_2xi32 = @|_format: &[u8], _a1: i32, _a2: i32| {
+		//anyq_print_3xi32(format, a1, a2, 0);
+	},
+
+	print_3xi32 = @|_format: &[u8], _a1: i32, _a2: i32, _a3: i32| {
+		//anyq_print_3xi32(format, a1, a2, a3);
+	}
+};
+
+fn @createDefaultAccDevice() = createAccDevice(0);
+
+
+#[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;
+#[import(cc = "C", name = "rv_extract")] fn rv_extract_u32(u32, i32) -> u32;
+#[import(cc = "C", name = "rv_insert")] fn rv_insert_i32(i32, i32, i32) -> i32;
+#[import(cc = "C", name = "rv_insert")] fn rv_insert_u32(u32, i32, u32) -> u32;
+#[import(cc = "C", name = "rv_ballot")] fn rv_ballot_u32(bool) -> u32;
+
+#[import(cc = "device", name = "llvm.ctpop.i32")] fn cpu_popcount_u32(u32) -> i32;
+
+
+fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
+	@|value: i32, src_lane: i32| -> i32 {
+		let mut result:i32 = self as i32; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
+	@|value: u32, src_lane: i32| -> u32 {
+		let mut result:u32 = self; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_u32(value, lane_src_lane);
+			result = rv_insert_u32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
+	@|body:fn(u32, u32)->()| {
+		let mask = rv_ballot(true) as u32;
+		let lsb = mask & -mask;
+		if 1 << self == lsb {
+			body(self, mask)
+		}
+	}
+}
+
+fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
+	= atomic_load[T](bitcast[&T](location), builtin_memory_order(order), "");
+
+fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
+	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(order), "");
+
+fn @cpu_atomic_rmw[T](op: u32) {
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(order), "")
+	}
+}
+
+fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+	match cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "") {
+		(old, _success) => old
+	}
+}
+
+fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
+	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let do_once = do_once_op(self, vec_width);
+	let atomic_add = cpu_atomic_rmw[u32](1);
+	let atomic_sub = cpu_atomic_rmw[u32](2);
+
+	@body(gpu_thread_context {
+		idx = tid,
+
+		gid = @|| gid_offset + self,
+
+		atomic_load_global_i32 = cpu_atomic_load[i32],
+		atomic_load_global_u32 = cpu_atomic_load[u32],
+		atomic_load_global_u64 = cpu_atomic_load[u64],
+
+		atomic_store_global_i32 = cpu_atomic_store[i32],
+		atomic_store_global_u32 = cpu_atomic_store[u32],
+		atomic_store_global_u64 = cpu_atomic_store[u64],
+
+		atomic_add_global_i32 = cpu_atomic_rmw[i32](1),
+		atomic_add_global_u32 = cpu_atomic_rmw[u32](1),
+		atomic_add_global_u64 = cpu_atomic_rmw[u64](1),
+
+		atomic_sub_global_i32 = cpu_atomic_rmw[i32](2),
+		atomic_sub_global_u32 = cpu_atomic_rmw[u32](2),
+		atomic_sub_global_u64 = cpu_atomic_rmw[u64](2),
+
+		atomic_and_global_i32 = cpu_atomic_rmw[i32](3),
+		atomic_and_global_u32 = cpu_atomic_rmw[u32](3),
+		atomic_and_global_u64 = cpu_atomic_rmw[u64](3),
+
+		atomic_or_global_i32 = cpu_atomic_rmw[i32](5),
+		atomic_or_global_u32 = cpu_atomic_rmw[u32](5),
+		atomic_or_global_u64 = cpu_atomic_rmw[u64](5),
+
+		atomic_xor_global_i32 = cpu_atomic_rmw[i32](6),
+		atomic_xor_global_u32 = cpu_atomic_rmw[u32](6),
+		atomic_xor_global_u64 = cpu_atomic_rmw[u64](6),
+
+		atomic_exch_global_i32 = cpu_atomic_rmw[i32](0),
+		atomic_exch_global_u32 = cpu_atomic_rmw[u32](0),
+		atomic_exch_global_u64 = cpu_atomic_rmw[u64](0),
+
+		atomic_min_global_i32 = cpu_atomic_rmw[i32]( 8),
+		atomic_min_global_u32 = cpu_atomic_rmw[u32](10),
+		atomic_min_global_u64 = cpu_atomic_rmw[u64](10),
+
+		atomic_max_global_i32 = cpu_atomic_rmw[i32](7),
+		atomic_max_global_u32 = cpu_atomic_rmw[u32](9),
+		atomic_max_global_u64 = cpu_atomic_rmw[u64](9),
+
+		atomic_cas_global_i32 = cpu_atomic_cas[i32],
+		atomic_cas_global_u32 = cpu_atomic_cas[u32],
+		atomic_cas_global_u64 = cpu_atomic_cas[u64],
+
+		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			let wrap_around = (val + 1);
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+			if old >= wrap_around { atomic_sub(addr, wrap_around, memory_order::relaxed); }
+			(old % wrap_around)
+		},
+		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			let wrap_around = (val + 1);
+			let old = bitcast[i32](atomic_sub(addr, 1, memory_order::relaxed));
+			if old <= 0 { atomic_add(addr, wrap_around, memory_order::relaxed); }
+			let result = (old % wrap_around as i32);
+			assert(result >= 0, "casting between i32/u32 shall not effect the result being >= 0");
+			result as u32
+		},
+
+		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
+
+		yield = @|_msg| { do_once(@|_, _| { yield(); }); }
+	});
+}
+
+fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_wave_context) -> ()) -> () {
+
+	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
+
+	fn @lanemask_eq() -> u64 {
+		1 << self as u64
+	}
+
+	fn @lanemask_lt() -> u64 {
+		let ballot = rv_ballot_u32(true) as u64;
+		let mask = (1 << self as u64) - 1;
+		mask & ballot
+	}
+
+	fn @lanemask_gt() -> u64 {
+		if (vec_width == 64 && self == 63) || (vec_width == 32 && self == 31) {
+			0
+		} else {
+			let ballot = rv_ballot_u32(true) as u64;
+			let mask = (!0:u64) << (self as u64 + 1);
+			mask & ballot
+		}
+	}
+
+	@body(gpu_wave_context{
+		idx = @|| idx.warp_id,
+
+		membermask = @|| membermask,
+
+		// TODO: return simd_lane
+		threads = @|body| @|| fiberless_thread(@|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
+
+		num_threads = num_threads,
+
+		barrier = @|| { },
+		barrier_all = @|predicate:bool| -> bool { rv_all(predicate) },
+		barrier_any = @|predicate:bool| -> bool { rv_any(predicate) },
+		barrier_count = @|predicate:bool| -> i32 { cpu_popcount_u32(rv_ballot_u32(predicate)) },
+		barrier_vote = @|predicate:bool| -> u64 { rv_ballot_u32(predicate) as u64 },
+
+		/* TODO: assert width <= num_threads == warp_size */
+		/* TODO: assert width 2^n */
+		shfl_i32 = @|x:i32, src_lane:i32, _width:u32| warp_shuffle_i32(x, src_lane),
+		shfl_u32 = @|x:u32, src_lane:i32, _width:u32| warp_shuffle_u32(x, src_lane),
+		//shfl_f32 = @|x:f32, src_lane:i32, width:u32| undef[f32](),
+
+		//shfl_up_i32 = @|x:i32, delta:u32, width:u32| rv_shuffle_i32(x, -(delta as i32)),
+		//shfl_up_u32 = @|x:u32, delta:u32, width:u32| rv_shuffle_u32(x, -(delta as i32)),
+		shfl_up_i32 = @|x:i32, delta:u32, width:u32| warp_shuffle_i32(x, if (self & (width - 1)) < delta { self } else { self - delta } as i32),
+		shfl_up_u32 = @|x:u32, delta:u32, width:u32| warp_shuffle_u32(x, if (self & (width - 1)) < delta { self } else { self - delta } as i32),
+		//shfl_up_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
+
+		shfl_down_i32 = @|x:i32, delta:u32, width:u32| warp_shuffle_i32(x, if (self & (width - 1)) + delta >= width { self } else { self + delta } as i32),
+		shfl_down_u32 = @|x:u32, delta:u32, width:u32| warp_shuffle_u32(x, if (self & (width - 1)) + delta >= width { self } else { self + delta } as i32),
+		//shfl_down_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
+
+		shfl_bfly_i32 = @|x:i32, lane_mask:i32, width:u32| warp_shuffle_i32(x, (((self ^ lane_mask as u32) & (width - 1)) | (self & !(width - 1))) as i32),
+		shfl_bfly_u32 = @|x:u32, lane_mask:i32, width:u32| warp_shuffle_u32(x, (((self ^ lane_mask as u32) & (width - 1)) | (self & !(width - 1))) as i32),
+		//shfl_bfly_f32 = @|x:f32, lane_mask:i32, width:u32| undef[f32](),
+
+		lanemask =    @|| lanemask_eq(),
+		lanemask_le = @|| lanemask_lt() | lanemask_eq(),
+		lanemask_lt = @|| lanemask_lt(),
+		lanemask_ge = @|| lanemask_gt() | lanemask_eq(),
+		lanemask_gt = @|| lanemask_gt()
+	});
+}
+
+fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_group_context) -> ()) -> () {
+
+	@body(gpu_group_context {
+		// TODO: dispatch ndim-block_id
+		idx = @|_i:i32| logical_block_id,
+		waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
+		threads = @|body| @|| fiberless_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
+		num_waves = num_warps,
+		// TODO: dispatch ndim-thread_id
+		num_threads = @|_i:i32| num_threads(),
+		barrier = @|| -> () { assert(false, "no block barriers supported"); },
+		barrier_all = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
+		barrier_any = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
+		barrier_count = @|_predicate:bool| -> i32 { assert(false, "no block barriers supported"); 0 },
+	});
+}
+
+struct Index {
+	block_id: u32,
+	warp_id:  u32,
+	local_id: u32
+}
+
+fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> ()) -> () {
+
+	let num_threads_per_block = block_dim as u32;
+	let num_warps_per_block = (num_threads_per_block + warp_size - 1) / warp_size;
+	let num_blocks = grid_dim as u32;
+	let num_warps = num_blocks * num_warps_per_block;
+	let num_threads = num_blocks * num_threads_per_block;
+
+	fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
+	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| range(body)(0, l as i32);
+
+	for warp_id in parallel(cpu_threads, 0, num_warps as i32) {
+
+		let logical_block_id = warp_id as u32 / num_warps_per_block;
+		let logical_warp_id = warp_id as u32 % num_warps_per_block;
+
+		for local_id in warp_loop(warp_size) {
+			let idx = Index {
+				block_id = logical_block_id,
+				warp_id = logical_warp_id,
+				local_id = local_id as u32,
+			};
+
+			let context = gpu_grid_context {
+				device = 0,
+				groups = @|body| @|| fiberless_block(logical_block_id, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, body),
+				waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id, warp_id = warp_id as u32, local_id = idx.local_id }, body),
+				threads = @|body| @|| fiberless_thread(@|_i:i32| warp_id as u32 * warp_size + idx.local_id, @|| warp_size, warp_id as u32 * warp_size, idx, body),
+				num_groups = @|_i:i32| num_blocks,
+				num_waves = @|| num_warps,
+				num_threads = @|_i:i32| num_threads
+			};
+			@body(context)
+		}
+
+	}
+
+}

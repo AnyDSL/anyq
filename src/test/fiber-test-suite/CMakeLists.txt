@@ -34,7 +34,12 @@ set(TEST_SUITE_FILES
 
 foreach(_test_case ${TEST_SUITE_FILES})
 	get_filename_component(_testname ${_test_case} NAME_WE)
+
 	add_test_executable(${_testname}-cpu cpu ${_test_case} ${CMAKE_CURRENT_SOURCE_DIR}/fiber-test-suite.art)
 	set_target_properties(${_testname}-cpu PROPERTIES FOLDER "tests/fibers")
 	add_test(NAME "${_testname}-cpu" COMMAND ${_testname}-cpu WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+	add_test_executable(${_testname}-fiberless fiberless ${_test_case} ${CMAKE_CURRENT_SOURCE_DIR}/fiber-test-suite.art)
+	set_target_properties(${_testname}-fiberless PROPERTIES FOLDER "tests/fiberless")
+	add_test(NAME "${_testname}-fiberless" COMMAND ${_testname}-fiberless WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endforeach()
