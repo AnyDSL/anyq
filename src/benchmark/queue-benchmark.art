@@ -60,6 +60,7 @@ fn @run_queue_benchmark(num_threads_min: i32, num_threads_max: i32, benchmark: Q
 			print_i32(stats.num_enqueue_attempts); print_char(';');
 			print_i32(stats.num_dequeues); print_char(';');
 			print_i32(stats.num_dequeue_attempts); print_char('\n');
+			print_flush();
 		}
 	}
 
