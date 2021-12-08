@@ -1,6 +1,6 @@
 
 
-if (cpu IN_LIST AnyQ_PLATFORMS)
+if (cpu IN_LIST AnyQ_PLATFORMS OR fiberless IN_LIST AnyQ_PLATFORMS)
 	add_library(instrumentation_cpu STATIC)
 	if (WIN32)
 		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_win32.cpp)
@@ -10,9 +10,7 @@ if (cpu IN_LIST AnyQ_PLATFORMS)
 		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_linux.cpp)
 	endif()
 	target_include_directories(instrumentation_cpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cpu)
-endif()
 
-if (fiberless IN_LIST AnyQ_PLATFORMS)
 	add_library(instrumentation_fiberless INTERFACE)
 	target_link_libraries(instrumentation_fiberless INTERFACE instrumentation_cpu)
 endif()
