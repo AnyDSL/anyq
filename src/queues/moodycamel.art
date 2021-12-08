@@ -67,10 +67,12 @@ fn @createMoodyCamelQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsu
 
 		reset = @|_grid| {
 			let mut success:i32;
+			// HACK: we leak memory here, but this causes segfault on msvc
 			//success = moodycamel_cq_destroy(queue);
 			//assert(success > 0, "moodycamel_cq_destroy() failed");
 			success = moodycamel_cq_create(&mut queue);
 			assert(success > 0, "moodycamel_cq_create() failed");
+			alloc_next = 0;
 		},
 
 		validate = @|_corrupted: &mut addrspace(1) u32, grid| {
