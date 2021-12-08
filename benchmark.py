@@ -4,7 +4,7 @@ from os import stat
 import sys
 import io
 import codecs
-import subprocess
+import asyncio
 import re
 from pathlib import Path
 import argparse
@@ -16,26 +16,26 @@ default_bin_dir = Path(__file__).parent / "build" / "bin"
 def device_id(name):
 	return name.translate(str.maketrans(" \t\n\v@-/\\?", "_________"))
 
-def capture_benchmark_output(dest, p):
+async def capture_benchmark_output(dest, p):
 	def write(l):
 		# sys.stdout.write(codecs.decode(l))
 		sys.stdout.write('.')
 		sys.stdout.flush()
 		dest.write(l)
 
-	for l in p.stdout:
+	async for l in p.stdout:
 		write(l)
 		if l.isspace():
 			break
 
 	device_name = ""
-	for l in p.stdout:
+	async for l in p.stdout:
 		write(l)
 		if l.isspace():
 			break
 		device_name = codecs.decode(l).strip()
 
-	for l in p.stdout:
+	async for l in p.stdout:
 		write(l)
 
 	sys.stdout.write('\n')
@@ -44,24 +44,31 @@ def capture_benchmark_output(dest, p):
 class BenchmarkError(Exception):
 	pass
 
-def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8):
-	p = subprocess.Popen([
-		binary.as_posix(),
-		str(device),
-		str(num_threads_min),
-		str(num_threads_max),
-		str(block_size),
-		str(p_enq),
-		str(p_deq),
-		str(workload_size)
-		], stdout=subprocess.PIPE)
+def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_max = 1 << 18, block_size = 256, p_enq = 0.5, p_deq = 0.5, workload_size = 8, timeout = None):
+	async def run():
+		p = await asyncio.create_subprocess_exec(
+			binary.as_posix(), 
+			str(device),
+			str(num_threads_min),
+			str(num_threads_max),
+			str(block_size),
+			str(p_enq),
+			str(p_deq),
+			str(workload_size),
+			stdout=asyncio.subprocess.PIPE)
 
-	platform, device_name = capture_benchmark_output(dest, p)
+		try:
+			platform, device_name = await asyncio.wait_for(capture_benchmark_output(dest, p), timeout)
+		except asyncio.TimeoutError:
+			p.kill()
+			raise
 
-	if p.wait() != 0:
-		raise BenchmarkError("benchmark failed to run")
+		if p.returncode != 0:
+			raise BenchmarkError("benchmark failed to run")
 
-	return platform, device_name
+		return platform, device_name
+
+	return asyncio.run(run())
 
 
 def benchmark_binaries(bin_dir, include):
@@ -70,7 +77,7 @@ def benchmark_binaries(bin_dir, include):
 			test_name, _, platform = f.stem.rpartition('-')
 			yield f, test_name, platform
 
-def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
+def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -99,7 +106,7 @@ def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
 								if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
 									with io.BytesIO() as buffer:
 										print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
-										platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
+										platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size, timeout=timeout)
 
 										if platform_reported != platform:
 											raise Exception("benchmark platform doesn't match binary name")
@@ -114,8 +121,10 @@ def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
 												file.write(buffer.getbuffer())
 								else:
 									print("skipping", results_file_path(device_name))
+							except asyncio.TimeoutError:
+								print("TIMEOUT")
 							except BenchmarkError:
-								print("FAILED", results_file_path(device_name))
+								print("BENCHMARK FAILED")
 
 
 class Dataset:
@@ -306,7 +315,7 @@ def main(args):
 			"amdgpu": device_list(args.amdgpu_device)
 		}
 
-		run(results_dir, bin_dir, include, devices, args.rerun, args.dryrun)
+		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout)
 
 	elif args.command == plot:
 		plot(results_dir, include)
@@ -330,6 +339,7 @@ if __name__ == "__main__":
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
 	run_cmd.add_argument("-dryrun", "--dryrun", dest="dryrun", action="store_true")
+	run_cmd.add_argument("--timeout", type=int, default=20)
 
 	plot_cmd = add_command("plot", plot)
 
