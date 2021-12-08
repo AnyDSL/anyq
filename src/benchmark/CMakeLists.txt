@@ -48,11 +48,6 @@ function(add_benchmark _target _testfile _mapping)
 	add_dependencies(benchmark-${_mapping} ${_target})
 endfunction()
 
-set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
-set(queue_types_nvvm ${queue_types_cuda})
-set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
-
 set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerIndexQueue")
 
 function(generate_benchmarks template_file platform)
