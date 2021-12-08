@@ -21,22 +21,20 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 	// TODO: release resources
 
 
-	for grid in device.launch_1d(div_up(queue_size, block_size), block_size) {
-		queue.reset(grid);
-	}
-
 	let rand_mask = @|p: f32| (((-1 as u32) as f64 * p as f64) as u32);
 	let c_enq = magic_p_id(rand_mask(p_enq));
 	let c_deq = magic_p_id(rand_mask(p_deq));
 
 	QueueBenchmark {
-		reset_stats = @|| {
+		reset = @|| {
 			for grid in device.launch_1d(1, 1) {
 				for thread in grid.threads() {
 					if thread.idx(0) == 0 {
 						*stats_buffer = init_benchmark_stats();
 					}
 				}
+
+				queue.reset(grid);
 			}
 		},
 
