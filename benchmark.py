@@ -210,6 +210,11 @@ class Statistics:
 		self.t_max = max(self.t_max, t)
 		self.n += 1
 
+def skip(data, n):
+	for _ in range(n):
+		next(data)
+	yield from data
+
 def results(data):
 	stats = Statistics()
 	cur_num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = next(data)
@@ -271,7 +276,7 @@ const data = [""")
 	for d in datasets:
 		file.write(f"""
 	new LineData(new LineParams("{d.device}-{d.platform}","{d.queue_type}",{d.queue_size},{d.block_size},{d.p_enq},{d.p_deq},{d.workload_size}),[""")
-		for n, t_avg, t_min, t_max, _ in results(d.read()):
+		for n, t_avg, t_min, t_max, _ in results(skip(d.read(), 3)):
 			file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
 		file.write("]),")
 
