@@ -17,7 +17,9 @@ def device_id(name):
 
 def capture_benchmark_output(dest, p):
 	def write(l):
-		sys.stdout.write(codecs.decode(l))
+		# sys.stdout.write(codecs.decode(l))
+		sys.stdout.write('.')
+		sys.stdout.flush()
 		dest.write(l)
 
 	for l in p.stdout:
@@ -35,6 +37,7 @@ def capture_benchmark_output(dest, p):
 	for l in p.stdout:
 		write(l)
 
+	sys.stdout.write('\n')
 	return device_name.split(';')
 
 class BenchmarkError(Exception):
