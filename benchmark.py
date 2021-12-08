@@ -85,37 +85,37 @@ def run(results_dir, bin_dir, include, devices, rerun = False, dryrun = False):
 		for device in devices.get(platform):
 			for p_enq in (0.25, 0.5, 1.0):
 				for p_deq in (0.25, 0.5, 1.0):
-					for workload_size in (1, 8, 32):
-						num_threads_min = 1
-						num_threads_max = 1 << 18
-						block_size = 256
+					for workload_size in (1, 8, 128, 2048):
+						for block_size in [32, 256, 1024]:
+							num_threads_min = 1
+							num_threads_max = 1 << 21
 
-						def results_file_path(device_name):
-							return results_dir/f"{test_name}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{platform}-{device_id(device_name)}.csv"
+							def results_file_path(device_name):
+								return results_dir/f"{test_name}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{platform}-{device_id(device_name)}.csv"
 
-						device_name = device_name_map.get((platform, device))
+							device_name = device_name_map.get((platform, device))
 
-						try:
-							if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
-								with io.BytesIO() as buffer:
-									print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
-									platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
+							try:
+								if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
+									with io.BytesIO() as buffer:
+										print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
+										platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
 
-									if platform_reported != platform:
-										raise Exception("benchmark platform doesn't match binary name")
+										if platform_reported != platform:
+											raise Exception("benchmark platform doesn't match binary name")
 
-									if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
-										raise Exception("device name doesn't match previously reported device name")
+										if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
+											raise Exception("device name doesn't match previously reported device name")
 
-									results_file = results_file_path(device_name_reported)
+										results_file = results_file_path(device_name_reported)
 
-									if (rerun or result_outdated(results_file, binary)) and not dryrun:
-										with open(results_file, "wb") as file:
-											file.write(buffer.getbuffer())
-							else:
-								print("skipping", results_file_path(device_name))
-						except BenchmarkError:
-							print("FAILED", results_file_path(device_name))
+										if (rerun or result_outdated(results_file, binary)) and not dryrun:
+											with open(results_file, "wb") as file:
+												file.write(buffer.getbuffer())
+								else:
+									print("skipping", results_file_path(device_name))
+							except BenchmarkError:
+								print("FAILED", results_file_path(device_name))
 
 
 class Dataset:
@@ -138,8 +138,8 @@ class Dataset:
 		with open(self.filename, "rt") as file:
 			file.seek(self.data_offset)
 			for l in file:
-				num_threads, t = l.split(';')
-				yield int(num_threads), float(t)
+				num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = l.split(';')
+				yield int(num_threads), float(t), int(num_enqueues), int(num_enqueue_attempts), int(num_dequeues), int(num_dequeue_attempts)
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
@@ -211,10 +211,10 @@ class Statistics:
 
 def results(data):
 	stats = Statistics()
-	cur_num_threads, t = next(data)
+	cur_num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = next(data)
 	stats.reset(t)
 
-	for num_threads, t in data:
+	for num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts in data:
 		if num_threads != cur_num_threads:
 			yield cur_num_threads, *stats.get()
 			cur_num_threads = num_threads
