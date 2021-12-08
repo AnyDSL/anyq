@@ -44,51 +44,53 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 					for thread in wave.threads() {
 						let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
 
-						let mut stats = init_benchmark_stats();
+						if thread_id < num_threads as u32 {
+							let mut stats = init_benchmark_stats();
 
-						let mut rand_state = rng::xorseed32(thread_id);
+							let mut rand_state = rng::xorseed32(thread_id);
 
-						let sample = @|c: u32| -> bool {
-							rng::xorshift32(rand_state) < c
-						};
+							let sample = @|c: u32| -> bool {
+								rng::xorshift32(rand_state) < c
+							};
 
-						let simulate_workload = @|| {
-							for _ in range(0, workload_size) {
-								rand_state = rng::xorshift32(rand_state);
-							}
-						};
+							let simulate_workload = @|| {
+								for _ in range(0, workload_size) {
+									rand_state = rng::xorshift32(rand_state);
+								}
+							};
 
-						for _ in range(0, attempts_per_thread) {
-							if sample(c_enq) {
-								if for _ in queue.push(thread) {
-									simulate_workload();
-									rand_state
-								} > 0 {
-									++stats.num_enqueues;
+							for _ in range(0, attempts_per_thread) {
+								if sample(c_enq) {
+									if for _ in queue.push(thread) {
+										simulate_workload();
+										rand_state
+									} > 0 {
+										++stats.num_enqueues;
+									}
+
+									++stats.num_enqueue_attempts;
 								}
 
-								++stats.num_enqueue_attempts;
-							}
+								wave.barrier();
 
-							wave.barrier();
+								if sample(c_deq) {
+									if for _, _ in queue.pop(thread) {
+										simulate_workload();
+									} > 0 {
+										++stats.num_dequeues;
+									}
 
-							if sample(c_deq) {
-								if for _, _ in queue.pop(thread) {
-									simulate_workload();
-								} > 0 {
-									++stats.num_dequeues;
+									++stats.num_dequeue_attempts;
 								}
 
-								++stats.num_dequeue_attempts;
+								wave.barrier();
 							}
 
-							wave.barrier();
+							thread.atomic_add_global_i32(stats_buffer.num_enqueues, stats.num_enqueues, memory_order::relaxed);
+							thread.atomic_add_global_i32(stats_buffer.num_enqueue_attempts, stats.num_enqueue_attempts, memory_order::relaxed);
+							thread.atomic_add_global_i32(stats_buffer.num_dequeues, stats.num_dequeues, memory_order::relaxed);
+							thread.atomic_add_global_i32(stats_buffer.num_dequeue_attempts, stats.num_dequeue_attempts, memory_order::relaxed);
 						}
-
-						thread.atomic_add_global_i32(stats_buffer.num_enqueues, stats.num_enqueues, memory_order::relaxed);
-						thread.atomic_add_global_i32(stats_buffer.num_enqueue_attempts, stats.num_enqueue_attempts, memory_order::relaxed);
-						thread.atomic_add_global_i32(stats_buffer.num_dequeues, stats.num_dequeues, memory_order::relaxed);
-						thread.atomic_add_global_i32(stats_buffer.num_dequeue_attempts, stats.num_dequeue_attempts, memory_order::relaxed);
 					}
 				}
 			}
