@@ -160,7 +160,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 
 		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
 
-		yield = @|_msg| { do_once(@|_, _| { yield(); }); }
+		yield = @|_msg| { do_once(@|_, _| { /* yield(); */ }); }
 	});
 }
 
