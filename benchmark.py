@@ -93,7 +93,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 		for device in devices.get(platform):
 			for p_enq in (0.25, 0.5, 1.0):
 				for p_deq in (0.25, 0.5, 1.0):
-					for workload_size in (1, 8, 128, 2048):
+					for workload_size in (1, 8, 32, 128, 2048):
 						for block_size in [32, 256, 1024]:
 							num_threads_min = 1
 							num_threads_max = 1 << 21
