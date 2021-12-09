@@ -8,6 +8,7 @@ import asyncio
 import re
 from pathlib import Path
 import argparse
+from typing import final
 
 
 default_bin_dir = Path(__file__).parent / "build" / "bin"
@@ -62,6 +63,8 @@ def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_
 		except asyncio.TimeoutError:
 			p.kill()
 			raise
+		finally:
+			await p.wait()
 
 		if p.returncode != 0:
 			raise BenchmarkError("benchmark failed to run")
