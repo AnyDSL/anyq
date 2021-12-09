@@ -5,5 +5,5 @@
 
 std::ostream& Instrumentation::print_device_info(std::ostream& out)
 {
-	return out << "AMDGPU";  // TODO
+	return out << "AMD Radeon RX 6800";  // TODO
 }
