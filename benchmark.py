@@ -75,8 +75,11 @@ def run_benchmark(dest, binary, *, device = 0, num_threads_min = 1, num_threads_
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
 		if f.name.startswith("benchmark-") and include.match(f.name):
-			test_name, _, platform = f.stem.rpartition('-')
+			test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
 			yield f, test_name, platform
+
+def results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform):
+	return f"{test_name}--{queue_type}-{queue_size}-{block_size}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{device_id(device_name)}-{platform}.csv"
 
 def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None):
 	results_dir.mkdir(exist_ok=True, parents=True)
@@ -98,10 +101,9 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 							num_threads_min = 1
 							num_threads_max = 1 << 21
 
-							def results_file_path(device_name):
-								return results_dir/f"{test_name}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{platform}-{device_id(device_name)}.csv"
-
 							device_name = device_name_map.get((platform, device))
+
+							results_file_path = lambda device_name: results_dir/results_file_name(test_name, block_size, p_enq, p_deq, workload_size, device_name, platform)
 
 							try:
 								if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
@@ -129,7 +131,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 
 class Dataset:
-	def __init__(self, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, platform, device, filename, data_offset):
+	def __init__(self, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, platform, device, path, data_offset):
 		self.queue_type = queue_type
 		self.queue_size = queue_size
 		self.block_size = block_size
@@ -138,14 +140,14 @@ class Dataset:
 		self.workload_size = workload_size
 		self.platform = platform
 		self.device = device
-		self.filename = filename
+		self.path = path
 		self.data_offset = data_offset
 
 	def __repr__(self):
 		return f"Dataset(queue_type={self.queue_type}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}')"
 
 	def read(self):
-		with open(self.filename, "rt") as file:
+		with open(self.path, "rt") as file:
 			file.seek(self.data_offset)
 			for l in file:
 				cols = l.split(';')
@@ -293,6 +295,17 @@ const data = [""")
 	file.write("\n];\n")
 
 
+def fixup(results_dir, include):
+	for d in collect_datasets(results_dir, include):
+		test_name = d.path.name.split('--')[0]
+		filename = results_file_name(test_name, d.queue_type, d.queue_size, d.block_size, d.p_enq, d.p_deq, d.workload_size, d.device, d.platform)
+		dest = d.path.with_name(filename)
+
+		if d.path != dest:
+			print(d.path.stem, "->", filename)
+			d.path.rename(dest)
+
+
 
 def main(args):
 	this_dir = Path(__file__).parent.absolute()
@@ -322,19 +335,21 @@ def main(args):
 		plot(results_dir, include)
 	elif args.command == export:
 		export(sys.stdout, results_dir, include)
+	elif args.command == fixup:
+		fixup(results_dir, include)
 
 
 if __name__ == "__main__":
 	args = argparse.ArgumentParser()
 	sub_args = args.add_subparsers(dest='command', required=True)
 
-	def add_command(name, function):
-		args = sub_args.add_parser(name)
+	def add_command(name, function, **kwargs):
+		args = sub_args.add_parser(name, **kwargs)
 		args.add_argument("include", nargs="?", type=str, default=".*")
 		args.set_defaults(command=function)
 		return args
 
-	run_cmd = add_command("run", run)
+	run_cmd = add_command("run", run, help="run benchmarks")
 	run_cmd.add_argument("--bin-dir", type=Path, default=default_bin_dir)
 	run_cmd.add_argument("-dev-cuda", "--cuda-device", type=int, action="append")
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
@@ -342,9 +357,11 @@ if __name__ == "__main__":
 	run_cmd.add_argument("-dryrun", "--dryrun", dest="dryrun", action="store_true")
 	run_cmd.add_argument("--timeout", type=int, default=20)
 
-	plot_cmd = add_command("plot", plot)
+	plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
 
-	plot_cmd = add_command("export", export)
+	export_cmd = add_command("export", export, help="export benchmark data as JavaScript")
+
+	fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
 
 	try:
 		main(args.parse_args())
