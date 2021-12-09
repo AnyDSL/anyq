@@ -1,6 +1,5 @@
 #!/usr/bin/env python3.9
 
-from os import stat
 import sys
 import io
 import codecs
