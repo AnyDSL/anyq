@@ -8,7 +8,6 @@ import asyncio
 import re
 from pathlib import Path
 import argparse
-from typing import final
 
 
 default_bin_dir = Path(__file__).parent / "build" / "bin"
