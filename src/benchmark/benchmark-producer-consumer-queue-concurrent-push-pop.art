@@ -100,6 +100,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 			let mut stats: QueueBenchmarkStatistics;
 			let stats_ref = &mut stats;
 
+			device.synchronize();
 			runtime_copy(device.platform_device, stats_buffer_alloc.data, 0, 0, stats_ref as &mut[i8], 0, sizeof[QueueBenchmarkStatistics]());
 
 			stats
