@@ -76,7 +76,7 @@ def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
 		if f.name.startswith("benchmark-") and include.match(f.name):
 			test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
-			yield f, test_name, platform
+			yield f, test_name, queue_type, queue_size, platform
 
 def results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform):
 	return f"{test_name}--{queue_type}-{queue_size}-{block_size}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{device_id(device_name)}-{platform}.csv"
@@ -92,7 +92,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 	device_name_map = dict()
 
-	for binary, test_name, platform in benchmark_binaries(bin_dir, include):
+	for binary, test_name, queue_type, queue_size, platform in benchmark_binaries(bin_dir, include):
 		for device in devices.get(platform):
 			for p_enq in (0.25, 0.5, 1.0):
 				for p_deq in (0.25, 0.5, 1.0):
@@ -103,7 +103,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 							device_name = device_name_map.get((platform, device))
 
-							results_file_path = lambda device_name: results_dir/results_file_name(test_name, block_size, p_enq, p_deq, workload_size, device_name, platform)
+							results_file_path = lambda device_name: results_dir/results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform)
 
 							try:
 								if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
