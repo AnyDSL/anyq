@@ -228,19 +228,32 @@ def skip(data, n):
 	yield from data
 
 def results(data):
-	stats = Statistics()
-	cur_num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = next(data)
-	stats.reset(t)
+	burn_in = 3
 
-	for num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts in data:
-		if num_threads != cur_num_threads:
+	try:
+		stats = Statistics()
+		cur_num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = next(data)
+		stats.reset(t)
+		i = 1
+
+		for num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts in data:
+			if num_threads == cur_num_threads:
+				if i == burn_in:
+					stats.reset(t)
+				elif i > burn_in:
+					stats.add(t)
+				i = i + 1
+			else:
+				if i >= burn_in:
+					yield cur_num_threads, *stats.get()
+				cur_num_threads = num_threads
+				stats.reset(t)
+				i = 1
+
+		if i >= burn_in:
 			yield cur_num_threads, *stats.get()
-			cur_num_threads = num_threads
-			stats.reset(t)
-
-		stats.add(t)
-
-	yield cur_num_threads, *stats.get()
+	except StopIteration:
+		pass
 
 def export(file, results_dir, include):
 	datasets = [d for d in collect_datasets(results_dir, include)]
@@ -288,7 +301,7 @@ const data = [""")
 	for d in datasets:
 		file.write(f"""
 	new LineData(new LineParams("{d.device}-{d.platform}","{d.queue_type}",{d.queue_size},{d.block_size},{d.p_enq},{d.p_deq},{d.workload_size}),[""")
-		for n, t_avg, t_min, t_max, _ in results(skip(d.read(), 3)):
+		for n, t_avg, t_min, t_max, _ in results(d.read()):
 			file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
 		file.write("]),")
 
