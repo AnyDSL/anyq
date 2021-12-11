@@ -95,18 +95,28 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc != 8)
+		if (argc == 3) {
+			int device = parse_argument<int>(argv[1]);
+			if (std::string_view(argv[2]) == "info") {
+				Instrumentation::print_device_info(std::cout);
+				return 0;
+			}
+		}
+		else if (argc == 8) {
+			int device = parse_argument<int>(argv[1]);
+			int num_threads_min = parse_argument<int>(argv[2]);
+			int num_threads_max = parse_argument<int>(argv[3]);
+			int block_size = parse_argument<int>(argv[4]);
+			float p_enq = parse_argument<float>(argv[5]);
+			float p_deq = parse_argument<float>(argv[6]);
+			int workload_size = parse_argument<int>(argv[7]);
+
+			return run(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
+		}
+		else {
 			throw usage_error("expected 7 arguments");
+		}
 
-		int device = parse_argument<int>(argv[1]);
-		int num_threads_min = parse_argument<int>(argv[2]);
-		int num_threads_max = parse_argument<int>(argv[3]);
-		int block_size = parse_argument<int>(argv[4]);
-		float p_enq = parse_argument<float>(argv[5]);
-		float p_deq = parse_argument<float>(argv[6]);
-		int workload_size = parse_argument<int>(argv[7]);
-
-		return run(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
 	}
 	catch (const usage_error& e)
 	{

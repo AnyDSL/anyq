@@ -10,7 +10,7 @@ class Instrumentation
 {
 	uint64_t t_begin;
 public:
-	std::ostream& print_device_info(std::ostream&);
+	static std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{

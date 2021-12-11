@@ -10,7 +10,7 @@ class Instrumentation
 	std::chrono::steady_clock::time_point t_begin;
 
 public:
-	std::ostream& print_device_info(std::ostream&);
+	static std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{

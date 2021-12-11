@@ -81,7 +81,7 @@ def benchmark_binaries(bin_dir, include):
 def results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform):
 	return f"{test_name}--{queue_type}-{queue_size}-{block_size}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{device_id(device_name)}-{platform}.csv"
 
-def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None):
+def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None, verbose = False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -90,10 +90,14 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 		except:
 			return True
 
-	device_name_map = dict()
+	skipped = 0
+	scheduled = []
 
 	for binary, test_name, queue_type, queue_size, platform in benchmark_binaries(bin_dir, include):
 		for device in devices.get(platform):
+			# TODO: invoke `$> binary device_id info` to retrieve device_name
+			device_name = "AMD Ryzen 9 5950X 16-Core Processor"
+
 			for p_enq in (0.25, 0.5, 1.0):
 				for p_deq in (0.25, 0.5, 1.0):
 					for workload_size in (1, 8, 32, 128, 2048):
@@ -101,33 +105,93 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 							num_threads_min = 1
 							num_threads_max = 1 << 21
 
-							device_name = device_name_map.get((platform, device))
-
 							results_file_path = lambda device_name: results_dir/results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform)
 
-							try:
-								if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
-									with io.BytesIO() as buffer:
-										print(binary.stem, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size)
-										platform_reported, device_name_reported = run_benchmark(buffer, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size, timeout=timeout)
+							# print(device_name)
+							# print(results_file_path(device_name))
 
-										if platform_reported != platform:
-											raise Exception("benchmark platform doesn't match binary name")
-
-										if device_name_map.setdefault((platform, device), device_name_reported) != device_name_reported:
-											raise Exception("device name doesn't match previously reported device name")
-
-										results_file = results_file_path(device_name_reported)
-
-										if (rerun or result_outdated(results_file, binary)) and not dryrun:
-											with open(results_file, "wb") as file:
-												file.write(buffer.getbuffer())
-								else:
+							if rerun or not device_name or result_outdated(results_file_path(device_name), binary):
+								scheduled.append({
+									'binary': binary,
+									'args': dict(device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size, timeout=timeout),
+									'device_name': device_name,
+									'output': results_file_path(device_name)
+								})
+							else:
+								if verbose:
 									print("skipping", results_file_path(device_name))
-							except asyncio.TimeoutError:
-								print("TIMEOUT")
-							except BenchmarkError:
-								print("BENCHMARK FAILED")
+								skipped += 1
+
+	print("execute", len(scheduled), "benchmarks")
+	failed = []
+	timeout = []
+	success = 0
+	total = len(scheduled)
+
+	def num_digits(n):
+		d = 1
+		while n > 10:
+			n /= 10
+			d += 1
+		return d
+
+	def pad(n, width):
+		return " " * (width - num_digits(n)) + str(n)
+
+	max_digits = num_digits(total)
+
+	try:
+		for i, bm in enumerate(scheduled):
+			try:
+				with io.BytesIO() as buffer:
+					print("[", pad(i+1, max_digits), "/", total, "]", bm['binary'].stem, "--", list(bm['args'].values()))
+					platform_reported, device_name_reported = run_benchmark(buffer, bm['binary'], **bm['args'])
+
+					if platform_reported != platform:
+						raise Exception("benchmark platform doesn't match binary name")
+
+					if bm['device_name'] != device_name_reported:
+						raise Exception("device name doesn't match previously reported device name")
+
+					results_file = bm['output']
+
+					if not dryrun:
+						with open(results_file, "wb") as file:
+							file.write(buffer.getbuffer())
+
+					success += 1
+
+			except asyncio.TimeoutError:
+				print("TIMEOUT")
+				timeout.append(bm)
+
+			except BenchmarkError:
+				print("BENCHMARK FAILED")
+				failed.append(bm)
+
+	except KeyboardInterrupt:
+		print()
+		print("[CTRL+C detected]")
+
+	print()
+	print("Summary on benchmarks:")
+	padding = " " * (max_digits + 4);
+	print(padding, pad(success, max_digits), "successfully executed")
+	print(padding, pad(skipped, max_digits), "skipped")
+	print(padding, pad(len(failed), max_digits), "failed")
+	print(padding, pad(len(timeout), max_digits), "ran into timeout")
+
+	if len(failed) > 0:
+		print()
+		print("The following benchmarks FAILED:")
+		for bm in failed:
+			print("  -", bm['binary'].stem, "--", list(bm['args'].values()))
+
+	if len(timeout) > 0:
+		print()
+		print("The following benchmarks ran into TIMEOUT:")
+		for bm in timeout:
+			print("  -", bm['binary'].stem, "--", list(bm['args'].values()))
 
 
 class Dataset:
@@ -342,7 +406,7 @@ def main(args):
 			"amdgpu": device_list(args.amdgpu_device)
 		}
 
-		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout)
+		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout, verbose=args.verbose)
 
 	elif args.command == plot:
 		plot(results_dir, include)
@@ -369,6 +433,7 @@ if __name__ == "__main__":
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
 	run_cmd.add_argument("-dryrun", "--dryrun", dest="dryrun", action="store_true")
 	run_cmd.add_argument("--timeout", type=int, default=20)
+	run_cmd.add_argument("-v", "--verbose", action="store_true")
 
 	plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
 
