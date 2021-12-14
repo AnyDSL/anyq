@@ -15,9 +15,9 @@ extern "C"
 {
 	int run(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
 
-	void* instrumentation_create()
+	void* instrumentation_create(std::int32_t device)
 	{
-		return new Instrumentation;
+		return new Instrumentation(device);
 	}
 
 	void instrumentation_print_device_info(void* ctx)
@@ -95,14 +95,19 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc == 3) {
-			int device = parse_argument<int>(argv[1]);
-			if (std::string_view(argv[2]) == "info") {
-				Instrumentation::print_device_info(std::cout);
-				return 0;
-			}
+		if (argc == 3)
+		{
+			if (argv[1] != "info"sv)
+				throw usage_error("first argument must be `info`");
+
+			int device = parse_argument<int>(argv[2]);
+
+			Instrumentation(device).print_device_info(std::cout);
+
+			return 0;
 		}
-		else if (argc == 8) {
+		else if (argc == 8)
+		{
 			int device = parse_argument<int>(argv[1]);
 			int num_threads_min = parse_argument<int>(argv[2]);
 			int num_threads_max = parse_argument<int>(argv[3]);
@@ -113,10 +118,10 @@ int main(int argc, char* argv[])
 
 			return run(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
 		}
-		else {
+		else
+		{
 			throw usage_error("expected 7 arguments");
 		}
-
 	}
 	catch (const usage_error& e)
 	{

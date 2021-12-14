@@ -9,14 +9,27 @@
 
 class Instrumentation
 {
-	CU::unique_event event_begin = CU::create_event();
-	CU::unique_event event_end = CU::create_event();
+	CU::unique_event event_begin;
+	CU::unique_event event_end;
+
+	int device;
 
 public:
-	static std::ostream& print_device_info(std::ostream&);
+	Instrumentation(int device)
+		: device(device)
+	{
+	}
+
+	std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{
+		if (!event_begin)
+		{
+			event_begin = CU::create_event();
+			event_end = CU::create_event();
+		}
+
 		throw_error(cuEventRecord(event_begin, nullptr));
 	}
 

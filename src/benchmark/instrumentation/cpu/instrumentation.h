@@ -9,8 +9,15 @@ class Instrumentation
 {
 	std::chrono::steady_clock::time_point t_begin;
 
+	int device;
+
 public:
-	static std::ostream& print_device_info(std::ostream&);
+	Instrumentation(int device)
+		: device(device)
+	{
+	}
+
+	std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{

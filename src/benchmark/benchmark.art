@@ -6,14 +6,14 @@ struct Instrumentation {
 	destroy: fn() -> ()
 }
 
-#[import(cc = "C")] fn instrumentation_create() -> &mut u8;
+#[import(cc = "C")] fn instrumentation_create(i32) -> &mut u8;
 #[import(cc = "C")] fn instrumentation_print_device_info(&mut u8) -> ();
 #[import(cc = "C")] fn instrumentation_begin(&mut u8) -> ();
 #[import(cc = "C")] fn instrumentation_end(&mut u8) -> ();
 #[import(cc = "C")] fn instrumentation_destroy(&mut u8) -> ();
 
-fn create_instrumentation() {
-	let ctx = instrumentation_create();
+fn create_instrumentation(device: i32) {
+	let ctx = instrumentation_create(device);
 
 	Instrumentation {
 		print_device_info = @|| instrumentation_print_device_info(ctx),
