@@ -124,6 +124,9 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 		atomic_cas_global_i32 = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32),
 		atomic_cas_global_u32 = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32),
 		atomic_cas_global_u64 = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64),
+		atomic_cas_global_i32_weak = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32),
+		atomic_cas_global_u32_weak = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32),
+		atomic_cas_global_u64_weak = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64),
 
 		atomic_inc_global_u32 = cuda_atomic_inc_global_u32,
 		atomic_dec_global_u32 = cuda_atomic_dec_global_u32,

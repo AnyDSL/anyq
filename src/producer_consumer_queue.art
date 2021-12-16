@@ -177,7 +177,7 @@ fn @genericQueueElementType[T]() {
 				clear = @|| *lock = 0,
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
-					while thread.atomic_cas_global_u32(lock, 2, 3, memory_order::acquire, memory_order::relaxed) != 2 {
+					while thread.atomic_cas_global_u32_weak(lock, 2, 3, memory_order::acquire, memory_order::relaxed) != 2 {
 						thread.yield("wait for element lock to read");
 					}
 
@@ -187,7 +187,7 @@ fn @genericQueueElementType[T]() {
 					thread.atomic_store_global_u32(lock, 0, memory_order::release);
 				},
 				store = @|source, thread| {
-					while thread.atomic_cas_global_u32(lock, 0, 1, memory_order::acquire, memory_order::relaxed) != 0 {
+					while thread.atomic_cas_global_u32_weak(lock, 0, 1, memory_order::acquire, memory_order::relaxed) != 0 {
 						thread.yield("wait for element lock to write");
 					}
 
@@ -232,7 +232,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 			},
 			store = @|source, thread| {
 				let value = source();
-				while thread.atomic_cas_global_u32(element, FREE, value, memory_order::relaxed, memory_order::relaxed) != FREE {
+				while thread.atomic_cas_global_u32_weak(element, FREE, value, memory_order::relaxed, memory_order::relaxed) != FREE {
 					thread.yield("wait for a successful indexQueueElementType.store()");
 				}
 			},

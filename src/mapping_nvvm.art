@@ -66,7 +66,13 @@ fn @nvvm_atomic_rmw[T](op: u32) {
 }
 
 fn @nvvm_atomic_cas[T](location:&mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-	match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent") {
+	match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "") {
+		(old, _success) => old
+	}
+}
+
+fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
+	match cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "") {
 		(old, _success) => old
 	}
 }
@@ -120,6 +126,9 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 		atomic_cas_global_i32 = nvvm_atomic_cas[i32],
 		atomic_cas_global_u32 = nvvm_atomic_cas[u32],
 		atomic_cas_global_u64 = nvvm_atomic_cas[u64],
+		atomic_cas_global_i32_weak = nvvm_atomic_cas_weak[i32],
+		atomic_cas_global_u32_weak = nvvm_atomic_cas_weak[u32],
+		atomic_cas_global_u64_weak = nvvm_atomic_cas_weak[u64],
 
 		atomic_inc_global_u32 = nvvm_atomic_inc_global_u32,
 		atomic_dec_global_u32 = nvvm_atomic_dec_global_u32,
