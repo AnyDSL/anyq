@@ -158,17 +158,17 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 	device_name_cache = dict()
 
-	for binary in benchmark_binaries(bin_dir, include):
-		for device in devices.get(binary.platform):
-			device_name = device_name_cache.get((binary.platform, device))
+	for workload_size in (1, 8, 32, 128, 2048):
+		for binary in benchmark_binaries(bin_dir, include):
+			for device in devices.get(binary.platform):
+				device_name = device_name_cache.get((binary.platform, device))
 
-			if not device_name:
-				device_name = binary.info(device)
-				device_name_cache[(binary.platform, device)] = device_name
+				if not device_name:
+					device_name = binary.info(device)
+					device_name_cache[(binary.platform, device)] = device_name
 
-			for p_enq in (0.25, 0.5, 1.0):
-				for p_deq in (0.25, 0.5, 1.0):
-					for workload_size in (1, 8, 32, 128, 2048):
+				for p_enq in (0.25, 0.5, 1.0):
+					for p_deq in (0.25, 0.5, 1.0):
 						for block_size in [32, 256, 1024]:
 							num_threads_min = 1
 							num_threads_max = 1 << 21
