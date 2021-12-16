@@ -1,14 +1,9 @@
 
 
 if (cpu IN_LIST AnyQ_PLATFORMS OR fiberless IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_cpu STATIC)
-	if (WIN32)
-		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_win32.cpp)
-	elseif(APPLE)
-		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_darwin.cpp)
-	else()
-		target_sources(instrumentation_cpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation_linux.cpp)
-	endif()
+	add_library(instrumentation_cpu STATIC
+		${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation.cpp
+	)
 	target_include_directories(instrumentation_cpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cpu)
 
 	add_library(instrumentation_fiberless INTERFACE)
