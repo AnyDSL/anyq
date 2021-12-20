@@ -56,18 +56,18 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 				node(new_node).next = nil;
 
 				while true {
-					let tail = thread.atomic_load_global_u32(queue.tail, memory_order::relaxed);
-					let next = thread.atomic_load_global_u32(node(tail).next, memory_order::relaxed);
+					let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
+					let next = thread.atomic_load_global_u32(node(tail).next, memory_order::acquire);
 
-					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::relaxed) {
+					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::acquire) {
 						if next == nil {
 							if thread.atomic_cas_global_u32_weak(node(tail).next, next, new_node, memory_order::release, memory_order::relaxed) == next {
-								thread.atomic_cas_global_u32(queue.tail, tail, new_node, memory_order::relaxed, memory_order::relaxed);
+								thread.atomic_cas_global_u32(queue.tail, tail, new_node, memory_order::release, memory_order::relaxed);
 								break()
 							}
 						}
 						else {
-							thread.atomic_cas_global_u32_weak(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
+							thread.atomic_cas_global_u32_weak(queue.tail, tail, next, memory_order::release, memory_order::relaxed);
 						}
 					}
 				}
@@ -81,22 +81,22 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 
 		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
 			while true {
-				let head = thread.atomic_load_global_u32(queue.head, memory_order::relaxed);
-				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::relaxed);
+				let head = thread.atomic_load_global_u32(queue.head, memory_order::acquire);
+				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
 				let next = thread.atomic_load_global_u32(node(head).next, memory_order::acquire);
 
-				if head == thread.atomic_load_global_u32(queue.head, memory_order::relaxed) {
+				if head == thread.atomic_load_global_u32(queue.head, memory_order::acquire) {
 					if head == tail {
 						if next == nil {
 							return(0)
 						}
 
-						thread.atomic_cas_global_u32_weak(queue.tail, tail, next, memory_order::relaxed, memory_order::relaxed);
+						thread.atomic_cas_global_u32_weak(queue.tail, tail, next, memory_order::release, memory_order::relaxed);
 					}
 					else {
 						let payload = node(next).payload;
 
-						if thread.atomic_cas_global_u32_weak(queue.head, head, next, memory_order::acquire, memory_order::relaxed) == head {
+						if thread.atomic_cas_global_u32_weak(queue.head, head, next, memory_order::acq_rel, memory_order::relaxed) == head {
 							free_node(head, thread);
 							sink(payload, next);
 							break()
