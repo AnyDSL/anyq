@@ -159,6 +159,7 @@ set(TEST_SUITE_FILES
 	test-suite-atomic_cas.art
 	test-suite-atomic_cas-uniform.art
 	test-suite-atomic_cas-reverse.art
+	test-suite-atomic_cas_weak.art
 	test-suite-atomic_exch.art
 	test-suite-atomic_exch-uniform.art
 	test-suite-atomic_inc.art
