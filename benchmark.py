@@ -185,8 +185,8 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 	print("run", len(scheduled), "benchmarks")
 	failed = []
-	timeout = []
-	success = []
+	timeouted = []
+	succeeded = []
 	total = len(scheduled)
 
 	def num_digits(n):
@@ -206,7 +206,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 			try:
 				with io.BytesIO() as buffer:
 					print("[", pad(i+1, max_digits), "/", total, "]", bm)
-					bm.binary.run(buffer, **bm.args)
+					bm.binary.run(buffer, **bm.args, timeout=timeout)
 
 					buffer.seek(0)
 					params_reported = parse_benchmark_output_header(buffer)
@@ -227,11 +227,11 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 						with open(bm.output_path, "wb") as file:
 							file.write(buffer.getbuffer())
 
-					success.append(bm)
+					succeeded.append(bm)
 
 			except asyncio.TimeoutError:
 				print("TIMEOUT")
-				timeout.append(bm)
+				timeouted.append(bm)
 
 			except BenchmarkError:
 				print("BENCHMARK FAILED")
@@ -242,19 +242,19 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 	print("\nSummary on benchmarks:")
 	padding = " " * (max_digits + 4)
-	print(padding, pad(len(success), max_digits), "successfully executed")
+	print(padding, pad(len(succeeded), max_digits), "successfully executed")
 	print(padding, pad(len(skipped), max_digits), "skipped")
 	print(padding, pad(len(failed), max_digits), "failed")
-	print(padding, pad(len(timeout), max_digits), "ran into timeout")
+	print(padding, pad(len(timeouted), max_digits), "ran into timeout")
 
 	if len(failed) > 0:
 		print("\nThe following benchmarks FAILED:")
 		for bm in failed:
 			print("  -", bm)
 
-	if len(timeout) > 0:
+	if len(timeouted) > 0:
 		print("\nThe following benchmarks ran into TIMEOUT:")
-		for bm in timeout:
+		for bm in timeouted:
 			print("  -", bm)
 
 
