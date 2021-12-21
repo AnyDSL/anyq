@@ -27,16 +27,16 @@ fn @cuda_pred(b: bool) -> i32 {
 	if b {1} else {0}
 }
 
-fn @cuda_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
+fn @cuda_legacy_atomic_memory_barrier_pre(order:memory_order) {
 	match order {
 		memory_order::release => cuda_threadfence(),
 		memory_order::acq_rel => cuda_threadfence(),
 		memory_order::seq_cst => cuda_threadfence(),
 		_ => ()
 	}
+}
 
-	f();
-
+fn @cuda_legacy_atomic_memory_barrier_post(order:memory_order) {
 	match order {
 		memory_order::acquire => cuda_threadfence(),
 		memory_order::acq_rel => cuda_threadfence(),
@@ -47,31 +47,44 @@ fn @cuda_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
 
 fn @cuda_legacy_atomic_memory_order_wrap_load[T](f: fn(&addrspace(1) T) -> T) {
 	@|location:&addrspace(1) T, order:memory_order| -> T {
-		let mut res:T;
-		cuda_legacy_atomic_memory_order_wrap(order, @|| res = f(location));
+		cuda_legacy_atomic_memory_barrier_pre(order);
+		let res = f(location);
+		cuda_legacy_atomic_memory_barrier_post(order);
 		res
 	}
 }
 
 fn @cuda_legacy_atomic_memory_order_wrap_store[T](f: fn(&mut addrspace(1) T, T) -> ()) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> () {
-		cuda_legacy_atomic_memory_order_wrap(order, @|| f(location, value));
+		cuda_legacy_atomic_memory_barrier_pre(order);
+		f(location, value);
+		cuda_legacy_atomic_memory_barrier_post(order);
 	}
 }
 
 fn @cuda_legacy_atomic_memory_order_wrap_rmw[T](f: fn(&mut addrspace(1) T, T) -> T) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-		let mut old:T;
-		cuda_legacy_atomic_memory_order_wrap(order, @|| old = f(location, value));
+		cuda_legacy_atomic_memory_barrier_pre(order);
+		let old = f(location, value);
+		cuda_legacy_atomic_memory_barrier_post(order);
 		old
 	}
 }
 
 fn @cuda_legacy_atomic_memory_order_wrap_cas[T](f: fn(&mut addrspace(1) T, T, T) -> T, cmp: fn(T, T) -> bool) {
 	@|location:&mut addrspace(1) T, expected:T, desired:T, memory_order_succ:memory_order, memory_order_fail:memory_order| {
-		let mut old:T;
-		cuda_legacy_atomic_memory_order_wrap(stronger_memory_order(memory_order_succ, memory_order_fail), @|| old = f(location, expected, desired));
-		(old, cmp(old, expected))
+		cuda_legacy_atomic_memory_barrier_pre(stronger_memory_order(memory_order_succ, memory_order_fail));
+
+		let old = f(location, expected, desired);
+
+		if cmp(old, expected) {
+			cuda_legacy_atomic_memory_barrier_post(memory_order_succ);
+			(old, true)
+		}
+		else {
+			cuda_legacy_atomic_memory_barrier_post(memory_order_fail);
+			(old, false)
+		}
 	}
 }
 
