@@ -27,17 +27,11 @@ fn @amdgpu_atomic_rmw[T](op: u32) {
     }
 }
 
-fn @amdgpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-    match cmpxchg_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent") {
-        (old, _success) => old
-    }
-}
+fn @amdgpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
+    = cmpxchg_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent");
 
-fn @amdgpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order) -> T {
-    match cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent") {
-        (old, _success) => old
-    }
-}
+fn @amdgpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
+    = cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent");
 
 fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {

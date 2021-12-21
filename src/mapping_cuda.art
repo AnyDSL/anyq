@@ -61,17 +61,17 @@ fn @cuda_legacy_atomic_memory_order_wrap_store[T](f: fn(&mut addrspace(1) T, T) 
 
 fn @cuda_legacy_atomic_memory_order_wrap_rmw[T](f: fn(&mut addrspace(1) T, T) -> T) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-		let mut res:T;
-		cuda_legacy_atomic_memory_order_wrap(order, @|| res = f(location, value));
-		res
+		let mut old:T;
+		cuda_legacy_atomic_memory_order_wrap(order, @|| old = f(location, value));
+		old
 	}
 }
 
-fn @cuda_legacy_atomic_memory_order_wrap_cas[T](f: fn(&mut addrspace(1) T, T, T) -> T) {
-	@|location:&mut addrspace(1) T, expected:T, desired:T, memory_order_succ:memory_order, memory_order_fail:memory_order| -> T {
-		let mut res:T;
-		cuda_legacy_atomic_memory_order_wrap(stronger_memory_order(memory_order_succ, memory_order_fail), @|| res = f(location, expected, desired));
-		res
+fn @cuda_legacy_atomic_memory_order_wrap_cas[T](f: fn(&mut addrspace(1) T, T, T) -> T, cmp: fn(T, T) -> bool) {
+	@|location:&mut addrspace(1) T, expected:T, desired:T, memory_order_succ:memory_order, memory_order_fail:memory_order| {
+		let mut old:T;
+		cuda_legacy_atomic_memory_order_wrap(stronger_memory_order(memory_order_succ, memory_order_fail), @|| old = f(location, expected, desired));
+		(old, cmp(old, expected))
 	}
 }
 
@@ -121,12 +121,12 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 		atomic_max_global_u32 = cuda_legacy_atomic_memory_order_wrap_rmw[u32](cuda_atomic_max_global_u32),
 		atomic_max_global_u64 = cuda_legacy_atomic_memory_order_wrap_rmw[u64](cuda_atomic_max_global_u64),
 
-		atomic_cas_global_i32 = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32),
-		atomic_cas_global_u32 = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32),
-		atomic_cas_global_u64 = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64),
-		atomic_cas_global_i32_weak = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32),
-		atomic_cas_global_u32_weak = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32),
-		atomic_cas_global_u64_weak = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64),
+		atomic_cas_global_i32 = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32, @|a, b| a == b),
+		atomic_cas_global_u32 = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32, @|a, b| a == b),
+		atomic_cas_global_u64 = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64, @|a, b| a == b),
+		atomic_cas_global_i32_weak = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32, @|a, b| a == b),
+		atomic_cas_global_u32_weak = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32, @|a, b| a == b),
+		atomic_cas_global_u64_weak = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64, @|a, b| a == b),
 
 		atomic_inc_global_u32 = cuda_atomic_inc_global_u32,
 		atomic_dec_global_u32 = cuda_atomic_dec_global_u32,

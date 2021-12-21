@@ -61,7 +61,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 
 					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::acquire) {
 						if next == nil {
-							if thread.atomic_cas_global_u32_weak(node(tail).next, next, new_node, memory_order::release, memory_order::relaxed) == next {
+							if thread.atomic_cas_global_u32_weak(node(tail).next, next, new_node, memory_order::release, memory_order::relaxed).1 {
 								thread.atomic_cas_global_u32(queue.tail, tail, new_node, memory_order::release, memory_order::relaxed);
 								break()
 							}
@@ -96,7 +96,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerCon
 					else {
 						let payload = node(next).payload;
 
-						if thread.atomic_cas_global_u32_weak(queue.head, head, next, memory_order::acq_rel, memory_order::relaxed) == head {
+						if thread.atomic_cas_global_u32_weak(queue.head, head, next, memory_order::acq_rel, memory_order::relaxed).1 {
 							free_node(head, thread);
 							sink(payload, next);
 							break()
