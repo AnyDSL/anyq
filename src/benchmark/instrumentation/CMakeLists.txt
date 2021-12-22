@@ -1,23 +1,14 @@
 
 
 if (cpu IN_LIST AnyQ_PLATFORMS OR fiberless IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_cpu STATIC
-		${CMAKE_CURRENT_SOURCE_DIR}/cpu/instrumentation.cpp
-	)
-	target_include_directories(instrumentation_cpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cpu)
+	add_subdirectory(cpu)
 
 	add_library(instrumentation_fiberless INTERFACE)
 	target_link_libraries(instrumentation_fiberless INTERFACE instrumentation_cpu)
 endif()
 
-if (cuda IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_cuda STATIC
-		${CMAKE_CURRENT_SOURCE_DIR}/cuda/CUDA/error.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/cuda/CUDA/event.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/cuda/instrumentation.cpp
-	)
-	target_include_directories(instrumentation_cuda INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
-	target_link_libraries(instrumentation_cuda PUBLIC CUDA::cuda_driver)
+if (cuda IN_LIST AnyQ_PLATFORMS OR nvvm IN_LIST AnyQ_PLATFORMS)
+	add_subdirectory(cuda)
 endif()
 
 if (nvvm IN_LIST AnyQ_PLATFORMS)
@@ -26,8 +17,5 @@ if (nvvm IN_LIST AnyQ_PLATFORMS)
 endif()
 
 if (amdgpu IN_LIST AnyQ_PLATFORMS)
-	add_library(instrumentation_amdgpu STATIC
-		${CMAKE_CURRENT_SOURCE_DIR}/amdgpu/instrumentation.cpp
-	)
-	target_include_directories(instrumentation_amdgpu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/amdgpu)
+	add_subdirectory(amdgpu)
 endif()
