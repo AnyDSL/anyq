@@ -26,6 +26,10 @@ extern "C" {
 
 int moodycamel_cq_create(uint32_t capacity, uint32_t num_producer, MoodycamelCQHandle* handle)
 {
+	if (num_producer == 0)
+		num_producer = std::thread::hardware_concurrency();
+	//std::cout << "moodycamel::ConcurrentQueue for " << num_producer << " implicit producers." << std::endl;
+
 	//locked_memory = false;
 	MoodycamelCQPtr retval = new MoodycamelCQType(/*capacity*/ 6 * MoodycamelCQType::BLOCK_SIZE, 0, num_producer);
 	//locked_memory = true;
@@ -62,6 +66,10 @@ size_t moodycamel_cq_size_approx(MoodycamelCQHandle handle)
 
 int moodycamel_cq_create_u32(uint32_t capacity, uint32_t num_producer, MoodycamelCQHandle* handle)
 {
+	if (num_producer == 0)
+		num_producer = std::thread::hardware_concurrency();
+	//std::cout << "moodycamel::ConcurrentQueue for " << num_producer << " implicit producers." << std::endl;
+
 	//locked_memory = false;
 	MoodycamelCQU32Ptr retval = new MoodycamelCQU32Type(/*capacity*/ 6 * MoodycamelCQU32Type::BLOCK_SIZE, 0, num_producer);
 	//locked_memory = true;
