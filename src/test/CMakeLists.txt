@@ -96,6 +96,7 @@ set(genericTestElementComplexStruct_short_name generic-array)
 
 set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
 set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
+set(MoodyCamelQueue_constructor "createMoodyCamelQueueGeneric")
 
 function(add_queue_tests _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)

@@ -50,6 +50,7 @@ function(add_benchmark _target _testfile _mapping)
 endfunction()
 
 set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerIndexQueue")
+set(MoodyCamelQueue_constructor "createMoodyCamelIndexQueue")
 
 function(generate_benchmarks template_file platform)
 	get_filename_component(benchmark_name ${template_file} NAME_WE)

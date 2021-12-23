@@ -2,14 +2,15 @@
 type MoodycamelCQHandle = i64;
 type MoodycamelValue = i64;
 
-#[import(cc = "C", name = "moodycamel_cq_create")]       fn moodycamel_cq_create(_: &mut MoodycamelCQHandle) -> i32;
+#[import(cc = "C", name = "moodycamel_cq_create")]       fn moodycamel_cq_create(_capacity: u32, _num_producer: u32, _out_handle: &mut MoodycamelCQHandle) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_destroy")]      fn moodycamel_cq_destroy(_: MoodycamelCQHandle) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_enqueue")]      fn moodycamel_cq_enqueue(_: MoodycamelCQHandle, _: MoodycamelValue) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_try_dequeue")]  fn moodycamel_cq_try_dequeue(_: MoodycamelCQHandle, _:&mut MoodycamelValue) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_size_approx")]  fn moodycamel_cq_size_approx(_: MoodycamelCQHandle) -> i64;
 
 
-fn @createMoodyCamelQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
+fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
+	let num_producer:u32 = 32;
 
 	let buffer_size = pool_size as i64 * sizeof[T]();
 
@@ -34,7 +35,7 @@ fn @createMoodyCamelQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsu
 
 	let mut queue:MoodycamelCQHandle;
 
-	let success = moodycamel_cq_create(&mut queue);
+	let success = moodycamel_cq_create(pool_size as u32, num_producer, &mut queue);
 	assert(success > 0, "moodycamel_cq_create() failed");
 
 	ProducerConsumerQueue[T] {
@@ -70,7 +71,7 @@ fn @createMoodyCamelQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsu
 			// HACK: we leak memory here, but this causes segfault on msvc
 			//success = moodycamel_cq_destroy(queue);
 			//assert(success > 0, "moodycamel_cq_destroy() failed");
-			success = moodycamel_cq_create(&mut queue);
+			success = moodycamel_cq_create(pool_size as u32, num_producer, &mut queue);
 			assert(success > 0, "moodycamel_cq_create() failed");
 			alloc_next = 0;
 		},
@@ -84,6 +85,97 @@ fn @createMoodyCamelQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsu
 		release = @|| {
 			let success = moodycamel_cq_destroy(queue);
 			assert(success > 0, "moodycamel_cq_destroy() failed");
+		}
+	}
+}
+
+
+#[import(cc = "C")] fn moodycamel_cq_create_u32(_capacity: u32, _num_producer: u32, _out_handle: &mut MoodycamelCQHandle) -> i32;
+#[import(cc = "C")] fn moodycamel_cq_destroy_u32(_: MoodycamelCQHandle) -> i32;
+#[import(cc = "C")] fn moodycamel_cq_enqueue_u32(_: MoodycamelCQHandle, _value: u32) -> i32;
+#[import(cc = "C")] fn moodycamel_cq_try_dequeue_u32(_: MoodycamelCQHandle, _out_value: &mut u32) -> i32;
+#[import(cc = "C")] fn moodycamel_cq_size_approx_u32(_: MoodycamelCQHandle) -> u64;
+
+
+fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> ProducerConsumerQueue[u32] {
+	let num_producer:u32 = 32;
+
+	assert(device.platform_device == 0, "moodycamel::ConcurrentQueue is CPU only");
+
+	/*
+	let buffer_size = pool_size as i64 * sizeof[T]();
+
+	let buffer = device.alloc(buffer_size);
+	let memory = bitcast[&mut addrspace(1) [T]](buffer.data);
+	*/
+	//let mut alloc_next:u32 = 0;
+	//let alloc_ptr = bitcast[&mut addrspace(1) u32](&mut alloc_next);
+
+	let nil:u32 = -1;
+	let alloc_slot = @|_thread:gpu_thread_context| -> u32 {
+		/* let new_slot = thread.atomic_add_global_u32(alloc_ptr, 1, memory_order::relaxed);
+
+		if new_slot < pool_size as u32 {
+			new_slot
+		}
+		else {
+			thread.atomic_sub_global_u32(alloc_ptr, 1, memory_order::relaxed);
+			nil
+		} */
+		0
+	};
+
+	let mut queue:MoodycamelCQHandle;
+
+	let success = moodycamel_cq_create_u32(num_elements as u32, num_producer, &mut queue);
+	assert(success > 0, "moodycamel_cq_create_u32() failed");
+
+	ProducerConsumerQueue[u32] {
+		push = @|source:fn(u32)->u32| @|thread:gpu_thread_context| -> i32 {
+			let slot = alloc_slot(thread);
+			if (slot != nil) {
+				let value = source(slot);
+				let success = moodycamel_cq_enqueue_u32(queue, value);
+				if success > 0 { 1 } else { 0 }
+			} else {
+				0
+			}
+		},
+
+		pop = @|sink:fn(u32, u32)->()| @|thread:gpu_thread_context| -> i32 {
+			let mut value:u32 = thread.idx(0);
+			let success = moodycamel_cq_try_dequeue_u32(queue, &mut value);
+			if success > 0 {
+				sink(value, 0);
+				1
+			} else {
+				0
+			}
+		},
+
+		size = @|_thread| {
+			moodycamel_cq_size_approx_u32(queue) as i32
+		},
+
+		reset = @|_grid| {
+			let mut success:i32;
+			// HACK: we leak memory here, but this causes segfault on msvc
+			//success = moodycamel_cq_destroy(queue);
+			//assert(success > 0, "moodycamel_cq_destroy() failed");
+			success = moodycamel_cq_create_u32(num_elements as u32, num_producer, &mut queue);
+			assert(success > 0, "moodycamel_cq_create_u32() failed");
+			//alloc_next = 0;
+		},
+
+		validate = @|_corrupted: &mut addrspace(1) u32, grid| {
+			for _thread in grid.threads() {
+				// TODO
+			}
+		},
+
+		release = @|| {
+			let success = moodycamel_cq_destroy_u32(queue);
+			assert(success > 0, "moodycamel_cq_destroy_u32() failed");
 		}
 	}
 }
