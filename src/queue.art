@@ -1,0 +1,11 @@
+
+struct ProducerConsumerQueue[T] {
+	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. push/pop/size) are thread-safe
+	push: fn(fn(u32) -> T) -> fn(gpu_thread_context) -> i32,
+	pop: fn(fn(T, u32) -> ()) -> fn(gpu_thread_context) -> i32,
+	// pop_wave: fn(gpu_wave_context, i32, fn(i32, u32) -> ()) -> i32,
+	size: fn(gpu_thread_context) -> i32,
+	reset: fn(gpu_grid_context) -> (),
+	validate: fn(&mut addrspace(1) u32, gpu_grid_context) -> (),
+	release: fn() -> ()
+}

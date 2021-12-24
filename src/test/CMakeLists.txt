@@ -123,7 +123,7 @@ function(add_queue_tests _mapping _testfile)
 				configure_file(${_testfile} ${dest_file} @ONLY)
 
 				set(_target "${variant_name}-${_mapping}")
-				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES})
+				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES} ${${queue_type}_sources})
 				if (DEFINED ${queue_type}_link_LIBRARIES)
 					target_link_libraries(${_target} PRIVATE ${${queue_type}_link_LIBRARIES})
 				endif()

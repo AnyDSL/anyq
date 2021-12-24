@@ -70,7 +70,7 @@ function(generate_benchmarks template_file platform)
 			configure_file(${template_file} ${dest_file})
 
 			set(target_name "${variant_name}-${platform}")
-			add_benchmark(${target_name} ${dest_file} ${platform})
+			add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources})
 
 			if (DEFINED ${queue_type}_link_LIBRARIES)
 				target_link_libraries(${target_name} PRIVATE ${${queue_type}_link_LIBRARIES})

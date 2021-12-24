@@ -25,9 +25,7 @@ endfunction()
 set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/gpu.art
 	${CMAKE_CURRENT_SOURCE_DIR}/atomic.art
-	${CMAKE_CURRENT_SOURCE_DIR}/producer_consumer_queue.art
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/michael_scott.art
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/moodycamel.art
+	${CMAKE_CURRENT_SOURCE_DIR}/queue.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<LOWER_CASE:$<CONFIG>>.art
@@ -88,6 +86,10 @@ set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
 set(ConcurrentProducerConsumerQueue_short_name CPCQ)
 set(MichaelScottQueue_short_name MSQ)
 set(MoodyCamelQueue_short_name MOQ)
+
+set(ConcurrentProducerConsumerQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/producer_consumer_queue.art)
+set(MichaelScottQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/michael_scott.art)
+set(MoodyCamelQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/moodycamel.art)
 
 set(MoodyCamelQueue_link_LIBRARIES moodycamel)
 
