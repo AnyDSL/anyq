@@ -12,30 +12,28 @@
 __device__ unsigned long long timestamp()
 {
 	unsigned long long timestamp;
-	asm volatile("mov.u64 %0, %globaltimer;" : "=l"(timestamp) ::);
+	asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(timestamp) ::);
 	return timestamp;
 }
 
-__device__ unsigned long long wait_timestamp(unsigned long long t)
+__device__ unsigned long long wait_next_timestamp(unsigned long long t)
 {
-	unsigned long long curr_t;
+	unsigned long long t_next;
 
 	do
 	{
-		curr_t = timestamp();
-	} while (curr_t == t);
+		t_next = timestamp();
+	} while (t_next == t);
 
-	return curr_t;
+	return t_next;
 }
 
 __global__ void test()
 {
 	for (int i = 0; i < 128; ++i)
 	{
-		wait_timestamp(timestamp());
-
-		unsigned long long t_1 = timestamp();
-		unsigned long long t_2 = wait_timestamp(t_1);
+		unsigned long long t_1 = wait_next_timestamp(timestamp());
+		unsigned long long t_2 = wait_next_timestamp(t_1);
 
 		printf("%llu ", t_2 - t_1);
 	}
