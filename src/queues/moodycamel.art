@@ -66,14 +66,17 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 			moodycamel_cq_size_approx(queue) as i32
 		},
 
-		reset = @|_grid| {
-			let mut success:i32;
-			// HACK: we leak memory here, but this causes segfault on msvc
-			//success = moodycamel_cq_destroy(queue);
-			//assert(success > 0, "moodycamel_cq_destroy() failed");
-			success = moodycamel_cq_create(pool_size as u32, num_producer, &mut queue);
-			assert(success > 0, "moodycamel_cq_create() failed");
-			alloc_next = 0;
+		reset = @|grid| {
+			for thread in grid.threads() {
+				if thread.idx(0) == 0 {
+					let mut success:i32;
+					success = moodycamel_cq_destroy(queue);
+					assert(success > 0, "moodycamel_cq_destroy() failed");
+					success = moodycamel_cq_create(pool_size as u32, num_producer, &mut queue);
+					assert(success > 0, "moodycamel_cq_create() failed");
+					alloc_next = 0;
+				}
+			}
 		},
 
 		validate = @|_corrupted: &mut addrspace(1) u32, grid| {
@@ -157,14 +160,16 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 			moodycamel_cq_size_approx_u32(queue) as i32
 		},
 
-		reset = @|_grid| {
-			let mut success:i32;
-			// HACK: we leak memory here, but this causes segfault on msvc
-			//success = moodycamel_cq_destroy(queue);
-			//assert(success > 0, "moodycamel_cq_destroy() failed");
-			success = moodycamel_cq_create_u32(num_elements as u32, num_producer, &mut queue);
-			assert(success > 0, "moodycamel_cq_create_u32() failed");
-			//alloc_next = 0;
+		reset = @|grid| {
+			for thread in grid.threads() {
+				if thread.idx(0) == 0 {
+					let mut success:i32;
+					success = moodycamel_cq_destroy_u32(queue);
+					assert(success > 0, "moodycamel_cq_destroy() failed");
+					success = moodycamel_cq_create_u32(num_elements as u32, num_producer, &mut queue);
+					assert(success > 0, "moodycamel_cq_create_u32() failed");
+				}
+			}
 		},
 
 		validate = @|_corrupted: &mut addrspace(1) u32, grid| {
