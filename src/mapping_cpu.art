@@ -128,6 +128,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 
 		atomic_add_global_i32 = cpu_atomic_rmw[i32](1),
 		atomic_add_global_u32 = cpu_atomic_rmw[u32](1),
+		atomic_add_global_i64 = cpu_atomic_rmw[i64](1),
 		atomic_add_global_u64 = cpu_atomic_rmw[u64](1),
 
 		atomic_sub_global_i32 = cpu_atomic_rmw[i32](2),

@@ -107,6 +107,7 @@ struct gpu_thread_context {
 
 	atomic_add_global_i32: fn(&mut addrspace(1) i32, i32, memory_order) -> i32,
 	atomic_add_global_u32: fn(&mut addrspace(1) u32, u32, memory_order) -> u32,
+	atomic_add_global_i64: fn(&mut addrspace(1) i64, i64, memory_order) -> i64,
 	atomic_add_global_u64: fn(&mut addrspace(1) u64, u64, memory_order) -> u64,
 
 	atomic_sub_global_i32: fn(&mut addrspace(1) i32, i32, memory_order) -> i32,
