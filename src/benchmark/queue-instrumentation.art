@@ -1,0 +1,41 @@
+
+fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut QueueBenchmarkStatistics) -> ProducerConsumerQueue[T] {
+	let wrapped_queue = ProducerConsumerQueue[T] {
+		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+
+			let num_pushed = for el in queue.push(thread) {
+				source(el)
+			};
+
+			++stats.num_enqueue_attempts;
+
+			if num_pushed > 0 {
+				++stats.num_enqueues;
+			}
+
+			num_pushed
+		},
+
+		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+
+			let num_poppped = for el, i in queue.pop(thread) {
+				sink(el, i);
+			};
+
+			++stats.num_dequeue_attempts;
+
+			if num_poppped > 0 {
+				++stats.num_dequeues;
+			}
+
+			num_poppped
+		},
+
+		size = queue.size,
+		reset = queue.reset,
+		validate = queue.validate,
+		release = queue.release
+	};
+
+	wrapped_queue
+}

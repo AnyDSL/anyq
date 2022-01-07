@@ -46,6 +46,8 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 
 						if thread_id < num_threads as u32 {
 							let mut stats = init_benchmark_stats();
+							let q = wrap_queue_instrumentation(queue, &mut stats);
+							// let q = queue;
 
 							let mut rand_state = rng::xorseed32(thread_id);
 
@@ -61,26 +63,18 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 
 							for _ in range(0, attempts_per_thread) {
 								if sample(c_enq) {
-									if for _ in queue.push(thread) {
+									for _ in q.push(thread) {
 										simulate_workload();
 										rand_state
-									} > 0 {
-										++stats.num_enqueues;
-									}
-
-									++stats.num_enqueue_attempts;
+									};
 								}
 
 								wave.barrier();
 
 								if sample(c_deq) {
-									if for _, _ in queue.pop(thread) {
+									for _, _ in q.pop(thread) {
 										simulate_workload();
-									} > 0 {
-										++stats.num_dequeues;
-									}
-
-									++stats.num_dequeue_attempts;
+									};
 								}
 
 								wave.barrier();
