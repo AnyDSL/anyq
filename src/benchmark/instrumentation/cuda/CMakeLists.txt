@@ -5,7 +5,7 @@ add_library(instrumentation_cuda STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/instrumentation.cpp
 )
 target_include_directories(instrumentation_cuda INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(instrumentation_cuda PUBLIC CUDA::cuda_driver)
+target_link_libraries(instrumentation_cuda PUBLIC CUDA::cuda_driver CUDA::cupti)
 
 
 project(measure_globaltimer_res CUDA)

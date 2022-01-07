@@ -3,9 +3,19 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 	let wrapped_queue = ProducerConsumerQueue[T] {
 		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
 
+			let t_begin = thread.timestamp32();
+
 			let num_pushed = for el in queue.push(thread) {
 				source(el)
 			};
+
+			let t_end = thread.timestamp32();
+
+			let dt = t_end - t_begin;
+
+			stats.t_enqueue += dt as i64;
+			stats.t_enqueue_min = min(stats.t_enqueue_min, dt);
+			stats.t_enqueue_max = max(stats.t_enqueue_max, dt);
 
 			++stats.num_enqueue_attempts;
 
@@ -18,9 +28,19 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 
 		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
 
+			let t_begin = thread.timestamp32();
+
 			let num_poppped = for el, i in queue.pop(thread) {
 				sink(el, i);
 			};
+
+			let t_end = thread.timestamp32();
+
+			let dt = t_end - t_begin;
+
+			stats.t_dequeue += dt as i64;
+			stats.t_dequeue_min = min(stats.t_dequeue_min, dt);
+			stats.t_dequeue_max = max(stats.t_dequeue_max, dt);
 
 			++stats.num_dequeue_attempts;
 

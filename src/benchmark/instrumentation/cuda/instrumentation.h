@@ -15,10 +15,7 @@ class Instrumentation
 	int device;
 
 public:
-	Instrumentation(int device)
-		: device(device)
-	{
-	}
+	Instrumentation(int device);
 
 	std::ostream& print_device_info(std::ostream&);
 

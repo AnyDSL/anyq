@@ -272,7 +272,7 @@ class Dataset:
 			file.seek(self.data_offset)
 			for l in file:
 				cols = l.split(';')
-				num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = (*cols[:2], 0, 0, 0, 0) if len(cols) == 2 else cols
+				num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = (*cols[:2], 0, 0, 0, 0) if len(cols) == 2 else cols[:6]
 				yield int(num_threads), float(t), int(num_enqueues), int(num_enqueue_attempts), int(num_dequeues), int(num_dequeue_attempts)
 
 def collect_datasets(results_dir, include):
