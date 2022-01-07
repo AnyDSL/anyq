@@ -129,6 +129,17 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 
 		memory_barrier = @|_:memory_order| nvvm_threadfence(),
 
+		timestamp = @|| {
+			let mut timestamp:u64;
+			asm("mov.u64 $0, %globaltimer;" : "=l"(timestamp) ::: "volatile");
+			timestamp as i64
+		},
+		timestamp32 = @|| {
+			let mut timestamp:u32;
+			asm("mov.u32 $0, %globaltimer_lo;" : "=r"(timestamp) ::: "volatile");
+			timestamp as i32
+		},
+
 		// yield = @|| nvvm_nanosleep(0)
 		yield = @|_msg:&[u8]| nvvm_threadfence()
 	});

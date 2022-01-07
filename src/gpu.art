@@ -149,5 +149,8 @@ struct gpu_thread_context {
 
 	memory_barrier: fn(memory_order) -> (),
 
+	timestamp: fn() -> i64,
+	timestamp32: fn() -> i32,
+
 	yield: fn(&[u8]) -> ()
 }
