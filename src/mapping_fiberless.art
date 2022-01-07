@@ -163,8 +163,8 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 
 		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
 
-		timestamp = get_micro_time,
-		timestamp32 = @|| get_micro_time() as i32,
+		timestamp = get_nano_time,
+		timestamp32 = @|| get_nano_time() as i32,
 
 		yield = @|_msg| { do_once(@|_, _| { /* yield(); */ }); }
 	});
