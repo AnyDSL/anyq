@@ -258,6 +258,22 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 			print("  -", bm)
 
 
+class EnqueueDequeueStatistics:
+	def __init__(self, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts):
+		self.num_enqueues = num_enqueues
+		self.num_enqueue_attempts = num_enqueue_attempts
+		self.num_dequeues = num_dequeues,
+		self.num_dequeue_attempts = num_dequeue_attempts
+
+class QueueOperationTimings:
+	def __init__(self, t_enqueue, t_enqueue_min, t_enqueue_max, t_dequeue, t_dequeue_min, t_dequeue_max):
+		self.t_enqueue = t_enqueue
+		self.t_enqueue_min = t_enqueue_min
+		self.t_enqueue_max = t_enqueue_max
+		self.t_dequeue = t_dequeue
+		self.t_dequeue_min = t_dequeue_min
+		self.t_dequeue_max = t_dequeue_max
+
 class Dataset:
 	def __init__(self, params, path, data_offset):
 		self.params = params
@@ -267,13 +283,33 @@ class Dataset:
 	def __repr__(self):
 		return f"Dataset({self.params}, device='{self.device}')"
 
+	@staticmethod
+	def parse_row(cols):
+		num_threads, t = int(cols[0]), float(cols[1])
+
+		if len(cols) == 2:  # original format
+			return num_threads, t, None, None
+
+		queue_stats = EnqueueDequeueStatistics(int(cols[2]), int(cols[3]), int(cols[4]), int(cols[5]))
+
+		if len(cols) == 6:  # with enqueue/dequeue stats
+			return num_threads, t, queue_stats, None
+
+		queue_timings = QueueOperationTimings(int(cols[6]), int(cols[7]), int(cols[8]), int(cols[9]), int(cols[10]), int(cols[11]))
+
+		if len(cols) == 12: # with individual operation timings
+			return num_threads, t, queue_stats, queue_timings
+
+		raise Exception("invalid file format")
+
 	def read(self):
 		with open(self.path, "rt") as file:
 			file.seek(self.data_offset)
 			for l in file:
 				cols = l.split(';')
-				num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = (*cols[:2], 0, 0, 0, 0) if len(cols) == 2 else cols[:6]
-				yield int(num_threads), float(t), int(num_enqueues), int(num_enqueue_attempts), int(num_dequeues), int(num_dequeue_attempts)
+				yield Dataset.parse_row(cols)
+
+
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
@@ -323,7 +359,7 @@ def plot(results_dir, include):
 				canvas.print_figure(results_dir/f"{device_id(device)}-{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
 
 class Statistics:
-	def reset(self, t):
+	def __init__(self, t):
 		self.t_avg = self.t_min = self.t_max = t
 		self.n = 1
 
@@ -332,9 +368,15 @@ class Statistics:
 
 	def add(self, t):
 		self.t_avg += t
-		self.t_min = min(self.t_min, t)
-		self.t_max = max(self.t_max, t)
 		self.n += 1
+		self.add_min(t)
+		self.add_max(t)
+
+	def add_min(self, t):
+		self.t_min = min(self.t_min, t)
+
+	def add_max(self, t):
+		self.t_max = max(self.t_max, t)
 
 def skip(data, n):
 	for _ in range(n):
@@ -345,27 +387,46 @@ def results(data):
 	burn_in = 3
 
 	try:
-		stats = Statistics()
-		cur_num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts = next(data)
-		stats.reset(t)
+		cur_num_threads, t, queue_stats, queue_timings = next(data)
+
+		def reset_stats(t, queue_stats, queue_timings):
+			if queue_stats and queue_timings:
+				return Statistics(t), Statistics(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts) if queue_stats.num_enqueue_attempts else None, Statistics(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts) if queue_stats.num_dequeue_attempts else None
+			return Statistics(t), None, None
+
+		def add_stats(t, queue_stats, queue_timings):
+			stats_t.add(t)
+			if stats_enq:
+				stats_enq.add(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts)
+				stats_enq.add_min(queue_timings.t_enqueue_min)
+				stats_enq.add_max(queue_timings.t_enqueue_max)
+			if stats_deq:
+				stats_deq.add(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts)
+				stats_deq.add_min(queue_timings.t_dequeue_min)
+				stats_deq.add_max(queue_timings.t_dequeue_max)
+
+		def package_stats():
+			return (stats_t.get(), stats_enq.get() if stats_enq else None, stats_deq.get() if stats_deq else None)
+
+		stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
 		i = 1
 
-		for num_threads, t, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts in data:
+		for num_threads, t, queue_stats, queue_timings in data:
 			if num_threads == cur_num_threads:
 				if i == burn_in:
-					stats.reset(t)
+					stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
 				elif i > burn_in:
-					stats.add(t)
+					add_stats(t, queue_stats, queue_timings)
 				i = i + 1
 			else:
 				if i >= burn_in:
-					yield cur_num_threads, *stats.get()
+					yield cur_num_threads, package_stats()
 				cur_num_threads = num_threads
-				stats.reset(t)
+				stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
 				i = 1
 
 		if i >= burn_in:
-			yield cur_num_threads, *stats.get()
+			yield cur_num_threads, package_stats()
 	except StopIteration:
 		pass
 
@@ -381,6 +442,19 @@ def export(file, results_dir, include):
 	datasets.sort(key=lambda d: d.params.queue_type)
 	datasets.sort(key=lambda d: d.params.device)
 	datasets.sort(key=lambda d: d.params.platform)
+
+	datasets = [(d.params, list(results(d.read()))) for d in datasets]
+
+	def write_line_data(i):
+		for params, dataset in datasets:
+			if dataset:
+				file.write(f"""
+	new LineData(new LineParams("{params.device}-{params.platform}","{params.queue_type}",{params.queue_size},{params.block_size},{params.p_enq},{params.p_deq},{params.workload_size}),[""")
+				for n, stats in dataset:
+					if stats[i]:
+						t_avg, t_min, t_max, _ = stats[i]
+						file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
+				file.write("]),")
 
 	file.write("""class LineParams {
 	constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
@@ -410,16 +484,21 @@ class LineData {
 	}
 };
 
-const data = [""")
+const kernel_run_time = [""")
+	write_line_data(0)
+	file.write("""
+];
 
-	for d in datasets:
-		file.write(f"""
-	new LineData(new LineParams("{d.params.device}-{d.params.platform}","{d.params.queue_type}",{d.params.queue_size},{d.params.block_size},{d.params.p_enq},{d.params.p_deq},{d.params.workload_size}),[""")
-		for n, t_avg, t_min, t_max, _ in results(d.read()):
-			file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
-		file.write("]),")
+const enqueue_time = [""")
+	write_line_data(1)
+	file.write("""
+];
 
-	file.write("\n];\n")
+const dequeue_time = [""")
+	write_line_data(2)
+	file.write("""
+];
+""")
 
 
 def fixup(results_dir, include):
