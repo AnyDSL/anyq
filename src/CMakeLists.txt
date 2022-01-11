@@ -63,6 +63,16 @@ set(AnyQ_PLATFORMS)
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	find_package(CUDAToolkit REQUIRED)
 	list(APPEND AnyQ_PLATFORMS cuda nvvm)
+	set(AnyQ_CUDA_ALL_SANITIZER_TOOLS memcheck racecheck initcheck synccheck)
+	set(AnyQ_CUDA_SANITIZER_TOOLS "all" CACHE STRING "values from all|${AnyQ_CUDA_ALL_SANITIZER_TOOLS} to select cuda sanitizer tools for AnyQ tests on CUDA")
+	if(AnyQ_CUDA_SANITIZER_TOOLS STREQUAL "all")
+		set(AnyQ_CUDA_SANITIZER_TOOLS ${AnyQ_CUDA_ALL_SANITIZER_TOOLS})
+	endif()
+	message(STATUS "AnyQ_CUDA_SANITIZER_TOOLS: ${AnyQ_CUDA_SANITIZER_TOOLS}")
+	find_program(CUDAToolkit_COMPUTE_SANITIZER_EXECUTABLE
+		NAMES compute-sanitizer
+		PATHS ${CUDAToolkit_TARGET_DIR} ${CUDAToolkit_LIBRARY_ROOT} ${CUDAToolkit_BIN_DIR}
+		PATH_SUFFIXES compute-sanitizer)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)

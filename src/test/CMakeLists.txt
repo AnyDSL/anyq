@@ -127,7 +127,17 @@ function(add_queue_tests _mapping _testfile)
 				if (DEFINED ${queue_type}_link_LIBRARIES)
 					target_link_libraries(${_target} PRIVATE ${${queue_type}_link_LIBRARIES})
 				endif()
+
 				add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+				if(${_mapping} STREQUAL "cuda")
+					foreach(_sanitizer ${AnyQ_CUDA_SANITIZER_TOOLS})
+						string(REPLACE " " ";" _sanitizer_options "${AnyQ_CUDA_SANITIZER_${_sanitizer}_OPTIONS}")
+						add_test(NAME "${_target}-${_sanitizer}"
+							COMMAND ${CUDAToolkit_COMPUTE_SANITIZER_EXECUTABLE} --error-exitcode 5 --tool ${_sanitizer} ${_sanitizer_options} $<TARGET_FILE:${_target}>
+							WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+							COMMAND_EXPAND_LISTS)
+					endforeach()
+				endif()
 			endforeach()
 		endforeach()
 	endforeach()
