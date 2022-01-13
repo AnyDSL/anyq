@@ -157,16 +157,8 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 
 		memory_barrier = @|_:memory_order| cuda_threadfence(),
 
-		timestamp = @|| {
-			let mut timestamp:u64;
-			asm("mov.u64 %0, %globaltimer;" : "=l"(timestamp) ::: "volatile");
-			timestamp as i64
-		},
-		timestamp32 = @|| {
-			let mut timestamp:u32;
-			asm("mov.u32 %0, %globaltimer_lo;" : "=r"(timestamp) ::: "volatile");
-			timestamp as i32
-		},
+		timestamp = @|| cuda_globaltimer() as i64,
+		timestamp32 = @|| cuda_globaltimer_lo() as i32,
 
 		// yield = @|_msg:&[u8]| cuda_threadfence() //cuda_nanosleep(0)
 		// atomic_wait_and_transition_global_u32 = cuda_atomic_wait_and_transition[u32](cuda_atomic_cas_global_u32, @|a, b| a == b)
