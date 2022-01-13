@@ -71,6 +71,12 @@ fn @nvvm_atomic_cas[T](location:&mut addrspace(1) T, expected: T, desired: T, me
 fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
 	= cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
+// fn @nvvm_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
+// 	while !nvvm_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
+// 		nvvm_threadfence();
+// 	}
+// }
+
 fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	@body(gpu_thread_context {
 		idx = idx,
@@ -142,7 +148,13 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 		},
 
 		// yield = @|| nvvm_nanosleep(0)
-		yield = @|_msg:&[u8]| nvvm_threadfence()
+		// yield = @|_msg:&[u8]| nvvm_threadfence()
+		// atomic_wait_and_transition_global_u32 = nvvm_atomic_wait_and_transition[u32]
+		wait = @|f:fn() -> bool, _debug_msg:&[u8]| -> () {
+			while !f() {
+				nvvm_threadfence();
+			}
+		}
 	});
 }
 

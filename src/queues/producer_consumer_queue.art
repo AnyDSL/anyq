@@ -166,9 +166,7 @@ fn @genericQueueElementType[T]() {
 				clear = @|| *lock = 0,
 				is_free = @|| *lock == 0,
 				load = @|sink, thread| {
-					while !thread.atomic_cas_global_u32_weak(lock, 2, 3, memory_order::acquire, memory_order::relaxed).1 {
-						thread.yield("wait for element lock to read");
-					}
+					thread.wait(@|| thread.atomic_cas_global_u32_weak(lock, 2, 3, memory_order::acquire, memory_order::relaxed).1, "wait for element lock to read");
 
 					let payload:T = *data;
 					sink(payload);
@@ -176,9 +174,7 @@ fn @genericQueueElementType[T]() {
 					thread.atomic_store_global_u32(lock, 0, memory_order::release);
 				},
 				store = @|source, thread| {
-					while !thread.atomic_cas_global_u32_weak(lock, 0, 1, memory_order::acquire, memory_order::relaxed).1 {
-						thread.yield("wait for element lock to write");
-					}
+					thread.wait(@|| thread.atomic_cas_global_u32_weak(lock, 0, 1, memory_order::acquire, memory_order::relaxed).1, "wait for element lock to write");
 
 					let payload:T = source();
 					*data = payload;
@@ -204,7 +200,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 			clear = @|| *element = FREE,
 			is_free = @|| *element == FREE,
 			load = @|sink, thread| {
-				let tryDequeue = @|| {
+				thread.wait(@|| {
 					let el = thread.atomic_exch_global_u32(element, FREE, memory_order::relaxed);
 					if el != FREE {
 						sink(el);
@@ -213,17 +209,11 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 					else {
 						false
 					}
-				};
-
-				while !tryDequeue() {
-					thread.yield("wait for a successful indexQueueElementType.load()");
-				}
+				}, "wait for a successful indexQueueElementType.load()");
 			},
 			store = @|source, thread| {
 				let value = source();
-				while !thread.atomic_cas_global_u32_weak(element, FREE, value, memory_order::relaxed, memory_order::relaxed).1 {
-					thread.yield("wait for a successful indexQueueElementType.store()");
-				}
+				thread.wait(@|| thread.atomic_cas_global_u32_weak(element, FREE, value, memory_order::relaxed, memory_order::relaxed).1, "wait for a successful indexQueueElementType.store()");
 			},
 			debug_print = @|device| {
 				device.print_2xi32("VALIDATION ERROR: inconsistent queue state: buffer[%d] = %d\n", i as i32, *element as i32);

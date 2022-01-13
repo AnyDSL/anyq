@@ -33,6 +33,12 @@ fn @amdgpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T,
 fn @amdgpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
     = cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "agent");
 
+fn @amdgpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
+    while !amdgpu_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
+        amdgcn_s_sleep(0);
+    }
+}
+
 fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(gpu_thread_context)->()) -> () {
     body(gpu_thread_context {
         idx = idx,
@@ -95,7 +101,13 @@ fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(gpu_thread_conte
         timestamp = @|| { trap(); 0 },   // TODO
         timestamp32 = @|| { trap(); 0 }, // TODO
 
-        yield = @|_msg:&[u8]| amdgcn_s_sleep(0)
+        // yield = @|_msg:&[u8]| amdgcn_s_sleep(0)
+        // atomic_wait_and_transition_global_u32 = amdgpu_atomic_wait_and_transition[u32]
+        wait = @|f:fn() -> bool, _debug_msg:&[u8]| -> () {
+            while !f() {
+                amdgcn_s_sleep(0);
+            }
+        }
     });
 }
 

@@ -88,6 +88,16 @@ fn @cuda_legacy_atomic_memory_order_wrap_cas[T](f: fn(&mut addrspace(1) T, T, T)
 	}
 }
 
+fn @cuda_atomic_wait_and_transition[T](f: fn(&mut addrspace(1) T, T, T) -> T, cmp: fn(T, T) -> bool) {
+	@|location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]| -> () {
+		cuda_legacy_atomic_memory_barrier_pre(order);
+		while !cmp(f(location, expected, desired), expected) {
+			cuda_threadfence();
+		}
+		cuda_legacy_atomic_memory_barrier_post(order);
+	}
+}
+
 fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_context) -> ()) -> () {
 	@body(gpu_thread_context {
 		idx = idx,
@@ -158,7 +168,13 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 			timestamp as i32
 		},
 
-		yield = @|_msg:&[u8]| cuda_threadfence() //cuda_nanosleep(0)
+		// yield = @|_msg:&[u8]| cuda_threadfence() //cuda_nanosleep(0)
+		// atomic_wait_and_transition_global_u32 = cuda_atomic_wait_and_transition[u32](cuda_atomic_cas_global_u32, @|a, b| a == b)
+		wait = @|f:fn() -> bool, _debug_msg:&[u8]| -> () {
+			while !f() {
+				cuda_threadfence();
+			}
+		}
 	});
 }
 
