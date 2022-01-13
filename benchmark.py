@@ -484,17 +484,17 @@ class LineData {
 	}
 };
 
-const kernel_run_time = [""")
+var kernel_run_time = [""")
 	write_line_data(0)
 	file.write("""
 ];
 
-const enqueue_time = [""")
+var enqueue_time = [""")
 	write_line_data(1)
 	file.write("""
 ];
 
-const dequeue_time = [""")
+var dequeue_time = [""")
 	write_line_data(2)
 	file.write("""
 ];

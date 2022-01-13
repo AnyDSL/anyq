@@ -21,6 +21,7 @@ steps:
       files:
         - index.html
         - data.js
+        - main.js
     when:
       branch:
         - master
