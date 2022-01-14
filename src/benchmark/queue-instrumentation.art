@@ -13,14 +13,11 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 
 			let dt = t_end - t_begin;
 
-			stats.t_enqueue += dt as i64;
-			stats.t_enqueue_min = min(stats.t_enqueue_min, dt);
-			stats.t_enqueue_max = max(stats.t_enqueue_max, dt);
-
-			++stats.num_enqueue_attempts;
-
 			if num_pushed > 0 {
-				++stats.num_enqueues;
+				record_queue_operation(stats.enqueue_stats_succ, dt);
+			}
+			else {
+				record_queue_operation(stats.enqueue_stats_fail, dt);
 			}
 
 			num_pushed
@@ -38,14 +35,11 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 
 			let dt = t_end - t_begin;
 
-			stats.t_dequeue += dt as i64;
-			stats.t_dequeue_min = min(stats.t_dequeue_min, dt);
-			stats.t_dequeue_max = max(stats.t_dequeue_max, dt);
-
-			++stats.num_dequeue_attempts;
-
 			if num_poppped > 0 {
-				++stats.num_dequeues;
+				record_queue_operation(stats.dequeue_stats_succ, dt);
+			}
+			else {
+				record_queue_operation(stats.dequeue_stats_fail, dt);
 			}
 
 			num_poppped
