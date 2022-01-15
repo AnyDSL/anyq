@@ -30,7 +30,7 @@ fn init_queue_operation_stats() = QueueOperationStatistics {
 	t_max = 0
 };
 
-fn record_queue_operation(stats: &mut QueueOperationStatistics, t: i32) {
+fn @record_queue_operation(stats: &mut QueueOperationStatistics, t: i32) {
 	++stats.num_operations;
 	stats.t_total += t as i64;
 	stats.t_min = min(stats.t_min, t);
