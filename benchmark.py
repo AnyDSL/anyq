@@ -119,7 +119,6 @@ def parse_benchmark_output_header(file):
 		next(file)
 		platform, device = codecs.decode(next(file)).strip().split(';')
 		next(file)
-		next(file)
 		return QueueBenchmarkParams(params[0], int(params[1]), int(params[2]), float(params[3]), float(params[4]), int(params[5]), platform, device)
 	except (StopIteration, ValueError, TypeError):
 		raise Exception("failed to parse benchmark output")
@@ -265,6 +264,13 @@ class EnqueueDequeueStatistics:
 		self.num_dequeues = num_dequeues,
 		self.num_dequeue_attempts = num_dequeue_attempts
 
+class QueueOperationStatistics:
+	def __init__(self, num_operations, t_total, t_min, t_max):
+		self.num_operations = num_operations
+		self.t_total = t_total
+		self.t_min = t_min
+		self.t_max = t_max
+
 class QueueOperationTimings:
 	def __init__(self, t_enqueue, t_enqueue_min, t_enqueue_max, t_dequeue, t_dequeue_min, t_dequeue_max):
 		self.t_enqueue = t_enqueue
@@ -284,7 +290,7 @@ class Dataset:
 		return f"Dataset({self.params}, device='{self.device}')"
 
 	@staticmethod
-	def parse_row(cols):
+	def parse_row_old_format(cols):
 		num_threads, t = int(cols[0]), float(cols[1])
 
 		if len(cols) == 2:  # original format
@@ -300,14 +306,50 @@ class Dataset:
 		if len(cols) == 12: # with individual operation timings
 			return num_threads, t, queue_stats, queue_timings
 
-		raise Exception("invalid file format")
+	@staticmethod
+	def parse_old_format(file):
+		for l in file:
+			cols = l.split(';')
+			yield Dataset.parse_row_old_format(cols)
+
+	@staticmethod
+	def parse_new_format(file):
+		for l in file:
+			cols = l.split(';')
+			num_threads, t = int(cols[0]), float(cols[1])
+
+			enqueue_stats_succ = QueueOperationStatistics(int(cols[ 2]), int(cols[ 3]), int(cols[ 4]), int(cols[ 5]))
+			enqueue_stats_fail = QueueOperationStatistics(int(cols[ 6]), int(cols[ 7]), int(cols[ 8]), int(cols[ 9]))
+			dequeue_stats_succ = QueueOperationStatistics(int(cols[10]), int(cols[11]), int(cols[12]), int(cols[13]))
+			dequeue_stats_fail = QueueOperationStatistics(int(cols[14]), int(cols[15]), int(cols[16]), int(cols[17]))
+
+			queue_stats = EnqueueDequeueStatistics(
+				enqueue_stats_succ.num_operations,
+				enqueue_stats_succ.num_operations + enqueue_stats_fail.num_operations,
+				dequeue_stats_succ.num_operations,
+				dequeue_stats_succ.num_operations + dequeue_stats_fail.num_operations)
+
+			queue_timings = QueueOperationTimings(
+				enqueue_stats_succ.t_total + enqueue_stats_fail.t_total,
+				min(enqueue_stats_succ.t_min, enqueue_stats_fail.t_min),
+				max(enqueue_stats_succ.t_max, enqueue_stats_fail.t_max),
+				dequeue_stats_succ.t_total + dequeue_stats_fail.t_total,
+				min(dequeue_stats_succ.t_min, dequeue_stats_fail.t_min),
+				max(dequeue_stats_succ.t_max, dequeue_stats_fail.t_max)
+			)
+
+			yield num_threads, t, queue_stats, queue_timings
 
 	def read(self):
 		with open(self.path, "rt") as file:
 			file.seek(self.data_offset)
-			for l in file:
-				cols = l.split(';')
-				yield Dataset.parse_row(cols)
+			header = next(file).split(';')
+			if len(header) in [2, 6, 12]:  # old format
+				yield from Dataset.parse_old_format(file)
+			elif len(header) == 18:        # new format
+				yield from Dataset.parse_new_format(file)
+			else:
+				raise Exception("invalid file format")
 
 
 
