@@ -150,6 +150,8 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 		try:
 			return results_file.stat().st_mtime <= binary.stat().st_mtime
 		except:
+			if verbose:
+				print("cannot determine whether", results_file, "is up-to-date - thus, rerun")
 			return True
 
 	skipped = []
@@ -175,7 +177,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 							output_path = results_dir/results_file_name(binary.test_name, binary.queue_type, binary.queue_size, block_size, p_enq, p_deq, workload_size, device_name, binary.platform)
 							bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
 
-							if rerun or result_outdated(output_path, binary):
+							if rerun or result_outdated(output_path, binary.path):
 								scheduled.append(bm)
 							else:
 								if verbose:
