@@ -253,56 +253,96 @@ function slugify(str) {
 	return str;
 }
 
+function findOrCreateField(name, parentElem) {
+	let elem = parentElem.find('div#pills-' + name);
+	if (elem.length > 0)
+		return elem;
 
-function fillButtonTable(tableElem, line_map, line_style_map)
-{
-	let header_row = $("<tr/>").appendTo(tableElem);
+	let item = $('<li/>')
+		.addClass('nav-item')
+		.attr('role', 'presentation');
+	let btn = $('<button/>')
+		.addClass('nav-link')
+		.attr('id', 'pills-tab-' + name)
+		.attr('data-bs-toggle', 'pill')
+		.attr('data-bs-target', '#pills-' + name)
+		.attr('type', 'button')
+		.attr('role', 'tab')
+		.attr('aria-controls', 'pills-' + name)
+		.attr('aria-selected', 'false')
+		.text(name)
+		.appendTo(item);
 
-	for (const [col_name, entries] of line_map.entries()) {
-		$("<th/>").text(col_name).appendTo(header_row);
+	let tab = $('<div/>')
+		.addClass('tab-pane')
+		.attr('id', 'pills-' + name)
+		.attr('role', 'tabpanel')
+		.attr('aria-labelledby', 'pills-tab-' + name)
+		.attr('data-category', name);
+
+	item.appendTo($('#pills-tab'));
+	tab.appendTo($('#pills-tabContent'));
+	return tab;
+}
+
+function findOrCreateLabel(name, entry, style, parentElem) {
+	//console.log(parentElem);
+	let slug = slugify(String(entry));
+	let elem = parentElem.children('label[data-category="' + name + '"][data-value="' + slug + '"]');
+	//console.log(elem);
+	if (elem.length > 0)
+		return elem;
+
+	let label = $("<label/>")
+		.addClass("checkbox")
+		.attr("data-category", name)
+		.attr("data-value", slug)
+		.appendTo(parentElem);
+
+	if (style) {
+		let stylist = style.get(entry);
+
+		if (stylist) {
+			let svg = d3.create("svg")
+						.attr("width", 24)
+						.attr("height", 9)
+						.attr("class", "legend_item");
+
+			let line = svg.append("path")
+						  .attr("d", "M 0 4 H 24")
+						  .attr("stroke", "black")
+						  .attr("stroke-width", 2);
+
+			stylist(line);
+
+			label.append(svg.node());
+		}
 	}
 
-	let values_row = $("<tr/>").appendTo(tableElem);
+	let checkbox = $("<input/>", {
+		"type": "checkbox",
+		"checked": true
+	});
+	checkbox.appendTo(label);
 
+	$("<span/>").text(entry).appendTo(label);
 
+	return label;
+}
+
+function fillButtonTable(menuElem, line_map, line_style_map)
+{
 	for (const [col_name, entries] of line_map.entries()) {
-		let col = $("<td/>")
-			.attr("data-category", col_name)
-			.appendTo(values_row);
+		let fieldElem = findOrCreateField(col_name, menuElem);
 
 		for (const [entry, lines] of entries) {
-			let label = $("<label/>")
-				.addClass("checkbox")
-				.attr("data-category", col_name)
-				.attr("data-value", slugify(String(entry)))
-				.appendTo(col);
-
 			let style = line_style_map.get(col_name);
 
-			if (style) {
-				let stylist = style.get(entry);
+			let label = findOrCreateLabel(col_name, entry, style, fieldElem);
+			//console.log(label);
 
-				if (stylist) {
-					let svg = d3.create("svg")
-								.attr("width", 24)
-								.attr("height", 9)
-								.attr("class", "legend_item");
+			let checkbox = label.children('input')
 
-					let line = svg.append("path")
-								  .attr("d", "M 0 4 H 24")
-								  .attr("stroke", "black")
-								  .attr("stroke-width", 2);
-
-					stylist(line);
-
-					label.append(svg.node());
-				}
-			}
-
-			let checkbox = $("<input/>", {
-				"type": "checkbox",
-				"checked": true
-			});
 			checkbox.on("change", function() {
 				for (let line of lines) {
 					//console.log(this, lines);
@@ -317,9 +357,6 @@ function fillButtonTable(tableElem, line_map, line_style_map)
 
 				plot.update();
 			});
-			checkbox.appendTo(label);
-
-			$("<span/>").text(entry).appendTo(label);
 
 			label.mouseenter(e => {
 				for (let line of lines) {
@@ -357,11 +394,9 @@ function createOpsPlot(svgElem)
 }
 
 
-function createPlot(plotElem)
+function createPlot(plotElem, menuElem)
 {
 	let svg = $('<svg width="800" height="600" class="plot-graph"></svg>').appendTo(plotElem);
-	let menu = $('<div class="plot-menu"></div>').appendTo(plotElem);
-	//let share = $('<div class="button-share"><a href="#">Go to preconfigured page</a></div>').appendTo(plotElem);
 
 	let plot;
 	if (plotElem.hasClass("plot-time")) {
@@ -404,11 +439,7 @@ function createPlot(plotElem)
 	plot.line_style_map = line_style_map;
 	plot.update();
 
-	let button_table = $("<table/>", {
-		"class": "button_table"
-	});
-	button_table.appendTo(menu);
-	fillButtonTable(button_table, line_map, line_style_map);
+	fillButtonTable(menuElem, line_map, line_style_map);
 
 	return plot;
 }

@@ -16,11 +16,13 @@
 				["queue_size", { attr: "stroke-width", values: [1.5, 2.25, 3.0]}]
 			]);
 		</script>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 		<style type="text/css">
 			body {
+				margin-top: 120px;
 				margin-bottom: 40px;
 			}
-			h2 {
+			h1, h2 {
 			    text-align: center;
 				margin-top: 2rem;
 			}
@@ -33,60 +35,102 @@
 				font-family: sans-serif;
 			}
 
-			th {
+			#plot-menu {
 				font-family: sans-serif;
-				text-align: center;
-			}
-
-			td {
-				padding: 1ex 1em;
-				vertical-align: top
 			}
 
 			.button_table, .button-share {
 				margin: 3ex auto 0
 			}
 
-			.button_table .legend_item {
+			#plot-menu .legend_item {
 				vertical-align: middle
 			}
 
-			.button_table .checkbox {
+			#plot-menu .checkbox {
 				white-space: nowrap;
+				line-height: 24px;
 				display: block;
 			}
+			#plot-menu .checkbox:hover {
+				background: var(--bs-secondary);
+				color: var(--bs-white);
+			}
+
+			#plot-menu .checkbox input {
+				margin: 3px;
+			}
+
 		</style>
 	</head>
 	<body>
-		<h2>Total benchmark runtimes</h2>
-		<div class="plot plot-time" data-src="kernel_run_time"></div>
-		<hr/>
+		<nav class="navbar fixed-top bg-light border-bottom" id="plot-menu">
+			<div class="container">
+				<div class="row w-100 justify-content-between">
+					<div class="col-auto mt-2">
+						<ul class="nav nav-pills" id="pills-tab" role="tablist">
+							<li class="nav-item" role="presentation">
+								<button class="nav-link active" id="pills-home-tab" data-bs-toggle="pill" data-bs-target="#pills-home" type="button" role="tab" aria-controls="pills-home" aria-selected="true">Home</button>
+							</li>
+						</ul>
+					</div>
+					<div class="col-auto mt-2">
+						<button class="nav-link" id="share-btn" type="button">Share</button>
+					</div>
 
-		<h2>Enqueue performance</h2>
-		<div class="plot plot-ops" data-src="enqueue_time"></div>
-		<hr/>
+					<div class="col-12 tab-content mx-5 mt-2" id="pills-tabContent">
+						<div class="tab-pane fade show active d-none" id="pills-home" role="tabpanel" aria-labelledby="pills-home-tab"></div>
+					</div>
 
-		<h2>Dequeue performance</h2>
-		<div class="plot plot-ops" data-src="dequeue_time"></div>
-		<hr/>
+				</div>
+			</div>
+		</nav>
 
+
+		<!-- Page content-->
+		<div class="container">
+			<h1>AnyQ - Benchmark Suite</h1>
+			<hr/>
+
+			<h2>Total benchmark runtimes</h2>
+			<div class="plot plot-time" data-src="kernel_run_time"></div>
+			<hr/>
+
+			<h2>Enqueue performance</h2>
+			<div class="plot plot-ops" data-src="enqueue_time"></div>
+			<hr/>
+
+			<h2>Dequeue performance</h2>
+			<div class="plot plot-ops" data-src="dequeue_time"></div>
+			<hr/>
+	    </div>
+
+
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"></script>
 		<script type="application/javascript">
 			$.ready.then(() => {
 
 				let plots = $("div.plot");
-				plots.each(function (idx, elem) { createPlot($(elem)); });
+				let menu = $('#plot-menu');
+				let body = $('body');
+
+				plots.each(function (idx, elem) { createPlot($(elem), menu); });
+
+				$('.nav .nav-link').on('shown.bs.tab', function(event){
+					body.css('margin-top', menu.height() + 40 + 'px');
+				});
 
 				let url = new window.URL(document.location);
 				let params = url.searchParams;
 
 				for (key of new Set(params.keys())) {
-					let boxes = $("td[data-category=" + key + "]").find("label.checkbox").click();
+					let boxes = $("div[data-category=" + key + "]").find("label.checkbox").click();
 					$.each(params.getAll(key), function(i, val) {
 						boxes.filter("[data-value=" + val + "]").click();
 					});
 				}
 
-				$(".button-share a").click(function() {
+				$("#share-btn").click(function() {
 
 					share = new window.URLSearchParams();
 
