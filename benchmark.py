@@ -448,7 +448,11 @@ def results(data):
 				stats_deq.add_max(queue_timings.t_dequeue_max)
 
 		def package_stats():
-			return (stats_t.get(), stats_enq.get() if stats_enq else None, stats_deq.get() if stats_deq else None)
+			return {
+				"kernel_run_time": stats_t.get(),
+				"enqueue_time": stats_enq.get() if stats_enq else None,
+				"dequeue_time": stats_deq.get() if stats_deq else None
+			}
 
 		stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
 		i = 1
@@ -472,7 +476,7 @@ def results(data):
 	except StopIteration:
 		pass
 
-def export(file, results_dir, include):
+def export(out_dir, results_dir, include):
 	datasets = [d for d in collect_datasets(results_dir, include)]
 
 	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
@@ -487,60 +491,28 @@ def export(file, results_dir, include):
 
 	datasets = [(d.params, list(results(d.read()))) for d in datasets]
 
-	def write_line_data(i):
+	def write_line_data(file, key):
+		file.write(f"var {key} = [")
 		for params, dataset in datasets:
 			if dataset:
 				file.write(f"""
 	new LineData(new LineParams("{params.device}-{params.platform}","{params.queue_type}",{params.queue_size},{params.block_size},{params.p_enq},{params.p_deq},{params.workload_size}),[""")
 				for n, stats in dataset:
-					if stats[i]:
-						t_avg, t_min, t_max, _ = stats[i]
+					data = stats.get(key)
+					if data:
+						t_avg, t_min, t_max, _ = data
 						file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
 				file.write("]),")
+		file.write("\n]\n")
 
-	file.write("""class LineParams {
-	constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
-		this.device = device;
-		this.queue_type = queue_type;
-		this.queue_size = queue_size;
-		this.block_size = block_size;
-		this.p_enq = p_enq;
-		this.p_deq = p_deq;
-		this.workload_size = workload_size;
-	}
-};
+	with open(out_dir/"kernel_run_time.js", "wt") as file:
+		write_line_data(file, "kernel_run_time")
 
-class Result {
-	constructor(num_threads, t_avg, t_min, t_max) {
-		this.num_threads = num_threads;
-		this.t_avg = t_avg;
-		this.t_min = t_min;
-		this.t_max = t_max;
-	}
-};
+	with open(out_dir/"enqueue_time.js", "wt") as file:
+		write_line_data(file, "enqueue_time")
 
-class LineData {
-	constructor(params, results) {
-		this.params = params;
-		this.results = results;
-	}
-};
-
-var kernel_run_time = [""")
-	write_line_data(0)
-	file.write("""
-];
-
-var enqueue_time = [""")
-	write_line_data(1)
-	file.write("""
-];
-
-var dequeue_time = [""")
-	write_line_data(2)
-	file.write("""
-];
-""")
+	with open(out_dir/"dequeue_time.js", "wt") as file:
+		write_line_data(file, "dequeue_time")
 
 
 def fixup(results_dir, include):
@@ -582,7 +554,9 @@ def main(args):
 	elif args.command == plot:
 		plot(results_dir, include)
 	elif args.command == export:
-		export(sys.stdout, results_dir, include)
+		plot_data_dir = this_dir/"plot_data"
+		plot_data_dir.mkdir(exist_ok=True, parents=True)
+		export(plot_data_dir, results_dir, include)
 	elif args.command == fixup:
 		fixup(results_dir, include)
 

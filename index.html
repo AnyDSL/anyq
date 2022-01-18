@@ -4,7 +4,10 @@
 		<meta charset="utf-8">
 		<script type="application/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
 		<script type="application/javascript" src="https://d3js.org/d3.v7.min.js"></script>
-		<script type="application/javascript" src="data.js"></script>
+		<script type="application/javascript" src="main.js"></script>
+		<script type="application/javascript" src="plot_data/kernel_run_time.js"></script>
+		<script type="application/javascript" src="plot_data/enqueue_time.js"></script>
+		<script type="application/javascript" src="plot_data/dequeue_time.js"></script>
 		<script>
 			let line_styles = new Map([
 				// ["device", { attr: "stroke", values: ["red", "green", "blue"]}],
@@ -67,7 +70,6 @@
 		<div class="plot plot-ops" data-src="dequeue_time"></div>
 		<hr/>
 
-		<script type="application/javascript" src="main.js"></script>
 		<script type="application/javascript">
 			$.ready.then(() => {
 

@@ -1,3 +1,32 @@
+class LineParams {
+	constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
+		this.device = device;
+		this.queue_type = queue_type;
+		this.queue_size = queue_size;
+		this.block_size = block_size;
+		this.p_enq = p_enq;
+		this.p_deq = p_deq;
+		this.workload_size = workload_size;
+	}
+};
+
+class Result {
+	constructor(num_threads, t_avg, t_min, t_max) {
+		this.num_threads = num_threads;
+		this.t_avg = t_avg;
+		this.t_min = t_min;
+		this.t_max = t_max;
+	}
+};
+
+class LineData {
+	constructor(params, results) {
+		this.params = params;
+		this.results = results;
+	}
+};
+
+
 class DefaultMap extends Map {
 	get(key, gen) {
 		let el = super.get(key);
