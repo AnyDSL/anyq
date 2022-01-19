@@ -161,7 +161,9 @@
 				let menu = $('#plot-menu');
 				let body = $('body');
 
-				plots.each(function (idx, elem) { createPlot($(elem), menu); });
+				let line_style_map = new Map();
+
+				plots.each(function (idx, elem) { createPlot($(elem), menu, line_style_map); });
 
 				$('.nav .nav-link').on('shown.bs.tab', function(event){
 					body.css('margin-top', menu.height() + 40 + 'px');

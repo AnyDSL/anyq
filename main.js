@@ -440,7 +440,7 @@ function createLatencyPlot(svgElem, opField)
 	return plot;
 }
 
-function createPlot(plotElem, menuElem)
+function createPlot(plotElem, menuElem, line_style_map)
 {
 	let svg = $('<svg viewBox="0 0 800 600" class="plot-graph"></svg>').appendTo(plotElem);
 
@@ -470,11 +470,13 @@ function createPlot(plotElem, menuElem)
 
 	const line_map = plot.add_lines(data);
 
-	const line_style_map = new Map();
 
 	for (const [param, values] of line_map) {
-		const style = line_styles.get(param);
+		let style = line_style_map.get(param);
+		if (style)
+			continue;
 
+		style = line_styles.get(param);
 		if (style) {
 			const style_map = new Map();
 
