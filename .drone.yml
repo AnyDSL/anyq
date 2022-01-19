@@ -20,9 +20,7 @@ steps:
       destination_path: /anyq
       files:
         - index.html
-        - plot_data/kernel_run_time.js
-        - plot_data/enqueue_time.js
-        - plot_data/dequeue_time.js
+        - plot_data/*.js
         - main.js
     when:
       branch:
