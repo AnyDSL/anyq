@@ -7,6 +7,17 @@ class LineDataScope:
 	def result(self, num_threads, t_avg, t_min, t_max):
 		self.file.write(f"new Result({num_threads},{t_avg},{t_min},{t_max}),")
 
+	def write_queue_op_stats(self, stats):
+		self.file.write(f",new QueueOperationStatistics({stats.num_operations},{stats.t_total},{stats.t_min},{stats.t_max})")
+
+	def queue_op_stats_result(self, num_threads, t, n, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
+		self.file.write(f"new QueueOpStatsResult({num_threads},{t},{n}")
+		self.write_queue_op_stats(enqueue_stats_succ)
+		self.write_queue_op_stats(enqueue_stats_fail)
+		self.write_queue_op_stats(dequeue_stats_succ)
+		self.write_queue_op_stats(dequeue_stats_fail)
+		self.file.write("),")
+
 
 class LineDataWriter:
 	def __init__(self, file, params):

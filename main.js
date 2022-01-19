@@ -28,6 +28,18 @@ class QueueOperationStatistics {
 	}
 };
 
+class QueueOpStatsResult {
+	constructor(num_threads, t, n, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail) {
+		this.num_threads = num_threads;
+		this.t = t;
+		this.n = n;
+		this.enqueue_stats_succ = enqueue_stats_succ;
+		this.enqueue_stats_fail = enqueue_stats_fail;
+		this.dequeue_stats_succ = dequeue_stats_succ;
+		this.dequeue_stats_fail = dequeue_stats_fail;
+	}
+};
+
 class LineData {
 	constructor(params, results) {
 		this.params = params;

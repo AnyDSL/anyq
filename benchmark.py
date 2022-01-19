@@ -323,11 +323,12 @@ class StatsAggregator:
 		self.i = self.i + 1
 
 class StatsAggregatorKernelTimes(StatsAggregator):
-	def __init__(self, kernel_run_time, enqueue_time, dequeue_time):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats):
 		super().__init__()
 		self.kernel_run_time = kernel_run_time
 		self.enqueue_time = enqueue_time
 		self.dequeue_time = dequeue_time
+		self.queue_op_stats = queue_op_stats
 
 	def reset(self, num_threads, t):
 		self.stats_t = Statistics(t)
@@ -346,8 +347,8 @@ class StatsAggregatorEqDqStats(StatsAggregatorKernelTimes):
 	def record(self, num_threads, t, queue_stats):
 		super().record(num_threads, t)
 
-	def leave(self):
-		super().leave()
+	# def leave(self):
+	# 	super().leave()
 
 class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
 	def reset(self, num_threads, t, queue_stats, queue_timings):
@@ -400,30 +401,44 @@ class StatsAggregatorOpStats(StatsAggregatorOpTimes):
 
 	def reset(self, num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
 		super().reset(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
+		self.t = t
+		self.n = 1
+		self.enqueue_stats_succ = enqueue_stats_succ
+		self.enqueue_stats_fail = enqueue_stats_fail
+		self.dequeue_stats_succ = dequeue_stats_succ
+		self.dequeue_stats_fail = dequeue_stats_fail
 
 	def record(self, num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
 		super().reset(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
+		self.t += t
+		self.n += 1
+		self.enqueue_stats_succ += enqueue_stats_succ
+		self.enqueue_stats_fail += enqueue_stats_fail
+		self.dequeue_stats_succ += dequeue_stats_succ
+		self.dequeue_stats_fail += dequeue_stats_fail
 
 	def leave(self):
 		super().leave()
+		self.queue_op_stats.queue_op_stats_result(self.cur_num_threads, self.t, self.n, self.enqueue_stats_succ, self.enqueue_stats_fail, self.dequeue_stats_succ, self.dequeue_stats_fail)
 
 class DatasetAggregationVisitor(DatasetVisitor):
-	def __init__(self, kernel_run_time, enqueue_time, dequeue_time):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats):
 		self.kernel_run_time = kernel_run_time
 		self.enqueue_time = enqueue_time
 		self.dequeue_time = dequeue_time
+		self.queue_op_stats = queue_op_stats
 
 	def visit_kernel_times(self):
-		return StatsAggregatorKernelTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+		return StatsAggregatorKernelTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
 
 	def visit_eqdq_stats(self):
-		return StatsAggregatorEqDqStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+		return StatsAggregatorEqDqStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
 
 	def visit_op_times(self):
-		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
 
 	def visit_op_stats(self):
-		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
 
 def export(out_dir, results_dir, include):
 	import plot_data
@@ -440,11 +455,11 @@ def export(out_dir, results_dir, include):
 	datasets.sort(key=lambda d: d.params.device)
 	datasets.sort(key=lambda d: d.params.platform)
 
-	with open(out_dir/"kernel_run_time.js", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.js", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.js", "wt") as dequeue_time_out:
-		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer:
+	with open(out_dir/"kernel_run_time.js", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.js", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.js", "wt") as dequeue_time_out, open(out_dir/"queue_op_stats.js", "wt") as queue_op_stats_out:
+		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer, plot_data.Writer(queue_op_stats_out, "queue_op_stats") as queue_op_stats_writer:
 			for d in datasets:
-				with kernel_run_time_writer.line_data(d.params) as kernel_run_time, enqueue_time_writer.line_data(d.params) as enqueue_time, dequeue_time_writer.line_data(d.params) as dequeue_time:
-					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time))
+				with kernel_run_time_writer.line_data(d.params) as kernel_run_time, enqueue_time_writer.line_data(d.params) as enqueue_time, dequeue_time_writer.line_data(d.params) as dequeue_time, queue_op_stats_writer.line_data(d.params) as queue_op_stats:
+					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats))
 
 
 
