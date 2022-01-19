@@ -71,15 +71,19 @@ class Line {
 		this.vis = 0;
 		this.path.css("visibility", "visible");
 		this.x_max = d3.max(data, d => d.num_threads);
-		this.y_max = d3.max(data, d => this.map_y_data(d));
+		this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 	}
 
 	map_y_data(d) {
 		return NaN;
 	}
 
+	defined(d) {
+		return true;
+	}
+
 	update(x, y, line_style_map) {
-		const line = d3.line().x(d => x(d.num_threads)).y(d => y(this.map_y_data(d)));
+		const line = d3.line().defined(this.defined).x(d => x(d.num_threads)).y(d => y(this.map_y_data(d)));
 
 		this.path.attr("d", line(this.data));
 
@@ -405,6 +409,9 @@ function createOpsPlot(svgElem)
 		map_y_data(d) {
 			// t_avg in nanoseconds
 			return 1000000000 / d.t_avg / d.num_threads;
+		}
+		defined(d) {
+			return d.t_avg > 0;
 		}
 	}
 
