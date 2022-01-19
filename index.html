@@ -27,6 +27,11 @@
 			    text-align: center;
 				margin-top: 2rem;
 			}
+			.plot {
+				max-width: 800px;
+				margin: 10px auto;
+			}
+
 			.plot svg.plot-graph {
 				display: block;
 				margin: auto
@@ -90,20 +95,36 @@
 
 		<!-- Page content-->
 		<div class="container">
-			<h1>AnyQ - Benchmark Suite</h1>
-			<hr/>
+			<div class="row justify-content-center">
+				<div class="col">
+					<h1>AnyQ - Benchmark Suite</h1>
+					<hr/>
+				</div>
+			</div>
 
-			<h2>Total benchmark runtimes</h2>
-			<div class="plot plot-time" data-src="kernel_run_time"></div>
-			<hr/>
+			<div class="row justify-content-center">
+				<div class="col">
+					<h2>Total benchmark runtimes</h2>
+					<div class="plot plot-time" data-src="kernel_run_time"></div>
+					<hr/>
+				</div>
+			</div>
 
-			<h2>Enqueue performance</h2>
-			<div class="plot plot-ops" data-src="enqueue_time"></div>
-			<hr/>
+			<div class="row justify-content-center">
+				<div class="col">
+					<h2>Enqueue performance</h2>
+					<div class="plot plot-ops" data-src="enqueue_time"></div>
+					<hr/>
+				</div>
+			</div>
+			<div class="row justify-content-center">
+				<div class="col">
+					<h2>Dequeue performance</h2>
+					<div class="plot plot-ops" data-src="dequeue_time"></div>
+					<hr/>
+				</div>
+			</div>
 
-			<h2>Dequeue performance</h2>
-			<div class="plot plot-ops" data-src="dequeue_time"></div>
-			<hr/>
 	    </div>
 
 

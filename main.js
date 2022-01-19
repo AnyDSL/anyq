@@ -140,8 +140,8 @@ class TimingLine extends Line {
 class Plot {
 	constructor(svg, y_axis, lineType, margin) {
 		this.svg = svg;
-		this.width = () => svg.width();
-		this.height = () => svg.height();
+		this.width = () => 800; //svg.width();
+		this.height = () => 600; //svg.height();
 		this.margin = margin;
 		this.lineType = lineType;
 
@@ -424,7 +424,7 @@ function createOpsPlot(svgElem)
 
 function createPlot(plotElem, menuElem)
 {
-	let svg = $('<svg width="800" height="600" class="plot-graph"></svg>').appendTo(plotElem);
+	let svg = $('<svg viewBox="0 0 800 600" class="plot-graph"></svg>').appendTo(plotElem);
 
 	let plot;
 	if (plotElem.hasClass("plot-time")) {
