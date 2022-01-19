@@ -421,6 +421,24 @@ function createOpsPlot(svgElem)
 	return plot;
 }
 
+function createLatencyPlot(svgElem, opField)
+{
+	class LatencyLine extends Line {
+		map_y_data(d) {
+			let f = opField(d);
+			return 0.001 * f.t_total / f.num_operations;
+		}
+		defined(d) {
+			let f = opField(d);
+			return f.num_operations > 0;
+		}
+	}
+
+	plot = new Plot(svgElem, "avg time / operation (\u00B5s)", LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_min = 0.001;
+
+	return plot;
+}
 
 function createPlot(plotElem, menuElem)
 {
@@ -431,6 +449,19 @@ function createPlot(plotElem, menuElem)
 		plot = createTimePlot(svg);
 	} else if (plotElem.hasClass("plot-ops")) {
 		plot = createOpsPlot(svg);
+	} else if (plotElem.hasClass("plot-latency")) {
+		let field;
+		if (plotElem.hasClass("plot-latency-enq-success")) {
+			field = d => d.enqueue_stats_succ;
+		} else if (plotElem.hasClass("plot-latency-enq-failure")) {
+			field = d => d.enqueue_stats_fail;
+		} else if (plotElem.hasClass("plot-latency-deq-success")) {
+			field = d => d.dequeue_stats_succ;
+		} else if (plotElem.hasClass("plot-latency-deq-failure")) {
+			field = d => d.dequeue_stats_fail;
+		}
+
+		plot = createLatencyPlot(svg, field);
 	}
 
 	let data = window[plotElem.attr('data-src')];
