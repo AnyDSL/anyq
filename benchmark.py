@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 import argparse
 
+from results import *
+
 
 default_bin_dir = Path(__file__).parent / "build" / "bin"
 
@@ -95,33 +97,6 @@ class QueueBenchmarkBinary:
 				raise BenchmarkError("benchmark failed to run")
 
 		return asyncio.run(run())
-
-
-class QueueBenchmarkParams:
-	def __init__(self, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, platform, device):
-		self.queue_type = queue_type
-		self.queue_size = queue_size
-		self.block_size = block_size
-		self.p_enq = p_enq
-		self.p_deq = p_deq
-		self.workload_size = workload_size
-		self.platform = platform
-		self.device = device
-
-	def __repr__(self):
-		return f"QueueBenchmarkParams(queue_type={self.queue_type}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}')"
-
-def parse_benchmark_output_header(file):
-	try:
-		next(file)
-		params = codecs.decode(next(file)).strip().split(';')
-		next(file)
-		next(file)
-		platform, device = codecs.decode(next(file)).strip().split(';')
-		next(file)
-		return QueueBenchmarkParams(params[0], int(params[1]), int(params[2]), float(params[3]), float(params[4]), int(params[5]), platform, device)
-	except (StopIteration, ValueError, TypeError):
-		raise Exception("failed to parse benchmark output")
 
 
 def benchmark_binaries(bin_dir, include):
@@ -259,107 +234,13 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 			print("  -", bm)
 
 
-class EnqueueDequeueStatistics:
-	def __init__(self, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts):
-		self.num_enqueues = num_enqueues
-		self.num_enqueue_attempts = num_enqueue_attempts
-		self.num_dequeues = num_dequeues,
-		self.num_dequeue_attempts = num_dequeue_attempts
-
-class QueueOperationStatistics:
-	def __init__(self, num_operations, t_total, t_min, t_max):
-		self.num_operations = num_operations
-		self.t_total = t_total
-		self.t_min = t_min
-		self.t_max = t_max
-
-class QueueOperationTimings:
-	def __init__(self, t_enqueue, t_enqueue_min, t_enqueue_max, t_dequeue, t_dequeue_min, t_dequeue_max):
-		self.t_enqueue = t_enqueue
-		self.t_enqueue_min = t_enqueue_min
-		self.t_enqueue_max = t_enqueue_max
-		self.t_dequeue = t_dequeue
-		self.t_dequeue_min = t_dequeue_min
-		self.t_dequeue_max = t_dequeue_max
-
-class Dataset:
-	def __init__(self, params, path, data_offset):
-		self.params = params
-		self.path = path
-		self.data_offset = data_offset
-
-	def __repr__(self):
-		return f"Dataset({self.params}, device='{self.device}')"
-
-	@staticmethod
-	def parse_row_old_format(cols):
-		num_threads, t = int(cols[0]), float(cols[1])
-
-		if len(cols) == 2:  # original format
-			return num_threads, t, None, None
-
-		queue_stats = EnqueueDequeueStatistics(int(cols[2]), int(cols[3]), int(cols[4]), int(cols[5]))
-
-		if len(cols) == 6:  # with enqueue/dequeue stats
-			return num_threads, t, queue_stats, None
-
-		queue_timings = QueueOperationTimings(int(cols[6]), int(cols[7]), int(cols[8]), int(cols[9]), int(cols[10]), int(cols[11]))
-
-		if len(cols) == 12: # with individual operation timings
-			return num_threads, t, queue_stats, queue_timings
-
-	@staticmethod
-	def parse_old_format(file):
-		for l in file:
-			cols = l.split(';')
-			yield Dataset.parse_row_old_format(cols)
-
-	@staticmethod
-	def parse_new_format(file):
-		for l in file:
-			cols = l.split(';')
-			num_threads, t = int(cols[0]), float(cols[1])
-
-			enqueue_stats_succ = QueueOperationStatistics(int(cols[ 2]), int(cols[ 3]), int(cols[ 4]), int(cols[ 5]))
-			enqueue_stats_fail = QueueOperationStatistics(int(cols[ 6]), int(cols[ 7]), int(cols[ 8]), int(cols[ 9]))
-			dequeue_stats_succ = QueueOperationStatistics(int(cols[10]), int(cols[11]), int(cols[12]), int(cols[13]))
-			dequeue_stats_fail = QueueOperationStatistics(int(cols[14]), int(cols[15]), int(cols[16]), int(cols[17]))
-
-			queue_stats = EnqueueDequeueStatistics(
-				enqueue_stats_succ.num_operations,
-				enqueue_stats_succ.num_operations + enqueue_stats_fail.num_operations,
-				dequeue_stats_succ.num_operations,
-				dequeue_stats_succ.num_operations + dequeue_stats_fail.num_operations)
-
-			queue_timings = QueueOperationTimings(
-				enqueue_stats_succ.t_total + enqueue_stats_fail.t_total,
-				min(enqueue_stats_succ.t_min, enqueue_stats_fail.t_min),
-				max(enqueue_stats_succ.t_max, enqueue_stats_fail.t_max),
-				dequeue_stats_succ.t_total + dequeue_stats_fail.t_total,
-				min(dequeue_stats_succ.t_min, dequeue_stats_fail.t_min),
-				max(dequeue_stats_succ.t_max, dequeue_stats_fail.t_max)
-			)
-
-			yield num_threads, t, queue_stats, queue_timings
-
-	def read(self):
-		with open(self.path, "rt") as file:
-			file.seek(self.data_offset)
-			header = next(file).split(';')
-			if len(header) in [2, 6, 12]:  # old format
-				yield from Dataset.parse_old_format(file)
-			elif len(header) == 18:        # new format
-				yield from Dataset.parse_new_format(file)
-			else:
-				raise Exception("invalid file format")
-
-
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
 		if f.suffix == ".csv" and include.match(f.name):
 			with open(f, "rb") as file:
 				yield Dataset(parse_benchmark_output_header(file), f, file.tell())
+
 
 def plot(results_dir, include):
 	import numpy as np
@@ -390,9 +271,10 @@ def plot(results_dir, include):
 				for queue_size, color in zip(queue_sizes, plotutils.getBaseColorCycle()):
 					for workload_size, style in zip(workload_sizes, plotutils.getBaseStyleCycle()):
 						for d in filter(lambda d: d.params.queue_size == queue_size and d.params.workload_size == workload_size, plot_datasets):
-							print(d)
-							t = np.asarray([e for e in d.read()])
-							ax.plot(t[:,0], t[:,1], color=color, linestyle=style)
+							# print(d)
+							# t = np.asarray([e for e in d.read()])
+							# ax.plot(t[:,0], t[:,1], color=color, linestyle=style)
+							pass
 
 				ax.set_xlabel("number of threads")
 				ax.set_ylabel("average run time/ms")
@@ -401,6 +283,7 @@ def plot(results_dir, include):
 				ax.add_artist(matplotlib.legend.Legend(parent=ax, handles=[matplotlib.lines.Line2D([], [], linestyle=style) for _, style in zip(workload_sizes, plotutils.getBaseStyleCycle())], labels=[f"workload = {workload_size}" for workload_size in workload_sizes], loc="upper left", bbox_to_anchor=(0.0, 0.8)))
 
 				canvas.print_figure(results_dir/f"{device_id(device)}-{platform}-{int(p_enq * 100)}-{int(p_deq * 100)}.pdf")
+
 
 class Statistics:
 	def __init__(self, t):
@@ -422,63 +305,129 @@ class Statistics:
 	def add_max(self, t):
 		self.t_max = max(self.t_max, t)
 
-def skip(data, n):
-	for _ in range(n):
-		next(data)
-	yield from data
+class StatsAggregator:
+	def __init__(self, *, burn_in = 3):
+		super().__init__()
+		self.burn_in = burn_in
+		self.cur_num_threads = None
 
-def results(data):
-	burn_in = 3
+	def visit(self, num_threads, *args):
+		if self.cur_num_threads != num_threads:
+			if self.cur_num_threads is not None:
+				self.leave()
+			self.cur_num_threads = num_threads
+			self.i = -self.burn_in
+			self.reset(num_threads, *args)
+		else:
+			self.record(num_threads, *args)
+		self.i = self.i + 1
 
-	try:
-		cur_num_threads, t, queue_stats, queue_timings = next(data)
+class StatsAggregatorKernelTimes(StatsAggregator):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time):
+		super().__init__()
+		self.kernel_run_time = kernel_run_time
+		self.enqueue_time = enqueue_time
+		self.dequeue_time = dequeue_time
 
-		def reset_stats(t, queue_stats, queue_timings):
-			if queue_stats and queue_timings:
-				return Statistics(t), Statistics(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts) if queue_stats.num_enqueue_attempts else None, Statistics(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts) if queue_stats.num_dequeue_attempts else None
-			return Statistics(t), None, None
+	def reset(self, num_threads, t):
+		self.stats_t = Statistics(t)
 
-		def add_stats(t, queue_stats, queue_timings):
-			stats_t.add(t)
-			if stats_enq:
-				stats_enq.add(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts)
-				stats_enq.add_min(queue_timings.t_enqueue_min)
-				stats_enq.add_max(queue_timings.t_enqueue_max)
-			if stats_deq:
-				stats_deq.add(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts)
-				stats_deq.add_min(queue_timings.t_dequeue_min)
-				stats_deq.add_max(queue_timings.t_dequeue_max)
+	def record(self, num_threads, t):
+		self.stats_t.add(t)
 
-		def package_stats():
-			return {
-				"kernel_run_time": stats_t.get(),
-				"enqueue_time": stats_enq.get() if stats_enq else None,
-				"dequeue_time": stats_deq.get() if stats_deq else None
-			}
+	def leave(self):
+		t_avg, t_min, t_max, _ = self.stats_t.get()
+		self.kernel_run_time.result(self.cur_num_threads, t_avg, t_min, t_max)
 
-		stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
-		i = 1
+class StatsAggregatorEqDqStats(StatsAggregatorKernelTimes):
+	def reset(self, num_threads, t, queue_stats):
+		super().reset(num_threads, t)
 
-		for num_threads, t, queue_stats, queue_timings in data:
-			if num_threads == cur_num_threads:
-				if i == burn_in:
-					stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
-				elif i > burn_in:
-					add_stats(t, queue_stats, queue_timings)
-				i = i + 1
-			else:
-				if i >= burn_in:
-					yield cur_num_threads, package_stats()
-				cur_num_threads = num_threads
-				stats_t, stats_enq, stats_deq = reset_stats(t, queue_stats, queue_timings)
-				i = 1
+	def record(self, num_threads, t, queue_stats):
+		super().record(num_threads, t)
 
-		if i >= burn_in:
-			yield cur_num_threads, package_stats()
-	except StopIteration:
-		pass
+	def leave(self):
+		super().leave()
+
+class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
+	def reset(self, num_threads, t, queue_stats, queue_timings):
+		super().reset(num_threads, t, queue_stats)
+		self.stats_enq = Statistics(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts) if queue_stats.num_enqueue_attempts else None
+		self.stats_deq = Statistics(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts) if queue_stats.num_dequeue_attempts else None
+
+	def record(self, num_threads, t, queue_stats, queue_timings):
+		super().record(num_threads, t, queue_stats)
+
+		if self.stats_enq:
+			self.stats_enq.add(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts)
+			self.stats_enq.add_min(queue_timings.t_enqueue_min)
+			self.stats_enq.add_max(queue_timings.t_enqueue_max)
+
+		if self.stats_deq:
+			self.stats_deq.add(queue_timings.t_dequeue / queue_stats.num_dequeue_attempts)
+			self.stats_deq.add_min(queue_timings.t_dequeue_min)
+			self.stats_deq.add_max(queue_timings.t_dequeue_max)
+
+	def leave(self):
+		super().leave()
+
+		if self.stats_enq:
+			t_avg, t_min, t_max, _ = self.stats_enq.get()
+			self.enqueue_time.result(self.cur_num_threads, t_avg, t_min, t_max)
+
+		if self.stats_deq:
+			t_avg, t_min, t_max, _ = self.stats_deq.get()
+			self.dequeue_time.result(self.cur_num_threads, t_avg, t_min, t_max)
+
+class StatsAggregatorOpStats(StatsAggregatorOpTimes):
+	@staticmethod
+	def translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
+		queue_stats = EnqueueDequeueStatistics(
+			enqueue_stats_succ.num_operations,
+			enqueue_stats_succ.num_operations + enqueue_stats_fail.num_operations,
+			dequeue_stats_succ.num_operations,
+			dequeue_stats_succ.num_operations + dequeue_stats_fail.num_operations)
+
+		queue_timings = QueueOperationTimings(
+			enqueue_stats_succ.t_total + enqueue_stats_fail.t_total,
+			min(enqueue_stats_succ.t_min, enqueue_stats_fail.t_min),
+			max(enqueue_stats_succ.t_max, enqueue_stats_fail.t_max),
+			dequeue_stats_succ.t_total + dequeue_stats_fail.t_total,
+			min(dequeue_stats_succ.t_min, dequeue_stats_fail.t_min),
+			max(dequeue_stats_succ.t_max, dequeue_stats_fail.t_max))
+
+		return num_threads, t, queue_stats, queue_timings
+
+	def reset(self, num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
+		super().reset(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
+
+	def record(self, num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
+		super().reset(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
+
+	def leave(self):
+		super().leave()
+
+class DatasetAggregationVisitor(DatasetVisitor):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time):
+		self.kernel_run_time = kernel_run_time
+		self.enqueue_time = enqueue_time
+		self.dequeue_time = dequeue_time
+
+	def visit_kernel_times(self):
+		return StatsAggregatorKernelTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+
+	def visit_eqdq_stats(self):
+		return StatsAggregatorEqDqStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+
+	def visit_op_times(self):
+		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
+
+	def visit_op_stats(self):
+		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time)
 
 def export(out_dir, results_dir, include):
+	import plot_data
+
 	datasets = [d for d in collect_datasets(results_dir, include)]
 
 	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
@@ -491,30 +440,12 @@ def export(out_dir, results_dir, include):
 	datasets.sort(key=lambda d: d.params.device)
 	datasets.sort(key=lambda d: d.params.platform)
 
-	datasets = [(d.params, list(results(d.read()))) for d in datasets]
+	with open(out_dir/"kernel_run_time.js", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.js", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.js", "wt") as dequeue_time_out:
+		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer:
+			for d in datasets:
+				with kernel_run_time_writer.line_data(d.params) as kernel_run_time, enqueue_time_writer.line_data(d.params) as enqueue_time, dequeue_time_writer.line_data(d.params) as dequeue_time:
+					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time))
 
-	def write_line_data(file, key):
-		file.write(f"var {key} = [")
-		for params, dataset in datasets:
-			if dataset:
-				file.write(f"""
-	new LineData(new LineParams("{params.device}-{params.platform}","{params.queue_type}",{params.queue_size},{params.block_size},{params.p_enq},{params.p_deq},{params.workload_size}),[""")
-				for n, stats in dataset:
-					data = stats.get(key)
-					if data:
-						t_avg, t_min, t_max, _ = data
-						file.write(f"new Result({n},{t_avg},{t_min},{t_max}),")
-				file.write("]),")
-		file.write("\n]\n")
-
-	with open(out_dir/"kernel_run_time.js", "wt") as file:
-		write_line_data(file, "kernel_run_time")
-
-	with open(out_dir/"enqueue_time.js", "wt") as file:
-		write_line_data(file, "enqueue_time")
-
-	with open(out_dir/"dequeue_time.js", "wt") as file:
-		write_line_data(file, "dequeue_time")
 
 
 def fixup(results_dir, include):

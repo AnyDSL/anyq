@@ -19,6 +19,15 @@ class Result {
 	}
 };
 
+class QueueOperationStatistics {
+	constructor(num_operations, t_total, t_min, t_max) {
+		this.num_operations = num_operations
+		this.t_total = t_total
+		this.t_min = t_min
+		this.t_max = t_max
+	}
+};
+
 class LineData {
 	constructor(params, results) {
 		this.params = params;
