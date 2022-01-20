@@ -421,6 +421,25 @@ function createOpsPlot(svgElem)
 	return plot;
 }
 
+function createThroughputPlot(svgElem)
+{
+	class ThroughputLine extends Line {
+		map_y_data(d) {
+			let deq = d.dequeue_stats_succ;
+			return 1000.0 * deq.num_operations / d.t;
+		}
+		defined(d) {
+			let deq = d.dequeue_stats_succ.num_operations;
+			return Number.isInteger(deq) && deq > 0 && d.t > 0;
+		}
+	}
+
+	plot = new OpsPlot(svgElem, "queue elements per sec", ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_min = 0.1;
+
+	return plot;
+}
+
 function createLatencyPlot(svgElem, opField)
 {
 	class LatencyLine extends Line {
@@ -449,6 +468,8 @@ function createPlot(plotElem, menuElem, line_style_map)
 		plot = createTimePlot(svg);
 	} else if (plotElem.hasClass("plot-ops")) {
 		plot = createOpsPlot(svg);
+	} else if (plotElem.hasClass("plot-throughput")) {
+		plot = createThroughputPlot(svg);
 	} else if (plotElem.hasClass("plot-latency")) {
 		let field;
 		if (plotElem.hasClass("plot-latency-enq-success")) {
