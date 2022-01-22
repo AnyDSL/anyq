@@ -135,10 +135,21 @@ class TimingLine extends Line {
 }
 
 
-
+function formatLog10(v) {
+	let e = Math.log10(v);
+	if (!Number.isInteger(e)) return;
+	if (e == 0) {
+		return "1";
+	} else if (e == 1) {
+		return "10";
+	} else {
+		return `${v}`;
+		//return `10${(e + "").replace(/./g, c => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c] || "⁻")}`;
+	}
+}
 
 class Plot {
-	constructor(svg, y_axis, lineType, margin) {
+	constructor(svg, y_axis, y_scale, lineType, margin) {
 		this.svg = svg;
 		this.width = () => 800; //svg.width();
 		this.height = () => 600; //svg.height();
@@ -160,6 +171,9 @@ class Plot {
 				   .attr("text-anchor", "middle")
 				   .attr("class", "axis_label")
 		};
+
+		this.y_scale = y_scale;
+		this.y_tickFormat = null;
 
 		this.x_min = 1;
 		this.y_min = 0.0025;
@@ -193,23 +207,30 @@ class Plot {
 		return line_map;
 	}
 
-	update() {
+	update(y_domain) {
 		this.x_max = d3.max(this.lines, l => l.is_visible() ? l.x_max : this.x_min);
 		this.y_max = d3.max(this.lines, l => l.is_visible() ? l.y_max : this.y_min);
 
-		this.x = d3.scaleLog()
-				   .base(2)
-				   .domain([this.x_min, this.x_max])
-				   .range([this.margin.left, this.width() - this.margin.right]);
+		this.x = d3.scaleLog().base(2)
+			.domain([this.x_min, this.x_max])
+			.range([this.margin.left, this.width() - this.margin.right]);
 
-		this.y = d3.scaleLog()
-				   .domain([this.y_min, 1.1 * this.y_max])
-				   .range([this.height() - this.margin.bottom, this.margin.top]);
+		if (y_domain) {
+			this.y_min = y_domain[0];
+			this.y_max = y_domain[1];
+		} else {
+			// add 10% padding to the top
+			this.y_max *= 1.1;
+		}
+
+		this.y = this.y_scale()
+			.domain([this.y_min, this.y_max])
+			.range([this.height() - this.margin.bottom, this.margin.top]);
 
 
 		this.axis.x.call(d3.axisBottom(this.x))
 				   .attr("transform", `translate(0, ${this.y(this.y_min)})`);
-		this.axis.y.call(d3.axisLeft(this.y).ticks(10, v => { if (!Number.isInteger(Math.log10(v))) return; return `${v}`; }))
+		this.axis.y.call(d3.axisLeft(this.y).ticks(10, this.y_tickFormat))
 				   .attr("transform", `translate(${this.x(1)}, 0)`);
 		this.label.x.attr("transform", `translate(${(this.x(this.x_min) + this.x(this.x_max)) / 2}, ${this.y(this.y_min) + 38})`);
 		this.label.y.attr("transform", `translate(${this.x(this.x_min) - 34}, ${(this.y(this.y_min) + this.y(this.y_max)) / 2})rotate(-90)`);
@@ -222,25 +243,13 @@ class Plot {
 	}
 }
 
-class OpsPlot extends Plot {
+class RatioPlot extends Plot {
 
 	update() {
-		super.update();
-
-		this.axis.y.call(d3.axisLeft(this.y).ticks(10, v => {
-			var e = Math.log10(v);
-			if (!Number.isInteger(e)) return;
-			if (e >= 6) {
-				return `${v/1000000}M`;
-			} else if (e >= 3) {
-				return `${v/1000}k`;
-			}
-			return `${v}`;
-		}));
+		super.update([0, 100]);
 	}
 
 }
-
 // const bisect_num_threads = d3.bisector(d => d.num_threads).center;
 
 // let cursor = svg.append("circle")
@@ -399,7 +408,8 @@ function fillButtonTable(menuElem, line_map, line_style_map)
 
 function createTimePlot(svgElem)
 {
-	plot = new Plot(svgElem, "run time/ms", TimingLine, { top: 8, right: 48, bottom: 48, left: 48});
+	let plot = new Plot(svgElem, "run time (ms)", d3.scaleLog, TimingLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_tickFormat = formatLog10;
 	return plot;
 }
 
@@ -415,7 +425,17 @@ function createOpsPlot(svgElem)
 		}
 	}
 
-	plot = new OpsPlot(svgElem, "ops per sec per thread", OpsLine, { top: 8, right: 48, bottom: 48, left: 48});
+	let plot = new Plot(svgElem, "ops/sec per thread", d3.scaleLog, OpsLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_tickFormat = v => {
+		var e = Math.log10(v);
+		if (!Number.isInteger(e)) return;
+		if (e >= 6) {
+			return `${v/1000000}M`;
+		} else if (e >= 3) {
+			return `${v/1000}k`;
+		}
+		return `${v}`;
+	};
 	plot.y_min = 0.001;
 
 	return plot;
@@ -434,8 +454,9 @@ function createThroughputPlot(svgElem)
 		}
 	}
 
-	plot = new OpsPlot(svgElem, "queue elements per sec", ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
-	plot.y_min = 0.1;
+	let plot = new Plot(svgElem, "queue elements per sec", d3.scaleLog, ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_tickFormat = "~s";
+	plot.y_min = 10.0;
 
 	return plot;
 }
@@ -453,8 +474,30 @@ function createLatencyPlot(svgElem, opField)
 		}
 	}
 
-	plot = new Plot(svgElem, "avg time / operation (\u00B5s)", LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot = new Plot(svgElem, "avg time / operation (\u00B5s)", d3.scaleLog, LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot.y_tickFormat = formatLog10;
 	plot.y_min = 0.001;
+
+	return plot;
+}
+
+function createRatioPlot(svgElem, opField1, opField2)
+{
+	class RatioLine extends Line {
+		map_y_data(d) {
+			let f1 = opField1(d);
+			let f2 = opField2(d);
+			let total = f1.num_operations + f2.num_operations;
+			return 100.0 * f1.num_operations / total;
+		}
+		defined(d) {
+			let f1 = opField1(d);
+			let f2 = opField2(d);
+			return f1.num_operations > 0 || f2.num_operations > 0;
+		}
+	}
+
+	plot = new RatioPlot(svgElem, "%", d3.scaleLinear, RatioLine, { top: 8, right: 48, bottom: 48, left: 48});
 
 	return plot;
 }
@@ -481,9 +524,23 @@ function createPlot(plotElem, menuElem, line_style_map)
 		} else if (plotElem.hasClass("plot-latency-deq-failure")) {
 			field = d => d.dequeue_stats_fail;
 		}
+		if (!field) return;
 
 		plot = createLatencyPlot(svg, field);
+	} else if (plotElem.hasClass("plot-percent")) {
+		let f1, f2;
+		if (plotElem.hasClass("plot-ratio-enq-success")) {
+			f1 = d => d.enqueue_stats_succ;
+			f2 = d => d.enqueue_stats_fail;
+		} else if (plotElem.hasClass("plot-ratio-deq-success")) {
+			f1 = d => d.dequeue_stats_succ;
+			f2 = d => d.dequeue_stats_fail;
+		}
+		if (!f1 || !f2) return;
+
+		plot = createRatioPlot(svg, f1, f2);
 	}
+	if (!plot) return;
 
 	let data = window[plotElem.attr('data-src')];
 	//console.log(plotElem, "data:", data);
