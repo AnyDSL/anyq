@@ -72,6 +72,7 @@ class Line {
 		this.path.css("visibility", "visible");
 		this.x_max = d3.max(data, d => d.num_threads);
 		this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
+		//this.y_min = d3.min(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 	}
 
 	map_y_data(d) {
@@ -146,6 +147,17 @@ function formatLog10(v) {
 		return `${v}`;
 		//return `10${(e + "").replace(/./g, c => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c] || "⁻")}`;
 	}
+}
+
+function formatSILog10(v) {
+	var e = Math.log10(v);
+	if (!Number.isInteger(e)) return;
+	if (e >= 6) {
+		return `${v/1000000}M`;
+	} else if (e >= 3) {
+		return `${v/1000}k`;
+	}
+	return `${v}`;
 }
 
 class Plot {
@@ -364,7 +376,7 @@ function findOrCreateLabel(name, entry, style, parentElem) {
 	return label;
 }
 
-function fillButtonTable(menuElem, line_map, line_style_map)
+function fillButtonTable(menuElem, line_map, line_style_map, plot)
 {
 	for (const [col_name, entries] of line_map.entries()) {
 		let fieldElem = findOrCreateField(col_name, menuElem);
@@ -426,16 +438,7 @@ function createOpsPlot(svgElem)
 	}
 
 	let plot = new Plot(svgElem, "ops/sec per thread", d3.scaleLog, OpsLine, { top: 8, right: 48, bottom: 48, left: 48});
-	plot.y_tickFormat = v => {
-		var e = Math.log10(v);
-		if (!Number.isInteger(e)) return;
-		if (e >= 6) {
-			return `${v/1000000}M`;
-		} else if (e >= 3) {
-			return `${v/1000}k`;
-		}
-		return `${v}`;
-	};
+	plot.y_tickFormat = formatSILog10;
 	plot.y_min = 0.001;
 
 	return plot;
@@ -455,7 +458,7 @@ function createThroughputPlot(svgElem)
 	}
 
 	let plot = new Plot(svgElem, "queue elements per sec", d3.scaleLog, ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
-	plot.y_tickFormat = "~s";
+	plot.y_tickFormat = formatSILog10;
 	plot.y_min = 10.0;
 
 	return plot;
@@ -470,13 +473,14 @@ function createLatencyPlot(svgElem, opField)
 		}
 		defined(d) {
 			let f = opField(d);
-			return f.num_operations > 0;
+			//if (!f) return false;
+			return f.num_operations > 0 && f.t_total > 0;
 		}
 	}
 
 	plot = new Plot(svgElem, "avg time / operation (\u00B5s)", d3.scaleLog, LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
 	plot.y_tickFormat = formatLog10;
-	plot.y_min = 0.001;
+	plot.y_min = 0.01;
 
 	return plot;
 }
@@ -578,7 +582,7 @@ function createPlot(plotElem, menuElem, line_style_map)
 	plot.line_style_map = line_style_map;
 	plot.update();
 
-	fillButtonTable(menuElem, line_map, line_style_map);
+	fillButtonTable(menuElem, line_map, line_style_map, plot);
 
 	return plot;
 }
