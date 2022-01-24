@@ -93,6 +93,10 @@ if(AnyQ_BENCHMARK_AUTO)
 endif()
 
 foreach(_platform ${AnyQ_PLATFORMS})
+	if(_platform STREQUAL "cuda")
+		continue()   # skip cuda for now as it's broken
+	endif()
+
 	if(AnyQ_BENCHMARK_AUTO)
 		set(AnyQ_BENCHMARK_ARGS_${_platform} "" CACHE STRING "additional arguments for the benchmark script")
 		string(REPLACE " " ";" BENCHMARK_ARGS "${AnyQ_BENCHMARK_ARGS_${_platform}}")
