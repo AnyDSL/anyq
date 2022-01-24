@@ -45,6 +45,13 @@ class QueueOperationStatistics:
 			min(self.t_min, other.t_min),
 			max(self.t_max, other.t_max))
 
+	def __mul__(self, other):
+		return QueueOperationStatistics(
+			self.num_operations,
+			self.t_total * other,
+			self.t_min * other,
+			self.t_max * other)
+
 
 class DataVisitorKernelTimes:
 	def visit(self, num_threads, t):

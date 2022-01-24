@@ -351,6 +351,10 @@ class StatsAggregatorEqDqStats(StatsAggregatorKernelTimes):
 	# 	super().leave()
 
 class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale):
+		super().__init__(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats)
+		self.op_time_scale = op_time_scale
+
 	def reset(self, num_threads, t, queue_stats, queue_timings):
 		super().reset(num_threads, t, queue_stats)
 		self.stats_enq = Statistics(queue_timings.t_enqueue / queue_stats.num_enqueue_attempts) if queue_stats.num_enqueue_attempts else None
@@ -374,11 +378,11 @@ class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
 
 		if self.stats_enq:
 			t_avg, t_min, t_max, _ = self.stats_enq.get()
-			self.enqueue_time.result(self.cur_num_threads, t_avg, t_min, t_max)
+			self.enqueue_time.result(self.cur_num_threads, t_avg * self.op_time_scale, t_min * self.op_time_scale, t_max * self.op_time_scale)
 
 		if self.stats_deq:
 			t_avg, t_min, t_max, _ = self.stats_deq.get()
-			self.dequeue_time.result(self.cur_num_threads, t_avg, t_min, t_max)
+			self.dequeue_time.result(self.cur_num_threads, t_avg * self.op_time_scale, t_min * self.op_time_scale, t_max * self.op_time_scale)
 
 class StatsAggregatorOpStats(StatsAggregatorOpTimes):
 	@staticmethod
@@ -419,14 +423,15 @@ class StatsAggregatorOpStats(StatsAggregatorOpTimes):
 
 	def leave(self):
 		super().leave()
-		self.queue_op_stats.queue_op_stats_result(self.cur_num_threads, self.t, self.n, self.enqueue_stats_succ, self.enqueue_stats_fail, self.dequeue_stats_succ, self.dequeue_stats_fail)
+		self.queue_op_stats.queue_op_stats_result(self.cur_num_threads, self.t, self.n, self.enqueue_stats_succ * self.op_time_scale, self.enqueue_stats_fail * self.op_time_scale, self.dequeue_stats_succ * self.op_time_scale, self.dequeue_stats_fail * self.op_time_scale)
 
 class DatasetAggregationVisitor(DatasetVisitor):
-	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale):
 		self.kernel_run_time = kernel_run_time
 		self.enqueue_time = enqueue_time
 		self.dequeue_time = dequeue_time
 		self.queue_op_stats = queue_op_stats
+		self.op_time_scale = op_time_scale
 
 	def visit_kernel_times(self):
 		return StatsAggregatorKernelTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
@@ -435,10 +440,10 @@ class DatasetAggregationVisitor(DatasetVisitor):
 		return StatsAggregatorEqDqStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
 
 	def visit_op_times(self):
-		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
+		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
 
 	def visit_op_stats(self):
-		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
+		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
 
 def export(out_dir, results_dir, include):
 	import plot_data
@@ -459,7 +464,8 @@ def export(out_dir, results_dir, include):
 		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer, plot_data.Writer(queue_op_stats_out, "queue_op_stats") as queue_op_stats_writer:
 			for d in datasets:
 				with kernel_run_time_writer.line_data(d.params) as kernel_run_time, enqueue_time_writer.line_data(d.params) as enqueue_time, dequeue_time_writer.line_data(d.params) as dequeue_time, queue_op_stats_writer.line_data(d.params) as queue_op_stats:
-					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats))
+					op_time_scale = 10 if d.params.platform == "amdgpu" else 1  # timestamps on AMDGPU count in units of 10 ns
+					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale))
 
 
 
