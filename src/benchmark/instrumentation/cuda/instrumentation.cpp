@@ -15,7 +15,7 @@ Instrumentation::Instrumentation(int device)
 	// initialize CUPTI Profiling API in order to get increased %globaltimer resolution
 
 	CUpti_Profiler_Initialize_Params params = {
-		sizeof(params),
+		CUpti_Profiler_Initialize_Params_STRUCT_SIZE,
 		nullptr
 	};
 
