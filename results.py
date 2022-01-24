@@ -94,7 +94,7 @@ class Dataset:
 		self.data_offset = data_offset
 
 	def __repr__(self):
-		return f"Dataset({self.params}, device='{self.device}')"
+		return f"Dataset({self.params})"
 
 	@staticmethod
 	def make_sink(visitor, header):
