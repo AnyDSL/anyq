@@ -237,7 +237,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
-		if f.suffix == ".csv" and include.match(f.name):
+		if f.suffix == ".csv" and "-cuda" not in f.stem and include.match(f.name):
 			with open(f, "rb") as file:
 				yield Dataset(parse_benchmark_output_header(file), f, file.tell())
 
