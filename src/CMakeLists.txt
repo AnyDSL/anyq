@@ -73,6 +73,8 @@ if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 		NAMES compute-sanitizer
 		PATHS ${CUDAToolkit_TARGET_DIR} ${CUDAToolkit_LIBRARY_ROOT} ${CUDAToolkit_BIN_DIR}
 		PATH_SUFFIXES compute-sanitizer)
+	find_path(CUDA_cupti_INCLUDE_DIR cupti.h
+		PATHS ${CUDAToolkit_INCLUDE_DIRS} ${CUDAToolkit_TARGET_DIR}/include ${CUDAToolkit_TARGET_DIR}/extras/CUPTI/include)
 endif()
 
 if (AnyDSL_runtime_HAS_HSA_SUPPORT)
