@@ -73,8 +73,8 @@ function(generate_benchmarks template_file platform)
 			set(target_name "${variant_name}-${platform}")
 			add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources})
 
-			if (DEFINED ${queue_type}_link_LIBRARIES)
-				target_link_libraries(${target_name} PRIVATE ${${queue_type}_link_LIBRARIES})
+			if (DEFINED ${queue_type}_configure_target)
+				cmake_language(CALL ${${queue_type}_configure_target} ${target_name})
 			endif()
 		endforeach()
 	endforeach()
@@ -93,10 +93,6 @@ if(AnyQ_BENCHMARK_AUTO)
 endif()
 
 foreach(_platform ${AnyQ_PLATFORMS})
-	if(_platform STREQUAL "cuda")
-		continue()   # skip cuda for now as it's broken
-	endif()
-
 	if(AnyQ_BENCHMARK_AUTO)
 		set(AnyQ_BENCHMARK_ARGS_${_platform} "" CACHE STRING "additional arguments for the benchmark script")
 		string(REPLACE " " ";" BENCHMARK_ARGS "${AnyQ_BENCHMARK_ARGS_${_platform}}")

@@ -124,8 +124,9 @@ function(add_queue_tests _mapping _testfile)
 
 				set(_target "${variant_name}-${_mapping}")
 				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES} ${${queue_type}_sources})
-				if (DEFINED ${queue_type}_link_LIBRARIES)
-					target_link_libraries(${_target} PRIVATE ${${queue_type}_link_LIBRARIES})
+
+				if (DEFINED ${queue_type}_configure_target)
+					cmake_language(CALL ${${queue_type}_configure_target} ${_target})
 				endif()
 
 				add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

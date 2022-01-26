@@ -89,27 +89,10 @@ if (Thorin_HAS_RV_SUPPORT)
 endif()
 
 
-set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_fiberless ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_cuda ConcurrentProducerConsumerQueue MichaelScottQueue)
-set(queue_types_nvvm ${queue_types_cuda})
-set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
-
-set(ConcurrentProducerConsumerQueue_short_name CPCQ)
-set(MichaelScottQueue_short_name MSQ)
-set(MoodyCamelQueue_short_name MOQ)
-
-set(ConcurrentProducerConsumerQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/producer_consumer_queue.art)
-set(MichaelScottQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/michael_scott.art)
-set(MoodyCamelQueue_sources ${CMAKE_CURRENT_SOURCE_DIR}/queues/moodycamel.art)
-
-set(MoodyCamelQueue_link_LIBRARIES moodycamel)
-
+include(queues/queues.cmake)
 
 if (BUILD_TESTING)
 	add_subdirectory(test)
 endif()
 
 add_subdirectory(benchmark)
-
-add_subdirectory(queues)
