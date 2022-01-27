@@ -508,7 +508,7 @@ function createRatioPlot(svgElem, opField1, opField2)
 
 function createPlot(plotElem, menuElem, line_style_map)
 {
-	let svg = $('<svg viewBox="0 0 800 600" class="plot-graph"></svg>').appendTo(plotElem);
+	let svg = $('<svg viewBox="0 0 800 600" class="plot-graph" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>').appendTo(plotElem);
 
 	let plot;
 	if (plotElem.hasClass("plot-time")) {
@@ -583,6 +583,30 @@ function createPlot(plotElem, menuElem, line_style_map)
 	plot.update();
 
 	fillButtonTable(menuElem, line_map, line_style_map, plot);
+
+	let saveBtn = $('<div class="plot-save-btn d-flex justify-content-end"><a class="btn btn-outline-secondary">Download</a></div>')
+		.appendTo(plotElem)
+		.find('.btn').click(function(e) {
+			let active = $("label.checkbox")
+				.filter(function(idx, label) {
+					return $(label).find("input[type='checkbox']").prop("checked");
+				})
+				.map(function () {
+					let label = $(this);
+					return label.attr("data-category") + ':' + label.attr("data-value");
+				})
+				.get().join(', ');
+
+			let blob = new Blob([
+					'<?xml version="1.0" encoding="UTF-8" standalone="no"?>', '\n',
+					'<!-- ', active, ' -->', '\n',
+					svg.prop('outerHTML')
+				], {type: 'image/svg+xml'});
+
+			let a = $(this);
+			a.attr('href', window.URL.createObjectURL(blob));
+			a.attr('download', 'plot.svg');
+		});
 
 	return plot;
 }
