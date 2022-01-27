@@ -175,7 +175,7 @@ class Plot {
 		};
 		this.label = {
 			x: this.graph.append("text")
-				   .text("number of threads")
+				   .text("number of concurrent producers/consumers")
 				   .attr("text-anchor", "middle")
 				   .attr("class", "axis_label"),
 			y: this.graph.append("text")
