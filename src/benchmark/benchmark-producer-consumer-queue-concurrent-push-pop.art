@@ -58,13 +58,16 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 								for _ in range(0, workload_size) {
 									rand_state = rng::xorshift32(rand_state);
 								}
+
+								rand_state
 							};
 
 							for _ in range(0, attempts_per_thread) {
 								if sample(c_enq) {
+									let value = simulate_workload();
+
 									for _ in q.push(thread) {
-										simulate_workload();
-										rand_state
+										value
 									};
 								}
 
@@ -72,8 +75,9 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 
 								if sample(c_deq) {
 									for _, _ in q.pop(thread) {
-										simulate_workload();
 									};
+
+									simulate_workload();
 								}
 
 								wave.barrier();
