@@ -38,7 +38,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 			}
 		},
 
-		run = @|num_threads: i32| {
+		run = @|num_threads: i32, i: i32| {
 			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {
@@ -48,7 +48,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 							let mut stats = init_benchmark_stats();
 							let q = wrap_queue_instrumentation(queue, &mut stats);
 
-							let mut rand_state = rng::xorseed32(thread_id);
+							let mut rand_state = rng::xorseed32(thread_id * (i + 1) as u32);
 
 							let sample = @|c: u32| -> bool {
 								rand_state = rng::xorshift32(rand_state);

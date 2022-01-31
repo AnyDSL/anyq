@@ -61,7 +61,7 @@ fn accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, 
 
 struct QueueBenchmark {
 	reset: fn() -> (),
-	run: fn(i32) -> (),
+	run: fn(i32, i32) -> (),
 	read_stats: fn() -> QueueBenchmarkStatistics
 }
 
@@ -79,13 +79,13 @@ fn @run_queue_benchmark(device: i32, num_threads_min: i32, num_threads_max: i32,
 	let N = 10;
 
 	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
-		for _ in range(0, N) {
+		for i in range(0, N) {
 			print_i32(num_threads); print_char(';');
 
 			benchmark.reset();
 
 			for instrumentation.time() {
-				benchmark.run(num_threads);
+				benchmark.run(num_threads, i);
 			}
 
 			let stats = benchmark.read_stats();
