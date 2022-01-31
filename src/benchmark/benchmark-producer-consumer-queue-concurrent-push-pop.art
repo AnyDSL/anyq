@@ -51,33 +51,37 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 							let mut rand_state = rng::xorseed32(thread_id);
 
 							let sample = @|c: u32| -> bool {
-								rng::xorshift32(rand_state) < c
+								rand_state = rng::xorshift32(rand_state);
+								rand_state < c
 							};
+
+							let mut next_value = rand_state;
 
 							let simulate_workload = @|| {
 								for _ in range(0, workload_size) {
-									rand_state = rng::xorshift32(rand_state);
+									next_value = rng::xorshift32(next_value);
 								}
 
-								rand_state
+								next_value
 							};
 
 							for _ in range(0, attempts_per_thread) {
 								if sample(c_enq) {
-									let value = simulate_workload();
+									next_value = simulate_workload();
 
 									for _ in q.push(thread) {
-										value
+										next_value
 									};
 								}
 
 								wave.barrier();
 
 								if sample(c_deq) {
-									for _, _ in q.pop(thread) {
-									};
-
-									simulate_workload();
+									if for value, _ in q.pop(thread) {
+										next_value = value;
+									} > 0 {
+										simulate_workload();
+									}
 								}
 
 								wave.barrier();
