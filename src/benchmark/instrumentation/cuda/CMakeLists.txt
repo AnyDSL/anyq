@@ -15,3 +15,7 @@ add_executable(measure_globaltimer_res
 	${CMAKE_CURRENT_SOURCE_DIR}/measure_globaltimer_res.cu
 )
 target_link_libraries(measure_globaltimer_res PUBLIC CUDA::cudart CUDA::cupti)
+
+set_target_properties(measure_globaltimer_res PROPERTIES
+	CUDA_ARCHITECTURES "61;70;75"
+)
