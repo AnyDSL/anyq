@@ -23,7 +23,7 @@ struct QueueBenchmarkStatistics {
 	dequeue_stats_fail: QueueOperationStatistics
 }
 
-fn init_queue_operation_stats() = QueueOperationStatistics {
+fn @init_queue_operation_stats() = QueueOperationStatistics {
 	num_operations = 0,
 	t_total = 0,
 	t_min = ((1 as u32 << 31) - 1) as i32,
@@ -37,21 +37,21 @@ fn @record_queue_operation(stats: &mut QueueOperationStatistics, t: i32) {
 	stats.t_max = max(stats.t_max, t);
 }
 
-fn init_benchmark_stats() = QueueBenchmarkStatistics {
+fn @init_benchmark_stats() = QueueBenchmarkStatistics {
 	enqueue_stats_succ = init_queue_operation_stats(),
 	enqueue_stats_fail = init_queue_operation_stats(),
 	dequeue_stats_succ = init_queue_operation_stats(),
 	dequeue_stats_fail = init_queue_operation_stats(),
 };
 
-fn accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: gpu_thread_context) {
+fn @accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: gpu_thread_context) {
 	thread.atomic_add_global_i64(dest.num_operations, stats.num_operations, memory_order::relaxed);
 	thread.atomic_add_global_i64(dest.t_total, stats.t_total, memory_order::relaxed);
 	thread.atomic_min_global_i32(dest.t_min, stats.t_min, memory_order::relaxed);
 	thread.atomic_max_global_i32(dest.t_max, stats.t_max, memory_order::relaxed);
 }
 
-fn accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: gpu_thread_context) {
+fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: gpu_thread_context) {
 	accumulate_queue_operation_stats(&mut dest.enqueue_stats_succ, stats.enqueue_stats_succ, thread);
 	accumulate_queue_operation_stats(&mut dest.enqueue_stats_fail, stats.enqueue_stats_fail, thread);
 	accumulate_queue_operation_stats(&mut dest.dequeue_stats_succ, stats.dequeue_stats_succ, thread);

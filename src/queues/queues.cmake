@@ -10,7 +10,7 @@ target_compile_definitions(moodycamel PRIVATE MOODYCAMEL_STATIC)
 
 set(queue_types_cpu ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
 set(queue_types_fiberless ConcurrentProducerConsumerQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_cuda )
+set(queue_types_cuda BrokerWorkDistributorQueueCUDA)
 set(queue_types_nvvm ConcurrentProducerConsumerQueue MichaelScottQueue)
 set(queue_types_amdgpu ConcurrentProducerConsumerQueue MichaelScottQueue)
 
@@ -30,3 +30,25 @@ function (MoodyCamelQueue_configure target)
 	target_link_libraries(${target} PRIVATE moodycamel)
 endfunction()
 
+
+set(BrokerWorkDistributorQueueCUDA_configure_target BrokerWorkDistributorQueueCUDA_configure)
+
+set(BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/bwd.h")
+
+function (BrokerWorkDistributorQueueCUDA_configure target)
+	get_target_property(bin_dir ${target} BINARY_DIR)
+	get_target_property(name ${target} NAME)
+
+	set(cuda_src "${bin_dir}/${name}.cu")
+	set(patched_cuda_src "${bin_dir}/${name}.patched.cu")
+
+	add_custom_command(
+		TARGET ${target}
+		POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E rename ${cuda_src} ${cuda_src}.orig
+		COMMAND ${CMAKE_COMMAND} -E cat ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES} ${cuda_src}.orig > ${patched_cuda_src}
+		COMMAND ${CMAKE_COMMAND} -E copy ${patched_cuda_src} ${cuda_src}
+	)
+
+	set_property(TARGET ${target} PROPERTY LINK_DEPENDS ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES})
+endfunction()
