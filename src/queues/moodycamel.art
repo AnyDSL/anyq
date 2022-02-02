@@ -4,7 +4,7 @@ type MoodycamelValue = i64;
 
 #[import(cc = "C", name = "moodycamel_cq_create")]       fn moodycamel_cq_create(_capacity: u32, _num_producer: u32, _out_handle: &mut MoodycamelCQHandle) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_destroy")]      fn moodycamel_cq_destroy(_: MoodycamelCQHandle) -> i32;
-#[import(cc = "C", name = "moodycamel_cq_enqueue")]      fn moodycamel_cq_enqueue(_: MoodycamelCQHandle, _: MoodycamelValue) -> i32;
+#[import(cc = "C", name = "moodycamel_cq_try_enqueue")]  fn moodycamel_cq_try_enqueue(_: MoodycamelCQHandle, _: MoodycamelValue) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_try_dequeue")]  fn moodycamel_cq_try_dequeue(_: MoodycamelCQHandle, _:&mut MoodycamelValue) -> i32;
 #[import(cc = "C", name = "moodycamel_cq_size_approx")]  fn moodycamel_cq_size_approx(_: MoodycamelCQHandle) -> i64;
 
@@ -43,7 +43,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 			let slot = alloc_slot(thread);
 			if (slot != nil) {
 				memory(slot) = source(slot);
-				let success = moodycamel_cq_enqueue(queue, slot as i64);
+				let success = moodycamel_cq_try_enqueue(queue, slot as i64);
 				if success > 0 { 1 } else { 0 }
 			} else {
 				0
@@ -95,7 +95,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 
 #[import(cc = "C")] fn moodycamel_cq_create_u32(_capacity: u32, _num_producer: u32, _out_handle: &mut MoodycamelCQHandle) -> i32;
 #[import(cc = "C")] fn moodycamel_cq_destroy_u32(_: MoodycamelCQHandle) -> i32;
-#[import(cc = "C")] fn moodycamel_cq_enqueue_u32(_: MoodycamelCQHandle, _value: u32) -> i32;
+#[import(cc = "C")] fn moodycamel_cq_try_enqueue_u32(_: MoodycamelCQHandle, _value: u32) -> i32;
 #[import(cc = "C")] fn moodycamel_cq_try_dequeue_u32(_: MoodycamelCQHandle, _out_value: &mut u32) -> i32;
 #[import(cc = "C")] fn moodycamel_cq_size_approx_u32(_: MoodycamelCQHandle) -> u64;
 
@@ -138,7 +138,7 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 			let slot = alloc_slot(thread);
 			if (slot != nil) {
 				let value = source(slot);
-				let success = moodycamel_cq_enqueue_u32(queue, value);
+				let success = moodycamel_cq_try_enqueue_u32(queue, value);
 				if success > 0 { 1 } else { 0 }
 			} else {
 				0

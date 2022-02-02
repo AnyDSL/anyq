@@ -31,7 +31,7 @@ int moodycamel_cq_create(uint32_t capacity, uint32_t num_producer, MoodycamelCQH
 	//std::cout << "moodycamel::ConcurrentQueue for " << num_producer << " implicit producers." << std::endl;
 
 	//locked_memory = false;
-	MoodycamelCQPtr retval = new MoodycamelCQType(/*capacity*/ 6 * MoodycamelCQType::BLOCK_SIZE, 0, num_producer);
+	MoodycamelCQPtr retval = new MoodycamelCQType(capacity /* 6 * MoodycamelCQType::BLOCK_SIZE */, 0, num_producer);
 	//locked_memory = true;
 
 	if (retval == nullptr) {
@@ -47,9 +47,9 @@ int moodycamel_cq_destroy(MoodycamelCQHandle handle)
 	return 1;
 }
 
-int moodycamel_cq_enqueue(MoodycamelCQHandle handle, MoodycamelValue value)
+int moodycamel_cq_try_enqueue(MoodycamelCQHandle handle, MoodycamelValue value)
 {
-	return reinterpret_cast<MoodycamelCQPtr>(handle)->enqueue(value) ? 1 : 0;
+	return reinterpret_cast<MoodycamelCQPtr>(handle)->try_enqueue(value) ? 1 : 0;
 }
 
 int moodycamel_cq_try_dequeue(MoodycamelCQHandle handle, MoodycamelValue* value)
@@ -71,7 +71,7 @@ int moodycamel_cq_create_u32(uint32_t capacity, uint32_t num_producer, Moodycame
 	//std::cout << "moodycamel::ConcurrentQueue for " << num_producer << " implicit producers." << std::endl;
 
 	//locked_memory = false;
-	MoodycamelCQU32Ptr retval = new MoodycamelCQU32Type(/*capacity*/ 6 * MoodycamelCQU32Type::BLOCK_SIZE, 0, num_producer);
+	MoodycamelCQU32Ptr retval = new MoodycamelCQU32Type(capacity /* 6 * MoodycamelCQU32Type::BLOCK_SIZE */, 0, num_producer);
 	//locked_memory = true;
 	if (retval == nullptr) {
 		return 0;
@@ -86,9 +86,9 @@ int moodycamel_cq_destroy_u32(MoodycamelCQHandle handle)
 	return 1;
 }
 
-int moodycamel_cq_enqueue_u32(MoodycamelCQHandle handle, uint32_t value)
+int moodycamel_cq_try_enqueue_u32(MoodycamelCQHandle handle, uint32_t value)
 {
-	return reinterpret_cast<MoodycamelCQU32Ptr>(handle)->enqueue(value) ? 1 : 0;
+	return reinterpret_cast<MoodycamelCQU32Ptr>(handle)->try_enqueue(value) ? 1 : 0;
 }
 
 int moodycamel_cq_try_dequeue_u32(MoodycamelCQHandle handle, uint32_t* value)
