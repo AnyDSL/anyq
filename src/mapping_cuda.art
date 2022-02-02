@@ -114,7 +114,7 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(gpu_thread_conte
 
 		atomic_add_global_i32 = cuda_legacy_atomic_memory_order_wrap_rmw[i32](cuda_atomic_add_global_i32),
 		atomic_add_global_u32 = cuda_legacy_atomic_memory_order_wrap_rmw[u32](cuda_atomic_add_global_u32),
-		atomic_add_global_i64 = cuda_legacy_atomic_memory_order_wrap_rmw[i64](@|location:&mut addrspace(1) i64, value:i64| cuda_atomic_add_global_u64(bitcast[&mut addrspace(1) u64](location), value as u64) as i64),
+		atomic_add_global_i64 = cuda_legacy_atomic_memory_order_wrap_rmw[i64](@|location:&mut addrspace(1) i64, value:i64| cuda_atomic_add_global_u64(location as &mut addrspace(1) u64, value as u64) as i64),
 		atomic_add_global_u64 = cuda_legacy_atomic_memory_order_wrap_rmw[u64](cuda_atomic_add_global_u64),
 
 		atomic_sub_global_i32 = cuda_legacy_atomic_memory_order_wrap_rmw[i32](cuda_atomic_sub_global_i32),
