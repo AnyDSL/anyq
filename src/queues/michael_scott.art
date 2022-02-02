@@ -15,7 +15,8 @@ struct MichaelScottQueueNode[T] {
 	next: u32
 }
 
-fn @createMichaelScottQueue[T](device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
+fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[T] {
+	let pool_size = (1 << 21) * 20 * 2;
 	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScottQueueNode[T]]();
 	let buffer_alignment = alignof[MichaelScottQueueNode[T]]();
 
