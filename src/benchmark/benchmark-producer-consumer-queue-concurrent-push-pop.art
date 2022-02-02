@@ -14,7 +14,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 	let device = createAccDevice(device_id);
 
 	let stats_buffer_alloc = device.alloc(sizeof[QueueBenchmarkStatistics]());
-	let stats_buffer = bitcast[&mut addrspace(1) QueueBenchmarkStatistics](stats_buffer_alloc.data);
+	let stats_buffer = stats_buffer_alloc.data as &mut addrspace(1) QueueBenchmarkStatistics;
 
 	let queue = create_queue(device, queue_size);
 
