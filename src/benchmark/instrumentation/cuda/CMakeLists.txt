@@ -1,8 +1,12 @@
 
 add_library(instrumentation_cuda STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CUDA/error.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/CUDA/error.h
 	${CMAKE_CURRENT_SOURCE_DIR}/CUDA/event.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/CUDA/event.h
+	${CMAKE_CURRENT_SOURCE_DIR}/CUDA/unique_handle.h
 	${CMAKE_CURRENT_SOURCE_DIR}/instrumentation.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/instrumentation.h
 )
 target_include_directories(instrumentation_cuda INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 # sometimes FindCUDAToolkit's `CUDA::cupti` target is broken
