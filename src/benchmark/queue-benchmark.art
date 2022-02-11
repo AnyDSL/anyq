@@ -69,7 +69,7 @@ struct QueueBenchmark {
 fn @run_queue_benchmark(device: i32, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
 	let instrumentation = create_instrumentation(device);
 
-	print_string("platform;device_name\n");
+	print_string("platform;device_name;fingerprint\n");
 	instrumentation.print_device_info();
 	print_char('\n');
 	print_char('\n');

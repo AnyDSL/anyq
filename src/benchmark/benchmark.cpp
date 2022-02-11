@@ -10,6 +10,8 @@
 
 using namespace std::literals;
 
+extern const char* FINGERPRINT;
+
 
 extern "C"
 {
@@ -22,7 +24,7 @@ extern "C"
 
 	void instrumentation_print_device_info(void* ctx)
 	{
-		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';');
+		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';') << ';' << FINGERPRINT;
 	}
 
 	void instrumentation_begin(void* ctx)
@@ -102,7 +104,7 @@ int main(int argc, char* argv[])
 
 			int device = parse_argument<int>(argv[2]);
 
-			Instrumentation(device).print_device_info(std::cout);
+			Instrumentation(device).print_device_info(std::cout) << std::endl << FINGERPRINT;
 
 			return 0;
 		}

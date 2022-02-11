@@ -2,7 +2,7 @@ import codecs
 
 
 class QueueBenchmarkParams:
-	def __init__(self, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, platform, device):
+	def __init__(self, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, platform, device, fingerprint):
 		self.queue_type = queue_type
 		self.queue_size = queue_size
 		self.block_size = block_size
@@ -11,9 +11,10 @@ class QueueBenchmarkParams:
 		self.workload_size = workload_size
 		self.platform = platform
 		self.device = device
+		self.fingerprint = fingerprint
 
 	def __repr__(self):
-		return f"QueueBenchmarkParams(queue_type={self.queue_type}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}')"
+		return f"QueueBenchmarkParams(queue_type={self.queue_type}, queue_size={self.queue_size}, block_size={self.block_size}, p_enq={self.p_enq}, p_deq={self.p_deq}, workload_size={self.workload_size}, platform='{self.platform}', device='{self.device}', fingerprint='{self.fingerprint}')"
 
 class EnqueueDequeueStatistics:
 	def __init__(self, num_enqueues, num_enqueue_attempts, num_dequeues, num_dequeue_attempts):
@@ -156,8 +157,10 @@ def parse_benchmark_output_header(file):
 		params = codecs.decode(next(file)).strip().split(';')
 		next(file)
 		next(file)
-		platform, device = codecs.decode(next(file)).strip().split(';')
+		config = codecs.decode(next(file)).split(';')
+		platform, device = config[0].strip(), config[1].strip()
+		fingerprint = config[2].strip() if len(config) > 2 else None
 		next(file)
-		return QueueBenchmarkParams(params[0], int(params[1]), int(params[2]), float(params[3]), float(params[4]), int(params[5]), platform, device)
+		return QueueBenchmarkParams(params[0], int(params[1]), int(params[2]), float(params[3]), float(params[4]), int(params[5]), platform, device, fingerprint)
 	except (StopIteration, ValueError, TypeError):
 		raise Exception("failed to parse benchmark output")

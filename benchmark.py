@@ -29,20 +29,22 @@ class QueueBenchmarkBinary:
 		self.queue_type = queue_type
 		self.queue_size = queue_size
 		self.platform = platform
+		self.fingerprint = None
 
 	def __repr__(self):
 		return f"QueueBenchmarkBinary(path={self.path}, test_name={self.test_name}, queue_type={self.queue_type}, queue_size={self.queue_size}, platform={self.platform}')"
 
 	async def capture_benchmark_info(self, p):
 		device_name = None
+		fingerprint = None
 
-		async for l in p.stdout:
-			device_name = codecs.decode(l).strip()
+		device_name = codecs.decode(await p.stdout.readline()).strip()
+		fingerprint = codecs.decode(await p.stdout.readline()).strip()
 
-		if not device_name:
-			raise Exception("failed to parse device name")
+		if not device_name or not fingerprint:
+			raise Exception("failed to parse device name or fingerprint of benchmark executable")
 
-		return device_name
+		return device_name, fingerprint
 
 	def info(self, device):
 		async def run():
@@ -52,7 +54,7 @@ class QueueBenchmarkBinary:
 				str(device),
 				stdout=asyncio.subprocess.PIPE)
 
-			device_name = await self.capture_benchmark_info(p)
+			device_name, self.fingerprint = await self.capture_benchmark_info(p)
 
 			if await p.wait() != 0:
 				raise Exception("benchmark info failed to run")
@@ -123,8 +125,17 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 	def result_outdated(results_file, binary):
 		try:
-			return results_file.stat().st_mtime <= binary.stat().st_mtime
+			if not results_file.is_file():
+				return True
+			# return results_file.stat().st_mtime <= binary.path.stat().st_mtime
+			with open(results_file, 'rb') as f:
+				header = parse_benchmark_output_header(f)
+				if header.fingerprint is None:
+					return True
+				# print(header.fingerprint, binary.fingerprint, binary.path)
+				return header.fingerprint != binary.fingerprint
 		except:
+			raise
 			if verbose:
 				print("cannot determine whether", results_file, "is up-to-date - thus, rerun")
 			return True
@@ -133,9 +144,12 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	scheduled = []
 
 	device_name_cache = dict()
+	# avoid scanning the benchmark binaries dir over and over again
+	# we want to keep a persistent list of binaries since we amend it with info, such as fingerprint
+	selected_binaries = list(benchmark_binaries(bin_dir, include))
 
 	for workload_size in (1, 8, 32, 128, 2048):
-		for binary in benchmark_binaries(bin_dir, include):
+		for binary in selected_binaries:
 			for device in devices.get(binary.platform):
 				device_name = device_name_cache.get((binary.platform, device))
 
@@ -152,7 +166,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 							output_path = results_dir/results_file_name(binary.test_name, binary.queue_type, binary.queue_size, block_size, p_enq, p_deq, workload_size, device_name, binary.platform)
 							bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
 
-							if rerun or result_outdated(output_path, binary.path):
+							if rerun or result_outdated(output_path, binary):
 								scheduled.append(bm)
 							else:
 								if verbose:
@@ -186,6 +200,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 					buffer.seek(0)
 					params_reported = parse_benchmark_output_header(buffer)
+					# print(params_reported.device, bm.device_name)
 
 					if params_reported.device != bm.device_name:
 						raise Exception("benchmark reported inconsistent device name")
