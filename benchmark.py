@@ -120,7 +120,7 @@ class QueueBenchmarkRun:
 	def __str__(self):
 		return f"{self.binary.path.stem} -- {' '.join([str(v) for v in self.args.values()])}"
 
-def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None, verbose = False):
+def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None, retry_timeout = None, verbose = False):
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -173,15 +173,13 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 									print("skipping", output_path)
 								skipped.append(bm)
 
-	print("run", len(scheduled), "benchmarks")
 	failed = []
 	timeouted = []
 	succeeded = []
-	total = len(scheduled)
 
 	def num_digits(n):
 		d = 1
-		while n > 10:
+		while n >= 10:
 			n /= 10
 			d += 1
 		return d
@@ -189,50 +187,68 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	def pad(n, width):
 		return " " * (width - num_digits(n)) + str(n)
 
+	total = len(scheduled)
 	max_digits = num_digits(total)
 
 	try:
-		for i, bm in enumerate(scheduled):
-			try:
-				with io.BytesIO() as buffer:
-					print("[", pad(i+1, max_digits), "/", total, "]", bm)
-					bm.binary.run(buffer, **bm.args, timeout=timeout)
+		iteration = 1
+		current_timeout = timeout
+		while total > 0:
+			print(iteration, "--", "run", total, "benchmarks with timeout of", ("%.3f" % current_timeout), "sec")
+			for i, bm in enumerate(scheduled):
+				try:
+					with io.BytesIO() as buffer:
+						print(iteration, "--", "[", pad(i+1, max_digits), "/", total, "]", bm)
+						bm.binary.run(buffer, **bm.args, timeout=current_timeout)
 
-					buffer.seek(0)
-					params_reported = parse_benchmark_output_header(buffer)
-					# print(params_reported.device, bm.device_name)
+						buffer.seek(0)
+						params_reported = parse_benchmark_output_header(buffer)
+						# print(params_reported.device, bm.device_name)
 
-					if params_reported.device != bm.device_name:
-						raise Exception("benchmark reported inconsistent device name")
+						if params_reported.device != bm.device_name:
+							raise Exception("benchmark reported inconsistent device name")
 
-					if params_reported.platform != bm.binary.platform:
-						raise Exception("benchmark reported inconsistent platform")
+						if params_reported.platform != bm.binary.platform:
+							raise Exception("benchmark reported inconsistent platform")
 
-					if params_reported.queue_type != bm.binary.queue_type:
-						raise Exception("benchmark reported inconsistent queue type")
+						if params_reported.queue_type != bm.binary.queue_type:
+							raise Exception("benchmark reported inconsistent queue type")
 
-					if params_reported.queue_size != bm.binary.queue_size:
-						raise Exception("benchmark reported inconsistent queue size")
+						if params_reported.queue_size != bm.binary.queue_size:
+							raise Exception("benchmark reported inconsistent queue size")
 
-					if not dryrun:
-						with open(bm.output_path, "wb") as file:
-							file.write(buffer.getbuffer())
+						if not dryrun:
+							with open(bm.output_path, "wb") as file:
+								file.write(buffer.getbuffer())
 
-					succeeded.append(bm)
+						succeeded.append(bm)
+						if bm in timeouted:
+							timeouted.remove(bm)
 
-			except asyncio.TimeoutError:
-				print("TIMEOUT")
-				timeouted.append(bm)
+				except asyncio.TimeoutError:
+					print("TIMEOUT")
+					if bm not in timeouted:
+						timeouted.append(bm)
 
-			except BenchmarkError:
-				print("BENCHMARK FAILED")
-				failed.append(bm)
+				except BenchmarkError:
+					print("BENCHMARK FAILED")
+					failed.append(bm)
+
+			if retry_timeout is None:
+				break
+			else:
+				iteration += 1
+				current_timeout *= retry_timeout
+				print(iteration, "--", "reschedule", len(timeouted), "benchmarks that ran into timeout")
+				scheduled = timeouted.copy()
+				total = len(scheduled)
+				max_digits = num_digits(total)
 
 	except KeyboardInterrupt:
 		print("\n[CTRL+C detected]")
 
 	print("\nSummary on benchmarks:")
-	padding = " " * (max_digits + 4)
+	padding = " " * (max_digits + 9)
 	print(padding, pad(len(succeeded), max_digits), "successfully executed")
 	print(padding, pad(len(skipped), max_digits), "skipped")
 	print(padding, pad(len(failed), max_digits), "failed")
@@ -518,7 +534,7 @@ def main(args):
 			"amdgpu": device_list(args.amdgpu_device)
 		}
 
-		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout, verbose=args.verbose)
+		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout, retry_timeout=args.retry_timeout, verbose=args.verbose)
 
 	elif args.command == plot:
 		plot(results_dir, include)
@@ -546,7 +562,8 @@ if __name__ == "__main__":
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
 	run_cmd.add_argument("-rerun", "--rerun-all", dest="rerun", action="store_true")
 	run_cmd.add_argument("-dryrun", "--dryrun", dest="dryrun", action="store_true")
-	run_cmd.add_argument("--timeout", type=int, default=20)
+	run_cmd.add_argument("--timeout", type=float, default=20)
+	run_cmd.add_argument("--retry-timeout", type=float, default=2.0)
 	run_cmd.add_argument("-v", "--verbose", action="store_true")
 
 	plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
