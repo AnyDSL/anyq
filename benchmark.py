@@ -62,15 +62,16 @@ class QueueBenchmarkBinary:
 			return device_name
 		return asyncio.run(run())
 
-	async def capture_benchmark_output(self, dest, p):
-		def write(l):
-			# sys.stdout.write(codecs.decode(l))
-			sys.stdout.write('.')
-			sys.stdout.flush()
-			dest.write(l)
-
-		async for l in p.stdout:
-			write(l)
+	async def capture_benchmark_output(self, dest, p, timeout):
+		try:
+			while line := await asyncio.wait_for(p.stdout.readline(), timeout):
+				sys.stdout.write('.')
+				sys.stdout.flush()
+				dest.write(line)
+		except asyncio.TimeoutError as e:
+			values = line.decode('ansi').split(';')
+			e.last_success = (float(values[0]), float(values[1]))
+			raise
 
 		sys.stdout.write('\n')
 
@@ -88,7 +89,7 @@ class QueueBenchmarkBinary:
 				stdout=asyncio.subprocess.PIPE)
 
 			try:
-				await asyncio.wait_for(self.capture_benchmark_output(dest, p), timeout)
+				await self.capture_benchmark_output(dest, p, timeout)
 			except asyncio.TimeoutError:
 				p.kill()
 				raise
@@ -148,6 +149,9 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	# we want to keep a persistent list of binaries since we amend it with info, such as fingerprint
 	selected_binaries = list(benchmark_binaries(bin_dir, include))
 
+	num_threads_min = 1
+	num_threads_max = 1 << 21
+
 	for workload_size in (1, 8, 32, 128, 2048):
 		for binary in selected_binaries:
 			for device in devices.get(binary.platform):
@@ -160,8 +164,6 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 				for p_enq in (0.25, 0.5, 1.0):
 					for p_deq in (0.25, 0.5, 1.0):
 						for block_size in [32, 256, 1024]:
-							num_threads_min = 1
-							num_threads_max = 1 << 21
 
 							output_path = results_dir/results_file_name(binary.test_name, binary.queue_type, binary.queue_size, block_size, p_enq, p_deq, workload_size, device_name, binary.platform)
 							bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
@@ -225,8 +227,11 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 						if bm in timeouted:
 							timeouted.remove(bm)
 
-				except asyncio.TimeoutError:
-					print("TIMEOUT")
+				except asyncio.TimeoutError as e:
+					threads, total_time = e.last_success
+					eta = num_threads_max * total_time / threads / 1000
+					print("TIMEOUT (eta %.2fs)" % eta)
+					bm.eta = eta
 					if bm not in timeouted:
 						timeouted.append(bm)
 
@@ -262,7 +267,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	if len(timeouted) > 0:
 		print("\nThe following benchmarks ran into TIMEOUT:")
 		for bm in timeouted:
-			print("  -", bm)
+			print("  -", bm, '\t\t --', 'eta %.2fs' % bm.eta)
 
 
 
