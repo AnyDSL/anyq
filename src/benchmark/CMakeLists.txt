@@ -43,12 +43,26 @@ find_package(Python3 COMPONENTS Interpreter)
 
 
 function(add_benchmark _target _testfile _mapping)
-	set(_target_fingerprint ${CMAKE_CURRENT_BINARY_DIR}/${_target}-fingerprint.cpp)
-	set(_target_sources
-		$<FILTER:$<TARGET_PROPERTY:${_target},SOURCES>,EXCLUDE,${_target_fingerprint}>
+	add_anydsl_executable(${_target} ${COMMON_BENCHMARK_FILES} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${ARGN})
+
+	get_target_property(_target_sources ${_target} SOURCES)
+	list(APPEND _target_sources
 		$<TARGET_PROPERTY:benchmark_harness_${_mapping},SOURCES>
 		$<TARGET_PROPERTY:instrumentation_${_mapping},SOURCES>
 	)
+
+	set_target_properties(${_target} PROPERTIES FOLDER "benchmarks/${_mapping}" )
+	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
+	if(ADDITIONAL_LINK_DEPENDENCY)
+		foreach(_dep ${ADDITIONAL_LINK_DEPENDENCY})
+			list(APPEND _target_sources $<TARGET_PROPERTY:${_dep},SOURCES>)
+		endforeach()
+		target_link_libraries(${_target} PRIVATE ${ADDITIONAL_LINK_DEPENDENCY})
+	endif()
+	target_link_libraries(${_target} PRIVATE benchmark_harness_${_mapping})
+	add_dependencies(benchmark-${_mapping} ${_target})
+
+	set(_target_fingerprint ${CMAKE_CURRENT_BINARY_DIR}/${_target}-fingerprint.cpp)
 	set(FINGERPRINT_COMMAND Python3::Interpreter ${AnyQ_ROOT_DIR}/fingerprint.py -o ${_target_fingerprint})
 	add_custom_command(OUTPUT ${_target_fingerprint}
 		COMMAND ${FINGERPRINT_COMMAND} ${_target_sources}
@@ -56,14 +70,7 @@ function(add_benchmark _target _testfile _mapping)
 		COMMENT "Generating fingerprint of ${_target}"
 		WORKING_DIRECTORY ${AnyQ_ROOT_DIR} VERBATIM COMMAND_EXPAND_LISTS
 	)
-	add_anydsl_executable(${_target} ${COMMON_BENCHMARK_FILES} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${_target_fingerprint} ${ARGN})
-	set_target_properties(${_target} PROPERTIES FOLDER "benchmarks/${_mapping}" )
-	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
-	if(ADDITIONAL_LINK_DEPENDENCY)
-		target_link_libraries(${_target} PRIVATE ${ADDITIONAL_LINK_DEPENDENCY})
-	endif()
-	target_link_libraries(${_target} PRIVATE benchmark_harness_${_mapping})
-	add_dependencies(benchmark-${_mapping} ${_target})
+	target_sources(${_target} PRIVATE ${_target_fingerprint})
 endfunction()
 
 set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerIndexQueue")
