@@ -28,7 +28,7 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/queue.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
-	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<LOWER_CASE:$<CONFIG>>.art
+	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<IF:$<CONFIG:Debug>,debug,release>.art
 )
 
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
