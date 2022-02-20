@@ -23,8 +23,8 @@
 #[import(cc = "C", name = "bq_pop_fail")] fn bq_pop_fail[T](&mut T) -> i32;
 
 
-fn @createBrokerWorkDistributorQueueCUDA[T](_device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
-	let bq_init = match (pool_size) {
+fn @createBrokerWorkDistributorQueueCUDA[T](_device: AccDevice, queue_size: i32) -> ProducerConsumerQueue[T] {
+	let bq_init = match (queue_size) {
 		1000 => bq_init_1000,
 		10000 => bq_init_10000,
 		100000 => bq_init_100000,
@@ -32,7 +32,7 @@ fn @createBrokerWorkDistributorQueueCUDA[T](_device: AccDevice, pool_size: i32) 
 		_ => bq_init_fail
 	};
 
-	let bq_push = match (pool_size) {
+	let bq_push = match (queue_size) {
 		1000 => bq_push_1000[T],
 		10000 => bq_push_10000[T],
 		100000 => bq_push_100000[T],
@@ -40,7 +40,7 @@ fn @createBrokerWorkDistributorQueueCUDA[T](_device: AccDevice, pool_size: i32) 
 		_ => bq_push_fail[T]
 	};
 
-	let bq_pop = match (pool_size) {
+	let bq_pop = match (queue_size) {
 		1000 => bq_pop_1000[T],
 		10000 => bq_pop_10000[T],
 		100000 => bq_pop_100000[T],

@@ -1,0 +1,137 @@
+// implementation of queue algorithm described in
+// Bernhard Kerbl, Michael Kenzel, Joerg H. Mueller, Dieter Schmalstieg, Markus Steinberger, 2018, The Broker Queue: A Fast, Linearizable FIFO Queue for Fine-Granular Work Distribution on the GPU
+// ICS '18: Proceedings of the 2018 International Conference on Supercomputing, pages 76–85
+// https://doi.org/10.1145/3205289.3205291
+
+struct BrokerWorkDistributorQueue {
+	head: u32,
+	tail: u32,
+	size: i32,
+}
+
+fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> ProducerConsumerQueue[T] {
+	let tickets_offset = round_up_i64(sizeof[BrokerWorkDistributorQueue](), alignof[u32]());
+	let buffer_offset = round_up_i64(tickets_offset + queue_size as i64 * sizeof[u32](), alignof[T]());
+
+	let alloc_size = buffer_offset + queue_size as i64 * sizeof[T]();
+
+	let queue_device_alloc = device.alloc(alloc_size);
+	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
+
+	let queue = &mut queue_device_memory(0) as &mut addrspace(1) BrokerWorkDistributorQueue;
+	let tickets = &mut queue_device_memory(tickets_offset) as &mut addrspace(1) [u32];
+	let buffer = &mut queue_device_memory(buffer_offset) as &mut addrspace(1) [T];
+
+
+	fn @wait_for_ticket(i: u32, number: u32, thread: gpu_thread_context) -> () {
+		thread.wait(@|| tickets(i) == number, "BWD waiting for ticket");
+	}
+
+	fn @ensure_dequeue(thread: gpu_thread_context) -> bool {
+		let mut num = thread.atomic_load_global_i32(queue.size, memory_order::relaxed);
+
+		let mut ensurance = false;
+
+		while !ensurance && num > 0 {
+			if thread.atomic_sub_global_i32(queue.size, 1, memory_order::relaxed) > 0 {
+				ensurance = true;
+			}
+			else {
+				num = thread.atomic_add_global_i32(queue.size, 1, memory_order::relaxed) + 1;
+			}
+		}
+
+		ensurance
+	}
+
+	fn @ensure_enqueue(thread: gpu_thread_context) -> bool {
+		let mut num = thread.atomic_load_global_i32(queue.size, memory_order::relaxed);
+
+		let mut ensurance = false;
+
+		while !ensurance && num < queue_size {
+			if thread.atomic_add_global_i32(queue.size, 1, memory_order::relaxed) < queue_size {
+				ensurance = true;
+			}
+			else {
+				num = thread.atomic_sub_global_i32(queue.size, 1, memory_order::relaxed) - 1;
+			}
+		}
+
+		ensurance
+	}
+
+	fn @read_data(sink: fn(T, u32) -> (), thread: gpu_thread_context) -> () {
+		let pos = thread.atomic_add_global_u32(queue.head, 1, memory_order::relaxed);
+		let p = pos % queue_size as u32;
+
+		wait_for_ticket(p, 2 * (pos / queue_size as u32) + 1, thread);
+		let val = buffer(p);
+		thread.memory_barrier(memory_order::acquire);
+		tickets(p) = 2 * ((pos + queue_size as u32) / queue_size as u32);
+
+		sink(val, p);
+	}
+
+	fn @put_data(source: fn(u32) -> T, thread: gpu_thread_context) -> () {
+		let pos = thread.atomic_add_global_u32(queue.tail, 1, memory_order::relaxed);
+		let p = pos % queue_size as u32;
+		let b = 2 * (pos / queue_size as u32);
+
+		let val = source(p);
+
+		wait_for_ticket(p, b, thread);
+		buffer(p) = val;
+		thread.memory_barrier(memory_order::release);
+		tickets(p) = b + 1;
+	}
+
+	ProducerConsumerQueue[T] {
+		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+			if ensure_enqueue(thread) {
+				put_data(source, thread);
+				1
+			}
+			else {
+				0
+			}
+		},
+
+		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+			if ensure_dequeue(thread) {
+				read_data(sink, thread);
+				1
+			}
+			else {
+				0
+			}
+		},
+
+		size = @|thread| {
+			thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+		},
+
+		reset = @|grid| {
+			for thread in grid.threads() {
+				let lid = thread.idx(0) as i32;
+
+				if lid == 0 {
+					queue.size = 0;
+					queue.head = 0;
+					queue.tail = 0;
+				}
+		
+				for i in range_step(lid, queue_size, grid.num_threads(0) as i32) {
+					tickets(i) = 0;
+				}
+			}
+		},
+
+		validate = @|_corrupted: &mut addrspace(1) u32, _grid| {
+		},
+
+		release = @|| {
+			release(queue_device_alloc);
+		}
+	}
+}

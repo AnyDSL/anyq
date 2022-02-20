@@ -146,14 +146,14 @@ public:
 
 		for (int v = lid; v < N; v += blockDim.x * gridDim.x)
 		{
-			ring_buffer[v] = T(0x0);
+			// ring_buffer[v] = T(0x0);
 			tickets[v] = 0x0;
 		}
 	}
 
 	__device__ inline bool enqueue(const T& data)
 	{
-		bool writeData= ensureEnqueue();
+		bool writeData = ensureEnqueue();
 		if (writeData)
 		{
 			putData(data);
@@ -249,11 +249,3 @@ extern "C"
 		return bq_pop<1000000>(value);
 	}
 }
-
-
-#ifdef __LP64__
-inline __device__ unsigned long atomicAdd(unsigned long* loc, unsigned long value)
-{
-	return atomicAdd(reinterpret_cast<unsigned long long*>(loc), value);
-}
-#endif

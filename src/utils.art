@@ -1,6 +1,8 @@
 
 fn @min(a: i32, b: i32) -> i32 { if a < b { a } else { b } }
+fn @min_i64(a: i64, b: i64) -> i64 { if a < b { a } else { b } }
 fn @max(a: i32, b: i32) -> i32 { if a > b { a } else { b } }
+fn @max_i64(a: i64, b: i64) -> i64 { if a > b { a } else { b } }
 fn @abs(a: i32) -> i32 { if a < 0 { -a } else { a } }
 
 
