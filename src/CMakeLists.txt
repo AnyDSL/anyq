@@ -42,7 +42,9 @@ if (Boost_FOUND)
 	target_sources(fiber-support
 		PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/fibers.h
 		PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fibers.cpp)
-	target_include_directories(fiber-support PRIVATE ${Boost_INCLUDE_DIRS})
+	target_include_directories(fiber-support
+		PRIVATE ${Boost_INCLUDE_DIRS}
+		PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 	target_link_libraries(fiber-support PRIVATE ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 	option(AnyQ_VERBOSE OFF)
