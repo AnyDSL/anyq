@@ -10,7 +10,6 @@ endfunction()
 
 
 disable_tests(
-	test-suite-atomic_cas-reverse-cpu
 	test-suite-atomic_cas-reverse-fiberless
 	test-suite-atomic_cas-reverse-cuda
 	test-suite-atomic_cas-reverse-nvvm

@@ -1,5 +1,10 @@
 
-// inst_stats[x86_64]: atomicrmw(4), extractelement(0), insertelement(10), shufflevector(3), cmpxchg(0), urem(1)
+// inst_stats[x86_64]: atomicrmw(1), llvm.vector.reduce.add.v8i32(1), extractelement(7), insertelement(14), shufflevector(3), cmpxchg(0), urem(1)
+
+// improved RV codegen in [da19b25]: 1x atomicrmw, 1x llvm.vector.reduce.add.v8i32,
+//                                   vec_width: 7x extract of active lanes, 8x insertelement to ressemble the vector
+//                                   broadcasts: 2x insertelement + 3x shufflevector
+//                                   wrap_around_value: 4x cascaded insertelement
 
 // improved RV codegen in [f2ea517]: -4x cascaded extract & atomicrmw (PEed active lanes only), -4x broadcasts
 
