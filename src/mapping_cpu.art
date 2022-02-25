@@ -117,7 +117,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
-	let _do_once = do_once_op(self, vec_width);
+	let do_once = do_once_op(self, vec_width);
 
 	@body(gpu_thread_context {
 		idx = tid,
@@ -245,9 +245,12 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 
 		// yield = @|msg| { do_once(@|_, _| { fibers_yield(msg); }); }
 		// atomic_wait_and_transition_global_u32 = cpu_atomic_wait_and_transition[u32]
-		wait = @|f:fn() -> bool, _debug_msg:&[u8]| -> () {
+		wait = @|f:fn() -> bool, debug_msg:&[u8]| -> () {
+			let mut retry = 50;
 			while !f() {
 				// fibers_yield(debug_msg);
+				retry =- 1;
+				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
 			}
 		}
 	});
