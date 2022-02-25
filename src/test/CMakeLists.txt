@@ -216,3 +216,5 @@ endif()
 if (AnyQ_FIBER_SUPPORT)
 	add_subdirectory(fiber-test-suite)
 endif()
+
+include(${AnyQ_ROOT_DIR}/test-properties.cmake OPTIONAL)
