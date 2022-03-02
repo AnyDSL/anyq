@@ -18,36 +18,36 @@ class BrokerWorkDistributor
 
 	// use nanosleep on Turing architecture, threadfence on all others
 #if __CUDA_ARCH__ < 700
-	__device__ __forceinline__ void backoff()
+	__device__ static __forceinline__ void backoff()
 	{
 		__threadfence();
 	}
 
 	template <typename L>
-	__device__ __forceinline__ L uncachedLoad(L* l)
+	__device__ static __forceinline__ L uncachedLoad(const L* l)
 	{
 		return *l;
 	}
 
 	template <typename L>
-	__device__ __forceinline__ L atomicLoad(L* l)
+	__device__ static __forceinline__ L atomicLoad(const L* l)
 	{
 		return *l;
 	}
 #else
-	__device__ __forceinline__ void backoff()
+	__device__ static __forceinline__ void backoff()
 	{
 		__threadfence();
 	}
 
 	template <typename L>
-	__device__ __forceinline__ L uncachedLoad(L* l)
+	__device__ static __forceinline__ L uncachedLoad(const L* l)
 	{
 		return *l;
 	}
 
 	template <typename L>
-	__device__ __forceinline__ L atomicLoad(L* l)
+	__device__ static __forceinline__ L atomicLoad(const L* l)
 	{
 		return *l;
 	}
@@ -169,83 +169,45 @@ public:
 			readData(data);
 		}
 	}
+
+	__device__ int size() const
+	{
+		return atomicLoad(&count);
+	}
 };
 
 #endif
 
 template <int N, typename T>
-__device__ BrokerWorkDistributor<N, T> broker_queue;
+__device__ BrokerWorkDistributor<N, T> bwd_index_queue;
 
 template <int N>
-inline __device__ void bq_init()
+struct BWDIndexQueue
 {
-	broker_queue<N, unsigned int>.init();
-}
-
-template <int N>
-inline __device__ int bq_push(unsigned int value)
-{
-	return broker_queue<N, unsigned int>.enqueue(value);
-}
-
-template <int N>
-inline __device__ int bq_pop(unsigned int* dest)
-{
-	bool succ;
-	broker_queue<N, unsigned int>.dequeue(succ, *dest);
-	return succ;
-}
-
-extern "C"
-{
-	inline __device__ void bq_init_1000()
+	__device__ static void init()
 	{
-		bq_init<1000>();
-	}
-	inline __device__ void bq_init_10000()
-	{
-		bq_init<10000>();
-	}
-	inline __device__ void bq_init_100000()
-	{
-		bq_init<100000>();
-	}
-	inline __device__ void bq_init_1000000()
-	{
-		bq_init<1000000>();
+		bwd_index_queue<N, unsigned int>.init();
 	}
 
-	inline __device__ int bq_push_1000(unsigned int value)
+	__device__ static int push(unsigned int value)
 	{
-		return bq_push<1000>(value);
-	}
-	inline __device__ int bq_push_10000(unsigned int value)
-	{
-		return bq_push<10000>(value);
-	}
-	inline __device__ int bq_push_100000(unsigned int value)
-	{
-		return bq_push<100000>(value);
-	}
-	inline __device__ int bq_push_1000000(unsigned int value)
-	{
-		return bq_push<1000000>(value);
+		return bwd_index_queue<N, unsigned int>.enqueue(value);
 	}
 
-	inline __device__ int bq_pop_1000(unsigned int* value)
+	__device__ static int pop(unsigned int* dest)
 	{
-		return bq_pop<1000>(value);
+		bool succ;
+		bwd_index_queue<N, unsigned int>.dequeue(succ, *dest);
+		return succ;
 	}
-	inline __device__ int bq_pop_10000(unsigned int* value)
+
+	__device__ static int size()
 	{
-		return bq_pop<10000>(value);
+		return bwd_index_queue<N, unsigned int>.size();
 	}
-	inline __device__ int bq_pop_100000(unsigned int* value)
-	{
-		return bq_pop<100000>(value);
-	}
-	inline __device__ int bq_pop_1000000(unsigned int* value)
-	{
-		return bq_pop<1000000>(value);
-	}
-}
+};
+
+template struct BWDIndexQueue<1000>;
+template struct BWDIndexQueue<10000>;
+template struct BWDIndexQueue<100000>;
+template struct BWDIndexQueue<1000000>;

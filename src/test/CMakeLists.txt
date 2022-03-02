@@ -94,10 +94,6 @@ set(genericTestElementSimple_short_name generic)
 set(genericTestElementStruct_short_name generic-struct)
 set(genericTestElementComplexStruct_short_name generic-array)
 
-set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
-set(ConcurrentProducerConsumerQueue_constructor_indexTestElement "createConcurrentProducerConsumerIndexQueue")
-set(MoodyCamelQueue_constructor "createMoodyCamelQueueGeneric")
-
 function(add_queue_tests _mapping _testfile)
 	get_filename_component(_testname ${_testfile} NAME_WE)
 
@@ -109,35 +105,28 @@ function(add_queue_tests _mapping _testfile)
 
 				set(element_type "${${test_element}_element_type}")
 
-				if (DEFINED ${queue_type}_constructor_${test_element})
-					set(queue_constructor ${${queue_type}_constructor_${test_element}})
-				else()
-					if (DEFINED ${queue_type}_constructor)
-						set(queue_constructor_name ${${queue_type}_constructor})
-					else()
-						set(queue_constructor_name "create${queue_type}")
+				get_queue_constructor(queue_constructor ${queue_type} ${element_type})
+
+				if (NOT queue_constructor STREQUAL "")
+					configure_file(${_testfile} ${dest_file} @ONLY)
+
+					set(_target "${variant_name}-${_mapping}")
+					add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES} ${${queue_type}_sources})
+
+					if (DEFINED ${queue_type}_configure_target)
+						cmake_language(CALL ${${queue_type}_configure_target} ${_target})
 					endif()
-					set(queue_constructor "${queue_constructor_name}[${element_type}]")
-				endif()
 
-				configure_file(${_testfile} ${dest_file} @ONLY)
-
-				set(_target "${variant_name}-${_mapping}")
-				add_test_executable(${_target} ${_mapping} ${dest_file} ${COMMON_QUEUE_TEST_FILES} ${${queue_type}_sources})
-
-				if (DEFINED ${queue_type}_configure_target)
-					cmake_language(CALL ${${queue_type}_configure_target} ${_target})
-				endif()
-
-				add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-				if(${_mapping} STREQUAL "cuda")
-					foreach(_sanitizer ${AnyQ_CUDA_SANITIZER_TOOLS})
-						string(REPLACE " " ";" _sanitizer_options "${AnyQ_CUDA_SANITIZER_${_sanitizer}_OPTIONS}")
-						add_test(NAME "${_target}-${_sanitizer}"
-							COMMAND ${CUDAToolkit_COMPUTE_SANITIZER_EXECUTABLE} --error-exitcode 5 --tool ${_sanitizer} ${_sanitizer_options} $<TARGET_FILE:${_target}>
-							WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-							COMMAND_EXPAND_LISTS)
-					endforeach()
+					add_test(NAME "${_target}" COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+					if(${_mapping} STREQUAL "cuda")
+						foreach(_sanitizer ${AnyQ_CUDA_SANITIZER_TOOLS})
+							string(REPLACE " " ";" _sanitizer_options "${AnyQ_CUDA_SANITIZER_${_sanitizer}_OPTIONS}")
+							add_test(NAME "${_target}-${_sanitizer}"
+								COMMAND ${CUDAToolkit_COMPUTE_SANITIZER_EXECUTABLE} --error-exitcode 5 --tool ${_sanitizer} ${_sanitizer_options} $<TARGET_FILE:${_target}>
+								WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+								COMMAND_EXPAND_LISTS)
+						endforeach()
+					endif()
 				endif()
 			endforeach()
 		endforeach()

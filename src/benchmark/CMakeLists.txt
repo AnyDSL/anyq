@@ -73,9 +73,6 @@ function(add_benchmark _target _testfile _mapping)
 	target_sources(${_target} PRIVATE ${_target_fingerprint})
 endfunction()
 
-set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerIndexQueue")
-set(MoodyCamelQueue_constructor "createMoodyCamelIndexQueue")
-
 function(generate_benchmarks template_file platform)
 	get_filename_component(benchmark_name ${template_file} NAME_WE)
 
@@ -85,19 +82,17 @@ function(generate_benchmarks template_file platform)
 			set(variant_name "${benchmark_name}-${${queue_type}_short_name}-${queue_size}")
 			set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${variant_name}.art")
 
-			if (DEFINED ${queue_type}_constructor)
-				set(queue_constructor_name ${${queue_type}_constructor})
-			else()
-				set(queue_constructor_name "create${queue_type}[u32]")
-			endif()
+			get_queue_constructor(queue_constructor_name ${queue_type} u32)
 
-			configure_file(${template_file} ${dest_file})
+			if (DEFINED queue_constructor_name)
+				configure_file(${template_file} ${dest_file})
 
-			set(target_name "${variant_name}-${platform}")
-			add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources})
+				set(target_name "${variant_name}-${platform}")
+				add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources})
 
-			if (DEFINED ${queue_type}_configure_target)
-				cmake_language(CALL ${${queue_type}_configure_target} ${target_name})
+				if (DEFINED ${queue_type}_configure_target)
+					cmake_language(CALL ${${queue_type}_configure_target} ${target_name})
+				endif()
 			endif()
 		endforeach()
 	endforeach()
