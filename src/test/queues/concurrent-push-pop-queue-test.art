@@ -11,7 +11,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		let num_not_pushed = &mut push_buffer(push_buffer_size + 1);
 		let num_popped = &mut push_buffer(push_buffer_size + 2);
 		let num_not_popped = &mut push_buffer(push_buffer_size + 3);
-		let num_left_in_push_buffer = &mut push_buffer(push_buffer_size + 4);
+		let push_buffer_sum = &mut push_buffer(push_buffer_size + 4);
 
 		print_string("initialize debug push_buffer with "); print_i32(push_buffer_size); print_string(" elements ...\n");
 
@@ -61,12 +61,12 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 					if ref_count != 1 {
 						device.print_2xi32("ERROR: popped queue element %d was corrupted (got back ref count %d)!\n", ref_value, ref_count);
-						fail(3, thread);
+						fail(2, thread);
 					}
 				}
 				else {
 					device.print_i32("ERROR: popped queue element %d was corrupted (got back ref slot out of bounds)!\n", ref_value);
-					fail(4, thread);
+					fail(3, thread);
 				}
 			} > 0 {
 				thread.atomic_add_global_i32(num_popped, 1, memory_order::relaxed);
@@ -106,13 +106,13 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 		device.synchronize();
 
-		print_string("verify queue size, push and pop counters, and push_buffer state are consistent ...\n");
+		print_string("verify that queue size, push and pop counters, and push_buffer state are consistent ...\n");
 
 		for grid in device.launch_1d(div_up(push_buffer_size, block_dim), block_dim) {
 			for thread in grid.threads() {
 				if thread.idx(0) as i32 < push_buffer_size {
 					if push_buffer(thread.idx(0)) > 0 {
-						thread.atomic_add_global_i32(num_left_in_push_buffer, 1, memory_order::relaxed);
+						thread.atomic_add_global_i32(push_buffer_sum, push_buffer(thread.idx(0)), memory_order::relaxed);
 					}
 				}
 			}
@@ -128,12 +128,12 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 					if size != elements_left_reported {
 						device.print_2xi32("ERROR: queue size (%d) is not consistent with number of elements reported pushed and not popped (%d)!\n", size, elements_left_reported);
-						fail(5, thread);
+						fail(4, thread);
 					}
 
-					if size != *num_left_in_push_buffer {
-						device.print_2xi32("ERROR: queue size (%d) is not consistent with number of elements left in push_buffer (%d)!\n", size, *num_left_in_push_buffer);
-						fail(6, thread);
+					if size != *push_buffer_sum {
+						device.print_2xi32("ERROR: queue size (%d) is not consistent with number of source/sink invocations recorded in push_buffer (%d)!\n", size, *push_buffer_sum);
+						fail(5, thread);
 					}
 
 					let num_attempts = num_threads * attempts_per_thread;
@@ -141,7 +141,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 					if num_attempts_reported != num_attempts {
 						device.print_2xi32("ERROR: number of successful and unsuccessful pushes/pops (%d) does not match number of attempts to push/pop (%d)!\n", num_attempts_reported, num_attempts);
-						fail(7, thread);
+						fail(6, thread);
 					}
 				}
 			}
@@ -172,14 +172,14 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 					if size != 0 {
 						device.print_i32("ERROR: queue size (%d) is not 0!\n", size);
-						fail(9, thread);
+						fail(8, thread);
 					}
 				}
 
 				if thread.idx(0) as i32 < push_buffer_size {
 					if push_buffer(thread.idx(0)) != 0 {
-						device.print_i32("ERROR: unbalanced push/pop count at slot %u!\n", thread.idx(0) as i32);
-						fail(8, thread);
+						device.print_2xi32("ERROR: push/pop count (%u) at slot %u is not zero!\n", push_buffer(thread.idx(0)), thread.idx(0) as i32);
+						fail(9, thread);
 					}
 				}
 			}
