@@ -63,17 +63,17 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 	};
 
 	ProducerConsumerQueue[u32] {
-		push = @|source:fn(u32)->u32| @|_thread:gpu_thread_context| -> i32 {
-			bq_push(source(0))
+		push = @|source:fn()->u32| @|_thread:gpu_thread_context| -> i32 {
+			bq_push(source())
 		},
 
-		pop = @|sink:fn(u32, u32)->()| @|_thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(u32)->()| @|_thread:gpu_thread_context| -> i32 {
 			let mut el:u32;
 
 			let res = bq_pop(&mut el);
 
 			if res > 0 {
-				sink(el, 0);
+				sink(el);
 			}
 
 			res

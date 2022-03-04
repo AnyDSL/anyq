@@ -32,7 +32,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		}
 
 		let push = @|thread: gpu_thread_context, ref_value: i32| {
-			if for _ in queue.push(thread) {
+			if for queue.push(thread) {
 				thread.atomic_add_global_i32(push_buffer(ref_value), 1, memory_order::relaxed);
 
 				for anyq_verbose() {
@@ -49,7 +49,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		};
 
 		let pop = @|thread: gpu_thread_context| {
-			if for el, _ in queue.pop(thread) {
+			if for el in queue.pop(thread) {
 				let ref_value = test_element.unpackRefValue(el);
 
 				for anyq_verbose() {

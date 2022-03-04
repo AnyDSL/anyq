@@ -33,7 +33,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let buffer_element = @|i:u32| -> QueueElement[T] { element_type.buffer_element(buffer, i) };
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
 			let current_size1 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size1 >= num_elements {
 				0
@@ -57,14 +57,14 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 						device.print_2xi32("%d | QUEUE: move tail %d\n", thread.gid() as i32, i as i32);
 					}
 
-					buffer_element(i).store(@|| source(i), thread);
+					buffer_element(i).store(source, thread);
 
 					1
 				}
 			}
 		},
 
-		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
 			let current_size2 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size2 <= 0 {
 				0
@@ -88,7 +88,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 						device.print_2xi32("%d | QUEUE: move head %d\n", thread.gid() as i32, i as i32);
 					}
 
-					buffer_element(i).load(@|el:T| sink(el, i), thread);
+					buffer_element(i).load(sink, thread);
 
 					1
 				}

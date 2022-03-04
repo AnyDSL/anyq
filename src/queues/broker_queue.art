@@ -61,7 +61,7 @@ fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> P
 		ensurance
 	}
 
-	fn @read_data(sink: fn(T, u32) -> (), thread: gpu_thread_context) -> () {
+	fn @read_data(sink: fn(T) -> (), thread: gpu_thread_context) -> () {
 		let pos = thread.atomic_add_global_u32(queue.head, 1, memory_order::relaxed);
 		let p = pos % queue_size as u32;
 
@@ -70,15 +70,15 @@ fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> P
 		thread.memory_barrier(memory_order::acquire);
 		tickets(p) = 2 * ((pos + queue_size as u32) / queue_size as u32);
 
-		sink(val, p);
+		sink(val);
 	}
 
-	fn @put_data(source: fn(u32) -> T, thread: gpu_thread_context) -> () {
+	fn @put_data(source: fn() -> T, thread: gpu_thread_context) -> () {
 		let pos = thread.atomic_add_global_u32(queue.tail, 1, memory_order::relaxed);
 		let p = pos % queue_size as u32;
 		let b = 2 * (pos / queue_size as u32);
 
-		let val = source(p);
+		let val = source();
 
 		wait_for_ticket(p, b, thread);
 		buffer(p) = val;
@@ -87,7 +87,7 @@ fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> P
 	}
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
 			if ensure_enqueue(thread) {
 				put_data(source, thread);
 				1
@@ -97,7 +97,7 @@ fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> P
 			}
 		},
 
-		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
 			if ensure_dequeue(thread) {
 				read_data(sink, thread);
 				1

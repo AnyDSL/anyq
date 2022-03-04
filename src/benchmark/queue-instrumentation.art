@@ -1,12 +1,12 @@
 
 fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut QueueBenchmarkStatistics) -> ProducerConsumerQueue[T] {
 	let wrapped_queue = ProducerConsumerQueue[T] {
-		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
 
 			let t_begin = thread.timestamp32();
 
-			let num_pushed = for el in queue.push(thread) {
-				source(el)
+			let num_pushed = for queue.push(thread) {
+				source()
 			};
 
 			let t_end = thread.timestamp32();
@@ -23,12 +23,12 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 			num_pushed
 		},
 
-		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
 
 			let t_begin = thread.timestamp32();
 
-			let num_poppped = for el, i in queue.pop(thread) {
-				sink(el, i);
+			let num_poppped = for el in queue.pop(thread) {
+				sink(el);
 			};
 
 			let t_end = thread.timestamp32();

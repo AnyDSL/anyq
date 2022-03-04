@@ -47,13 +47,13 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 	};
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn(u32)->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
 			let new_node = alloc_node(thread);
 
 			if (new_node != nil) {
 				thread.atomic_add_global_i32(queue.size, 1, memory_order::relaxed);
 
-				node(new_node).payload = source(new_node);
+				node(new_node).payload = source();
 				node(new_node).next = nil;
 
 				while true {
@@ -80,7 +80,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 			}
 		},
 
-		pop = @|sink:fn(T, u32)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
 			while true {
 				let head = thread.atomic_load_global_u32(queue.head, memory_order::acquire);
 				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
@@ -99,7 +99,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 
 						if thread.atomic_cas_global_u32_weak(queue.head, head, next, memory_order::acq_rel, memory_order::relaxed).1 {
 							free_node(head, thread);
-							sink(payload, next);
+							sink(payload);
 							break()
 						}
 					}
