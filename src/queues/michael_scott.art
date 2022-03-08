@@ -135,7 +135,9 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 					let mut size = 0;
 					let mut n = queue.head;
 
-					while node(n).next != nil {
+					// this regularly causes endless loops
+					// (size < pool_size) is the emergency abortion criteria
+					while node(n).next != nil && size < pool_size {
 						n = node(n).next;
 						++size;
 					}
