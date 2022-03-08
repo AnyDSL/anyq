@@ -125,7 +125,7 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 
 				if thread.idx(0) as i32 < push_buffer_size {
 					if push_buffer(thread.idx(0)) != 0 {
-						device.print_2xi32("ERROR: push/pop count (%u) at slot %u is not zero!\n", push_buffer(thread.idx(0)), thread.idx(0) as i32);
+						device.print_2xi32("ERROR: push/pop count (%d) at slot %u is not zero!\n", push_buffer(thread.idx(0)), thread.idx(0) as i32);
 						fail(5, thread);
 					}
 				}
