@@ -6,6 +6,9 @@
 template <int N, typename T>
 class BrokerWorkDistributor
 {
+	template <int>
+	friend struct BWDIndexQueue;
+
 	typedef unsigned int Ticket;
 	typedef unsigned int HT_t;
 	typedef unsigned long long int HT;
@@ -179,31 +182,41 @@ public:
 #endif
 
 template <int N, typename T>
-__device__ BrokerWorkDistributor<N, T> bwd_index_queue;
+__device__ BrokerWorkDistributor<N, T> bwd_queue;
 
 template <int N>
 struct BWDIndexQueue
 {
 	__device__ static void init()
 	{
-		bwd_index_queue<N, unsigned int>.init();
+		bwd_queue<N, unsigned int>.init();
 	}
 
-	__device__ static int push(unsigned int value)
+	__device__ static bool ensure_enqueue()
 	{
-		return bwd_index_queue<N, unsigned int>.enqueue(value);
+		return bwd_queue<N, unsigned int>.ensureEnqueue();
 	}
 
-	__device__ static int pop(unsigned int* dest)
+	__device__ static void put_data(unsigned int value)
 	{
-		bool succ;
-		bwd_index_queue<N, unsigned int>.dequeue(succ, *dest);
-		return succ;
+		bwd_queue<N, unsigned int>.putData(value);
+	}
+
+	__device__ static bool ensure_dequeue()
+	{
+		return bwd_queue<N, unsigned int>.ensureDequeue();
+	}
+
+	__device__ static unsigned int read_data()
+	{
+		unsigned int dest;
+		bwd_queue<N, unsigned int>.readData(dest);
+		return dest;
 	}
 
 	__device__ static int size()
 	{
-		return bwd_index_queue<N, unsigned int>.size();
+		return bwd_queue<N, unsigned int>.size();
 	}
 };
 

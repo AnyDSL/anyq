@@ -10,17 +10,29 @@
 #[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE4initEv")] fn bq_init_1000000() -> ();
 #[import(cc = "C", name = "bq_init_NA")] fn bq_init_NA() -> ();
 
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE4pushEj")] fn bq_push_1000(u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE4pushEj")] fn bq_push_10000(u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE4pushEj")] fn bq_push_100000(u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE4pushEj")] fn bq_push_1000000(u32) -> i32;
-#[import(cc = "C", name = "bq_push_NA")] fn bq_push_NA(u32) -> i32;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE14ensure_enqueueEv")] fn bq_ensure_enqueue_1000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE14ensure_enqueueEv")] fn bq_ensure_enqueue_10000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE14ensure_enqueueEv")] fn bq_ensure_enqueue_100000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE14ensure_enqueueEv")] fn bq_ensure_enqueue_1000000() -> bool;
+#[import(cc = "C", name = "bq_ensure_enqueue_NA")] fn bq_ensure_enqueue_NA() -> bool;
 
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE3popEPj")] fn bq_pop_1000(&mut u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE3popEPj")] fn bq_pop_10000(&mut u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE3popEPj")] fn bq_pop_100000(&mut u32) -> i32;
-#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE3popEPj")] fn bq_pop_1000000(&mut u32) -> i32;
-#[import(cc = "C", name = "bq_pop_NA")] fn bq_pop_NA(&mut u32) -> i32;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE8put_dataEj")] fn bq_put_data_1000(u32) -> ();
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE8put_dataEj")] fn bq_put_data_10000(u32) -> ();
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE8put_dataEj")] fn bq_put_data_100000(u32) -> ();
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE8put_dataEj")] fn bq_put_data_1000000(u32) -> ();
+#[import(cc = "C", name = "bq_put_data_NA")] fn bq_put_data_NA(u32) -> ();
+
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE14ensure_dequeueEv")] fn bq_ensure_dequeue_1000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE14ensure_dequeueEv")] fn bq_ensure_dequeue_10000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE14ensure_dequeueEv")] fn bq_ensure_dequeue_100000() -> bool;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE14ensure_dequeueEv")] fn bq_ensure_dequeue_1000000() -> bool;
+#[import(cc = "C", name = "bq_ensure_dequeue_NA")] fn bq_ensure_dequeue_NA() -> bool;
+
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE9read_dataEv")] fn bq_read_data_1000() -> u32;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE9read_dataEv")] fn bq_read_data_10000() -> u32;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi100000EE9read_dataEv")] fn bq_read_data_100000() -> u32;
+#[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000000EE9read_dataEv")] fn bq_read_data_1000000() -> u32;
+#[import(cc = "C", name = "bq_read_data_NA")] fn bq_read_data_NA() -> u32;
 
 #[import(cc = "C", name = "_ZN13BWDIndexQueueILi1000EE4sizeEv")] fn bq_size_1000() -> i32;
 #[import(cc = "C", name = "_ZN13BWDIndexQueueILi10000EE4sizeEv")] fn bq_size_10000() -> i32;
@@ -38,20 +50,36 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 		_ => bq_init_NA
 	};
 
-	let bq_push = match (queue_size) {
-		1000 => bq_push_1000,
-		10000 => bq_push_10000,
-		100000 => bq_push_100000,
-		1000000 => bq_push_1000000,
-		_ => bq_push_NA
+	let bq_ensure_enqueue = match (queue_size) {
+		1000 => bq_ensure_enqueue_1000,
+		10000 => bq_ensure_enqueue_10000,
+		100000 => bq_ensure_enqueue_100000,
+		1000000 => bq_ensure_enqueue_1000000,
+		_ => bq_ensure_enqueue_NA
 	};
 
-	let bq_pop = match (queue_size) {
-		1000 => bq_pop_1000,
-		10000 => bq_pop_10000,
-		100000 => bq_pop_100000,
-		1000000 => bq_pop_1000000,
-		_ => bq_pop_NA
+	let bq_put_data = match (queue_size) {
+		1000 => bq_put_data_1000,
+		10000 => bq_put_data_10000,
+		100000 => bq_put_data_100000,
+		1000000 => bq_put_data_1000000,
+		_ => bq_put_data_NA
+	};
+
+	let bq_ensure_dequeue = match (queue_size) {
+		1000 => bq_ensure_dequeue_1000,
+		10000 => bq_ensure_dequeue_10000,
+		100000 => bq_ensure_dequeue_100000,
+		1000000 => bq_ensure_dequeue_1000000,
+		_ => bq_ensure_dequeue_NA
+	};
+
+	let bq_read_data = match (queue_size) {
+		1000 => bq_read_data_1000,
+		10000 => bq_read_data_10000,
+		100000 => bq_read_data_100000,
+		1000000 => bq_read_data_1000000,
+		_ => bq_read_data_NA
 	};
 
 	let bq_size = match (queue_size) {
@@ -64,19 +92,23 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 
 	ProducerConsumerQueue[u32] {
 		push = @|source:fn()->u32| @|_thread:gpu_thread_context| -> i32 {
-			bq_push(source())
+			if bq_ensure_enqueue() {
+				bq_put_data(source());
+				1
+			}
+			else {
+				0
+			}
 		},
 
 		pop = @|sink:fn(u32)->()| @|_thread:gpu_thread_context| -> i32 {
-			let mut el:u32;
-
-			let res = bq_pop(&mut el);
-
-			if res > 0 {
-				sink(el);
+			if bq_ensure_dequeue() {
+				sink(bq_read_data());
+				1
 			}
-
-			res
+			else {
+				0
+			}
 		},
 
 		size = @|_thread| bq_size(),
