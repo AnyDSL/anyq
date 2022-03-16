@@ -69,7 +69,7 @@ class QueueBenchmarkBinary:
 				sys.stdout.flush()
 				dest.write(line)
 		except asyncio.TimeoutError as e:
-			values = line.decode('ansi').split(';')
+			values = codecs.decode(line).split(';')
 			e.last_success = (float(values[0]), float(values[1]))
 			raise
 
