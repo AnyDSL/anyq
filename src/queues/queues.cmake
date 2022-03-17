@@ -63,17 +63,18 @@ set(BrokerWorkDistributorQueueCUDA_configure_target BrokerWorkDistributorQueueCU
 set(BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/bwd.h")
 
 function (BrokerWorkDistributorQueueCUDA_configure target)
-	set(cuda_src "$<TARGET_PROPERTY:BINARY_DIR>/${CMAKE_CFG_INTDIR}/$<TARGET_PROPERTY:NAME>")
+	get_target_property(_bin_dir ${target} BINARY_DIR)
+	get_target_property(_name ${target} NAME)
+
+	set(cuda_src "${_bin_dir}/${CMAKE_CFG_INTDIR}/${_name}")
 
 	add_custom_command(
-		TARGET ${target}
-		POST_BUILD
+		OUTPUT ${cuda_src}.ll
 		COMMAND ${CMAKE_COMMAND} -E echo "Patching ${cuda_src}.cu"
 		COMMAND ${CMAKE_COMMAND} -E rename ${cuda_src}.cu ${cuda_src}.orig.cu
 		COMMAND ${CMAKE_COMMAND} -E cat ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES} ${cuda_src}.orig.cu > ${cuda_src}.patched.cu
 		COMMAND ${CMAKE_COMMAND} -E copy ${cuda_src}.patched.cu ${cuda_src}.cu
-		VERBATIM COMMAND_EXPAND_LISTS
+		DEPENDS ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES}
+		VERBATIM APPEND COMMAND_EXPAND_LISTS
 	)
-
-	set_property(TARGET ${target} PROPERTY LINK_DEPENDS ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES})
 endfunction()
