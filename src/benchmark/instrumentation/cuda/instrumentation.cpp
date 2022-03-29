@@ -19,8 +19,8 @@ Instrumentation::Instrumentation(int device)
 		nullptr
 	};
 
-	if (cuptiProfilerInitialize(&params) != CUPTI_SUCCESS)
-		throw std::runtime_error("cuptiProfilerInitialize() failed");
+	// if (cuptiProfilerInitialize(&params) != CUPTI_SUCCESS)
+	// 	throw std::runtime_error("cuptiProfilerInitialize() failed");
 }
 
 std::ostream& Instrumentation::print_device_info(std::ostream& out)

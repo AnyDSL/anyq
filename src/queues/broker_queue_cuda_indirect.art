@@ -1,0 +1,132 @@
+// AnyQ wrapper for reference implementation published with
+// Bernhard Kerbl, Michael Kenzel, Joerg H. Mueller, Dieter Schmalstieg, Markus Steinberger, 2018, The Broker Queue: A Fast, Linearizable FIFO Queue for Fine-Granular Work Distribution on the GPU
+// ICS '18: Proceedings of the 2018 International Conference on Supercomputing, pages 76–85
+// https://doi.org/10.1145/3205289.3205291
+
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE4initEPv")] fn bq_init_1000(&mut addrspace(1) [u8]) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE4initEPv")] fn bq_init_10000(&mut addrspace(1) [u8]) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE4initEPv")] fn bq_init_100000(&mut addrspace(1) [u8]) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE4initEPv")] fn bq_init_1000000(&mut addrspace(1) [u8]) -> ();
+#[import(cc = "C", name = "bq_init_NA")] fn bq_init_NA(&mut addrspace(1) [u8]) -> ();
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE14ensure_enqueueEPv")] fn bq_ensure_enqueue_1000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE14ensure_enqueueEPv")] fn bq_ensure_enqueue_10000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE14ensure_enqueueEPv")] fn bq_ensure_enqueue_100000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE14ensure_enqueueEPv")] fn bq_ensure_enqueue_1000000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "bq_ensure_enqueue_NA")] fn bq_ensure_enqueue_NA(&mut addrspace(1) [u8]) -> bool;
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE8put_dataEPvj")] fn bq_put_data_1000(&mut addrspace(1) [u8], u32) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE8put_dataEPvj")] fn bq_put_data_10000(&mut addrspace(1) [u8], u32) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE8put_dataEPvj")] fn bq_put_data_100000(&mut addrspace(1) [u8], u32) -> ();
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE8put_dataEPvj")] fn bq_put_data_1000000(&mut addrspace(1) [u8], u32) -> ();
+#[import(cc = "C", name = "bq_put_data_NA")] fn bq_put_data_NA(&mut addrspace(1) [u8], u32) -> ();
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE14ensure_dequeueEPv")] fn bq_ensure_dequeue_1000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE14ensure_dequeueEPv")] fn bq_ensure_dequeue_10000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE14ensure_dequeueEPv")] fn bq_ensure_dequeue_100000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE14ensure_dequeueEPv")] fn bq_ensure_dequeue_1000000(&mut addrspace(1) [u8]) -> bool;
+#[import(cc = "C", name = "bq_ensure_dequeue_NA")] fn bq_ensure_dequeue_NA(&mut addrspace(1) [u8]) -> bool;
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE9read_dataEPv")] fn bq_read_data_1000(&mut addrspace(1) [u8]) -> u32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE9read_dataEPv")] fn bq_read_data_10000(&mut addrspace(1) [u8]) -> u32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE9read_dataEPv")] fn bq_read_data_100000(&mut addrspace(1) [u8]) -> u32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE9read_dataEPv")] fn bq_read_data_1000000(&mut addrspace(1) [u8]) -> u32;
+#[import(cc = "C", name = "bq_read_data_NA")] fn bq_read_data_NA(&mut addrspace(1) [u8]) -> u32;
+
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000EE4sizeEPv")] fn bq_size_1000(&mut addrspace(1) [u8]) -> i32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi10000EE4sizeEPv")] fn bq_size_10000(&mut addrspace(1) [u8]) -> i32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi100000EE4sizeEPv")] fn bq_size_100000(&mut addrspace(1) [u8]) -> i32;
+#[import(cc = "C", name = "_ZN21BWDIndexQueueIndirectILi1000000EE4sizeEPv")] fn bq_size_1000000(&mut addrspace(1) [u8]) -> i32;
+#[import(cc = "C", name = "bq_size_NA")] fn bq_size_NA(&mut addrspace(1) [u8]) -> i32;
+
+
+fn @createBrokerWorkDistributorQueueCUDAIndirect(device: AccDevice, queue_size: i32) -> ProducerConsumerQueue[u32] {
+	let bq_init = match (queue_size) {
+		1000 => bq_init_1000,
+		10000 => bq_init_10000,
+		100000 => bq_init_100000,
+		1000000 => bq_init_1000000,
+		_ => bq_init_NA
+	};
+
+	let bq_ensure_enqueue = match (queue_size) {
+		1000 => bq_ensure_enqueue_1000,
+		10000 => bq_ensure_enqueue_10000,
+		100000 => bq_ensure_enqueue_100000,
+		1000000 => bq_ensure_enqueue_1000000,
+		_ => bq_ensure_enqueue_NA
+	};
+
+	let bq_put_data = match (queue_size) {
+		1000 => bq_put_data_1000,
+		10000 => bq_put_data_10000,
+		100000 => bq_put_data_100000,
+		1000000 => bq_put_data_1000000,
+		_ => bq_put_data_NA
+	};
+
+	let bq_ensure_dequeue = match (queue_size) {
+		1000 => bq_ensure_dequeue_1000,
+		10000 => bq_ensure_dequeue_10000,
+		100000 => bq_ensure_dequeue_100000,
+		1000000 => bq_ensure_dequeue_1000000,
+		_ => bq_ensure_dequeue_NA
+	};
+
+	let bq_read_data = match (queue_size) {
+		1000 => bq_read_data_1000,
+		10000 => bq_read_data_10000,
+		100000 => bq_read_data_100000,
+		1000000 => bq_read_data_1000000,
+		_ => bq_read_data_NA
+	};
+
+	let bq_size = match (queue_size) {
+		1000 => bq_size_1000,
+		10000 => bq_size_10000,
+		100000 => bq_size_100000,
+		1000000 => bq_size_1000000,
+		_ => bq_size_NA
+	};
+
+
+	let queue_device_alloc = device.alloc((2 * queue_size as i64 + 4) * sizeof[u32]());
+	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
+
+	ProducerConsumerQueue[u32] {
+		push = @|source:fn()->u32| @|_thread:gpu_thread_context| -> i32 {
+			if bq_ensure_enqueue(queue_device_memory) {
+				bq_put_data(queue_device_memory, source());
+				1
+			}
+			else {
+				0
+			}
+		},
+
+		pop = @|sink:fn(u32)->()| @|_thread:gpu_thread_context| -> i32 {
+			if bq_ensure_dequeue(queue_device_memory) {
+				sink(bq_read_data(queue_device_memory));
+				1
+			}
+			else {
+				0
+			}
+		},
+
+		size = @|_thread| bq_size(queue_device_memory),
+
+		reset = @|grid| {
+			for _thread in grid.threads() {
+				bq_init(queue_device_memory);
+			}
+		},
+
+		validate = @|_corrupted: &mut addrspace(1) u32, _grid| {
+		},
+
+		release = @|| {
+		}
+	}
+}

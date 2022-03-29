@@ -10,7 +10,7 @@ target_compile_definitions(moodycamel PRIVATE MOODYCAMEL_STATIC)
 
 set(queue_types_cpu ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue MichaelScottQueue MoodyCamelQueue)
 set(queue_types_fiberless ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue MichaelScottQueue MoodyCamelQueue)
-set(queue_types_cuda ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue BrokerWorkDistributorQueueCUDA MichaelScottQueue)
+set(queue_types_cuda ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue BrokerWorkDistributorQueueCUDA BrokerWorkDistributorQueueCUDAIndirect MichaelScottQueue)
 set(queue_types_nvvm ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue MichaelScottQueue)
 set(queue_types_amdgpu ConcurrentProducerConsumerQueue BrokerWorkDistributorQueue MichaelScottQueue)
 
@@ -20,6 +20,7 @@ set(BrokerWorkDistributorQueue_short_name BWD)
 set(MichaelScottQueue_short_name MSQ)
 set(MoodyCamelQueue_short_name MOQ)
 set(BrokerWorkDistributorQueueCUDA_short_name BWD_cuda)
+set(BrokerWorkDistributorQueueCUDAIndirect_short_name BWD_cuda_indirect)
 
 set(ConcurrentProducerConsumerQueue_sources ${CMAKE_CURRENT_LIST_DIR}/producer_consumer_queue.art)
 set(ConcurrentProducerConsumerQueueGeneric_sources ${ConcurrentProducerConsumerQueue_sources})
@@ -27,11 +28,14 @@ set(BrokerWorkDistributorQueue_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue.ar
 set(MichaelScottQueue_sources ${CMAKE_CURRENT_LIST_DIR}/michael_scott.art)
 set(MoodyCamelQueue_sources ${CMAKE_CURRENT_LIST_DIR}/moodycamel.art)
 set(BrokerWorkDistributorQueueCUDA_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue_cuda.art)
+set(BrokerWorkDistributorQueueCUDAIndirect_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue_cuda_indirect.art)
 
 set(ConcurrentProducerConsumerQueue_constructor "createConcurrentProducerConsumerQueueGeneric")
 set(ConcurrentProducerConsumerQueue_constructor_u32 "createConcurrentProducerConsumerIndexQueue")
 set(BrokerWorkDistributorQueueCUDA_constructor "")
 set(BrokerWorkDistributorQueueCUDA_constructor_u32 "createBrokerWorkDistributorQueueCUDA")
+set(BrokerWorkDistributorQueueCUDAIndirect_constructor "")
+set(BrokerWorkDistributorQueueCUDAIndirect_constructor_u32 "createBrokerWorkDistributorQueueCUDAIndirect")
 set(MoodyCamelQueue_constructor "createMoodyCamelQueueGeneric")
 set(MoodyCamelQueue_constructor_u32 "createMoodyCamelIndexQueue")
 
@@ -58,11 +62,12 @@ function (MoodyCamelQueue_configure target)
 endfunction()
 
 
+
+
 set(BrokerWorkDistributorQueueCUDA_configure_target BrokerWorkDistributorQueueCUDA_configure)
+set(BrokerWorkDistributorQueueCUDAIndirect_configure_target BrokerWorkDistributorQueueCUDAIndirect_configure)
 
-set(BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/bwd.h")
-
-function (BrokerWorkDistributorQueueCUDA_configure target)
+function (BrokerWorkDistributorQueueCUDA_configure_target target _patch_includes)
 	get_target_property(_bin_dir ${target} BINARY_DIR)
 	get_target_property(_name ${target} NAME)
 
@@ -72,9 +77,21 @@ function (BrokerWorkDistributorQueueCUDA_configure target)
 		OUTPUT ${cuda_src}.ll
 		COMMAND ${CMAKE_COMMAND} -E echo "Patching ${cuda_src}.cu"
 		COMMAND ${CMAKE_COMMAND} -E rename ${cuda_src}.cu ${cuda_src}.orig.cu
-		COMMAND ${CMAKE_COMMAND} -E cat ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES} ${cuda_src}.orig.cu > ${cuda_src}.patched.cu
+		COMMAND ${CMAKE_COMMAND} -E cat ${_patch_includes} ${cuda_src}.orig.cu > ${cuda_src}.patched.cu
 		COMMAND ${CMAKE_COMMAND} -E copy ${cuda_src}.patched.cu ${cuda_src}.cu
-		DEPENDS ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES}
+		DEPENDS ${_patch_includes}
 		VERBATIM APPEND COMMAND_EXPAND_LISTS
 	)
+endfunction()
+
+set(BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/bwd.h")
+
+function (BrokerWorkDistributorQueueCUDA_configure target)
+	BrokerWorkDistributorQueueCUDA_configure_target(${target} ${BrokerWorkDistributorQueueCUDA_PATCH_INCLUDES})
+endfunction()
+
+set(BrokerWorkDistributorQueueCUDAIndirect_PATCH_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/bwd_indirect.h")
+
+function (BrokerWorkDistributorQueueCUDAIndirect_configure target)
+	BrokerWorkDistributorQueueCUDA_configure_target(${target} ${BrokerWorkDistributorQueueCUDAIndirect_PATCH_INCLUDES})
 endfunction()
