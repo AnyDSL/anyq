@@ -199,7 +199,8 @@ class AnyDSLRuntime(Build):
 			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
 			Thorin_DIR=thorin.build_dir/"share"/"anydsl"/"cmake",
 			Artic_DIR=artic.build_dir/"share"/"anydsl"/"cmake",
-			RUNTIME_JIT=True
+			RUNTIME_JIT=True,
+			AnyDSL_runtime_CUDA_CPP_STANDARD=17
 		)
 
 	def build(self, config):
