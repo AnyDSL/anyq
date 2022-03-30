@@ -200,7 +200,7 @@ class AnyDSLRuntime(Build):
 			Thorin_DIR=thorin.build_dir/"share"/"anydsl"/"cmake",
 			Artic_DIR=artic.build_dir/"share"/"anydsl"/"cmake",
 			RUNTIME_JIT=True,
-			AnyDSL_runtime_CUDA_CPP_STANDARD=17
+			AnyDSL_runtime_CUDA_CXX_STANDARD=17
 		)
 
 	def build(self, config):
