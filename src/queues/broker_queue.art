@@ -9,13 +9,13 @@ struct BrokerWorkDistributorQueue {
 	size: i32,
 }
 
-fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> ProducerConsumerQueue[T] {
+fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64) -> Buffer, dealloc: fn(Buffer) -> ()) -> ProducerConsumerQueue[T] {
 	let tickets_offset = round_up_i64(sizeof[BrokerWorkDistributorQueue](), alignof[u32]());
 	let buffer_offset = round_up_i64(tickets_offset + queue_size as i64 * sizeof[u32](), alignof[T]());
 
 	let alloc_size = buffer_offset + queue_size as i64 * sizeof[T]();
 
-	let queue_device_alloc = device.alloc(alloc_size);
+	let queue_device_alloc = alloc(alloc_size);
 	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
 
 	let queue = &mut queue_device_memory(0) as &mut addrspace(1) BrokerWorkDistributorQueue;
@@ -131,7 +131,27 @@ fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) -> P
 		},
 
 		release = @|| {
-			release(queue_device_alloc);
+			dealloc(queue_device_alloc);
 		}
 	}
+}
+
+fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) {
+	createBrokerWorkDistributorQueue_internal[T](queue_size, device.alloc, @|buffer| release(buffer))
+}
+
+static mut static_queue_buffer: [u8 * 268435456];
+
+fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, queue_size: i32) {
+	fn alloc(size: i64) {
+		assert(size <= 268435456, "size of statically-allocated queue exceeds static allocation size");
+
+		Buffer {
+			data = &mut static_queue_buffer as &mut [i8],
+			size = -1,
+			device = -1
+		}
+	}
+
+	createBrokerWorkDistributorQueue_internal[T](queue_size, alloc, @|_|{})
 }
