@@ -235,21 +235,14 @@ namespace
 		return value;
 	}
 
-	template <int N, int stride, typename F>
+	template <int N, typename pattern, typename F>
 	void kernels(F&& f)
 	{
-		f(test<load_volatile, store_volatile, N, linear_pattern<1, stride>>, "volatile"sv);
-		f(test<load_atomic_add, store_atomic_exch, N, linear_pattern<1, stride>>, "atomic"sv);
-		f(test<load_cg, store_cg, N, linear_pattern<1, stride>>, "cg"sv);
+		f(test<load_volatile, store_volatile, N, pattern>, "volatile"sv);
+		f(test<load_atomic_add, store_atomic_exch, N, pattern>, "atomic"sv);
+		f(test<load_cg, store_cg, N, pattern>, "cg"sv);
 #if __CUDA_ARCH__ >= 700
-		f(test<load_relaxed, store_relaxed, N, linear_pattern<1, stride>>, "relaxed"sv);
-#endif
-
-		f(test<load_volatile, store_volatile, N, linear_pattern<1024, stride>>, "volatile 1k"sv);
-		f(test<load_atomic_add, store_atomic_exch, N, linear_pattern<1024, stride>>, "atomic 1k"sv);
-		f(test<load_cg, store_cg, N, linear_pattern<1024, stride>>, "cg 1k"sv);
-#if __CUDA_ARCH__ >= 700
-		f(test<load_relaxed, store_relaxed, N, linear_pattern<1024, stride>>, "relaxed 1k"sv);
+		f(test<load_relaxed, store_relaxed, N, pattern>, "relaxed"sv);
 #endif
 	}
 }
@@ -276,11 +269,11 @@ int main(int argc, char** argv)
 
 		constexpr int N = 256;
 
-		constexpr int col_width = 11;
+		constexpr int col_width = 10;
 
-		std::cout << "\n       "sv;
+		std::cout << "\n              "sv;
 
-		kernels<N, 1>([]([[maybe_unused]] auto&& k, auto n)
+		kernels<N, linear_pattern<1, 1>>([]([[maybe_unused]] auto&& k, auto n)
 		{
 			int pad = col_width - n.length();
 
@@ -313,18 +306,20 @@ int main(int argc, char** argv)
 				std::cout << std::fixed << std::setprecision(2) << std::setw(col_width) << t << " ms "sv;
 			};
 
-			std::cout << "\n     1:"sv;
-			kernels<N,  1>(print_results);
-			std::cout << "\n     2:"sv;
-			kernels<N,  2>(print_results);
-			std::cout << "\n     4:"sv;
-			kernels<N,  4>(print_results);
-			std::cout << "\n     8:"sv;
-			kernels<N,  8>(print_results);
-			std::cout << "\n    16:"sv;
-			kernels<N, 16>(print_results);
-			std::cout << "\n    32:"sv;
-			kernels<N, 32>(print_results);
+			std::cout << "\n          <1>:"sv;
+			kernels<N, linear_pattern<1,  1>>(print_results);
+			std::cout << "\n    <1024, 1>:"sv;
+			kernels<N, linear_pattern<1024,  1>>(print_results);
+			std::cout << "\n    <1024, 2>:"sv;
+			kernels<N, linear_pattern<1024,  2>>(print_results);
+			std::cout << "\n    <1024, 4>:"sv;
+			kernels<N, linear_pattern<1024,  4>>(print_results);
+			std::cout << "\n    <1024, 8>:"sv;
+			kernels<N, linear_pattern<1024,  8>>(print_results);
+			std::cout << "\n    <1024,16>:"sv;
+			kernels<N, linear_pattern<1024, 16>>(print_results);
+			std::cout << "\n    <1024,32>:"sv;
+			kernels<N, linear_pattern<1024, 32>>(print_results);
 
 			std::cout << '\n' << std::flush;
 		}
