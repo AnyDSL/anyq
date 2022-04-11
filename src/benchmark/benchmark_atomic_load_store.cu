@@ -55,19 +55,25 @@ __device__ void store_cg(unsigned int* const location, const unsigned int value)
 	asm("st.global.cg.u32 [%0], %1;" : : "l"(location), "r"(value) : "memory");
 }
 
-#if __CUDA_ARCH__ >= 700
 __device__ unsigned int load_relaxed(const unsigned int* const location)
 {
+#if __CUDA_ARCH__ >= 700
 	unsigned int value;
 	asm("ld.relaxed.gpu.u32 %0, [%1];" : "=r"(value) : "l"(location) : "memory");
 	return value;
+#else
+	__trap();
+#endif
 }
 
 __device__ void store_relaxed(unsigned int* const location, const unsigned int value)
 {
+#if __CUDA_ARCH__ >= 700
 	asm("st.relaxed.gpu.u32 [%0], %1;" : : "l"(location), "r"(value) : "memory");
-}
+#else
+	__trap();
 #endif
+}
 
 template <unsigned int N, unsigned int stride = 1>
 struct linear_pattern
@@ -145,6 +151,14 @@ namespace
 		cudaDeviceProp props;
 		throw_error(cudaGetDeviceProperties(&props, device));
 		return props;
+	}
+
+	template <cudaDeviceAttr attr>
+	auto get_device_attribute(int device = get_current_device())
+	{
+		int value;
+		throw_error(cudaDeviceGetAttribute(&value, attr, device));
+		return value;
 	}
 
 	template <typename F>
@@ -236,14 +250,16 @@ namespace
 	}
 
 	template <int N, typename pattern, typename F>
-	void kernels(F&& f)
+	void kernels(bool try_relaxed_atomics, F&& f)
 	{
 		f(test<load_volatile, store_volatile, N, pattern>, "volatile"sv);
 		f(test<load_atomic_add, store_atomic_exch, N, pattern>, "atomic"sv);
 		f(test<load_cg, store_cg, N, pattern>, "cg"sv);
-#if __CUDA_ARCH__ >= 700
-		f(test<load_relaxed, store_relaxed, N, pattern>, "relaxed"sv);
-#endif
+
+		if (try_relaxed_atomics)
+		{
+			f(test<load_relaxed, store_relaxed, N, pattern>, "relaxed"sv);
+		}
 	}
 }
 
@@ -262,6 +278,8 @@ int main(int argc, char** argv)
 
 		auto dev_props = get_device_properties(device);
 
+		const bool try_relaxed_atomics = get_device_attribute<cudaDevAttrComputeCapabilityMajor>(device) >= 7;
+
 		std::cout << "device "sv << device << ": "sv << dev_props.name << " ("sv << dev_props.multiProcessorCount << " multiprocessors)\n"sv;
 
 
@@ -273,7 +291,7 @@ int main(int argc, char** argv)
 
 		std::cout << "\n              "sv;
 
-		kernels<N, linear_pattern<1, 1>>([]([[maybe_unused]] auto&& k, auto n)
+		kernels<N, linear_pattern<1, 1>>(try_relaxed_atomics, []([[maybe_unused]] auto&& k, auto n)
 		{
 			int pad = col_width - n.length();
 
@@ -307,19 +325,19 @@ int main(int argc, char** argv)
 			};
 
 			std::cout << "\n          <1>:"sv;
-			kernels<N, linear_pattern<1,  1>>(print_results);
+			kernels<N, linear_pattern<1,  1>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024, 1>:"sv;
-			kernels<N, linear_pattern<1024,  1>>(print_results);
+			kernels<N, linear_pattern<1024,  1>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024, 2>:"sv;
-			kernels<N, linear_pattern<1024,  2>>(print_results);
+			kernels<N, linear_pattern<1024,  2>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024, 4>:"sv;
-			kernels<N, linear_pattern<1024,  4>>(print_results);
+			kernels<N, linear_pattern<1024,  4>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024, 8>:"sv;
-			kernels<N, linear_pattern<1024,  8>>(print_results);
+			kernels<N, linear_pattern<1024,  8>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024,16>:"sv;
-			kernels<N, linear_pattern<1024, 16>>(print_results);
+			kernels<N, linear_pattern<1024, 16>>(try_relaxed_atomics, print_results);
 			std::cout << "\n    <1024,32>:"sv;
-			kernels<N, linear_pattern<1024, 32>>(print_results);
+			kernels<N, linear_pattern<1024, 32>>(try_relaxed_atomics, print_results);
 
 			std::cout << '\n' << std::flush;
 		}
