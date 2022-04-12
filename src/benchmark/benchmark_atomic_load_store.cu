@@ -262,9 +262,10 @@ namespace
 	template <int N, typename pattern, typename F>
 	void kernels(bool try_relaxed_atomics, F&& f)
 	{
-		f(test<load_volatile, store_volatile, N, pattern>, "volatile"sv);
-		f(test<load_atomic_add, store_atomic_exch, N, pattern>, "atomic"sv);
-		f(test<load_cg, store_cg, N, pattern>, "cg"sv);
+		f(test<load_volatile, store_volatile, N, pattern>, "v+v"sv);
+		f(test<load_volatile, store_atomic_exch, N, pattern>, "v+a"sv);
+		f(test<load_atomic_add, store_volatile, N, pattern>, "a+v"sv);
+		f(test<load_atomic_add, store_atomic_exch, N, pattern>, "a+a"sv);
 
 		if (try_relaxed_atomics)
 		{
