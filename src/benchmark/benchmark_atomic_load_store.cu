@@ -75,9 +75,14 @@ __device__ void store_relaxed(unsigned int* const location, const unsigned int v
 #endif
 }
 
-template <unsigned int N, unsigned int stride = 1>
+template <unsigned int N, unsigned int stride = 1, unsigned int thread_stride = 1>
 struct linear_pattern
 {
+	__device__ bool skip_thread(unsigned int i) const
+	{
+		return i % thread_stride != 0;
+	}
+
 	__device__ unsigned int operator ()(unsigned int i) const
 	{
 		return (i * stride) % N;
@@ -88,9 +93,14 @@ struct linear_pattern
 template <unsigned int (&load)(const unsigned int*), void (&store)(unsigned int*, unsigned int), int N, typename Pattern>
 __global__ void test()
 {
+	auto tid = blockIdx.x * blockDim.x + threadIdx.x;
+
 	Pattern pattern;
 
-	auto& a = buffer[pattern(blockIdx.x * blockDim.x + threadIdx.x)];
+	if (pattern.skip_thread(tid))
+		return;
+
+	auto& a = buffer[pattern(tid)];
 
 	#pragma unroll
 	for (int i = 0; i < N; ++i)
@@ -324,19 +334,29 @@ int main(int argc, char** argv)
 				std::cout << std::fixed << std::setprecision(2) << std::setw(col_width) << t << " ms "sv;
 			};
 
-			std::cout << "\n          <1>:"sv;
-			kernels<N, linear_pattern<1,  1>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024, 1>:"sv;
+			std::cout << "\n   <1, 1,  1>:"sv;
+			kernels<N, linear_pattern<1, 1,  1>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1, 1,  2>:"sv;
+			kernels<N, linear_pattern<1, 1,  2>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1, 1,  4>:"sv;
+			kernels<N, linear_pattern<1, 1,  4>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1, 1,  8>:"sv;
+			kernels<N, linear_pattern<1, 1,  8>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1, 1, 16>:"sv;
+			kernels<N, linear_pattern<1, 1, 16>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1, 1, 32>:"sv;
+			kernels<N, linear_pattern<1, 1, 32>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   <1024,  1>:"sv;
 			kernels<N, linear_pattern<1024,  1>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024, 2>:"sv;
+			std::cout << "\n   <1024,  2>:"sv;
 			kernels<N, linear_pattern<1024,  2>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024, 4>:"sv;
+			std::cout << "\n   <1024,  4>:"sv;
 			kernels<N, linear_pattern<1024,  4>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024, 8>:"sv;
+			std::cout << "\n   <1024,  8>:"sv;
 			kernels<N, linear_pattern<1024,  8>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024,16>:"sv;
+			std::cout << "\n   <1024, 16>:"sv;
 			kernels<N, linear_pattern<1024, 16>>(try_relaxed_atomics, print_results);
-			std::cout << "\n    <1024,32>:"sv;
+			std::cout << "\n   <1024, 32>:"sv;
 			kernels<N, linear_pattern<1024, 32>>(try_relaxed_atomics, print_results);
 
 			std::cout << '\n' << std::flush;
