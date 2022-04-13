@@ -18,6 +18,13 @@ using namespace std::literals;
 __device__ unsigned int buffer[256*1024*1024];
 
 
+__device__ unsigned int laneid()
+{
+	unsigned int id;
+	asm("mov.u32 %0, %laneid;" : "=r"(id));
+	return id;
+}
+
 __device__ unsigned int load_volatile(const unsigned int* const location)
 {
 	unsigned int value;
@@ -75,38 +82,66 @@ __device__ void store_relaxed(unsigned int* const location, const unsigned int v
 #endif
 }
 
-template <unsigned int N, unsigned int stride = 1, unsigned int thread_stride = 1>
-struct linear_pattern
-{
-	__device__ bool skip_thread(unsigned int i) const
-	{
-		return i % thread_stride != 0;
-	}
 
-	__device__ unsigned int operator ()(unsigned int i) const
+struct single_element
+{
+	__device__ constexpr unsigned int operator ()() const
 	{
-		return (i * stride) % N;
+		return 0;
+	}
+};
+
+template <unsigned int N, unsigned int stride>
+struct strided_access
+{
+	__device__ unsigned int operator ()() const
+	{
+		return ((blockIdx.x * blockDim.x + threadIdx.x) * stride) % N;
 	}
 };
 
 
-template <unsigned int (&load)(const unsigned int*), void (&store)(unsigned int*, unsigned int), int N, typename Pattern>
+struct all_lanes
+{
+	__device__ constexpr bool operator ()() const
+	{
+		return true;
+	}
+};
+
+template <unsigned int stride>
+struct skip_lanes
+{
+	__device__ bool operator ()() const
+	{
+		return laneid() % stride == 0;
+	}
+};
+
+template <unsigned int N>
+struct lower_lanes
+{
+	__device__ bool operator ()() const
+	{
+		return laneid() < N;
+	}
+};
+
+
+
+template <unsigned int (&load)(const unsigned int*), void (&store)(unsigned int*, unsigned int), int N, typename AccessPattern, typename LanePattern>
 __global__ void test()
 {
-	auto tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	Pattern pattern;
-
-	if (pattern.skip_thread(tid))
-		return;
-
-	auto& a = buffer[pattern(tid)];
-
-	#pragma unroll
-	for (int i = 0; i < N; ++i)
+	if (LanePattern{}())
 	{
-		auto x = load(&a);
-		store(&a, x + 1);
+		auto& a = buffer[AccessPattern{}()];
+
+		#pragma unroll
+		for (int i = 0; i < N; ++i)
+		{
+			auto x = load(&a);
+			store(&a, x + 1);
+		}
 	}
 }
 
@@ -259,17 +294,17 @@ namespace
 		return value;
 	}
 
-	template <int N, typename pattern, typename F>
+	template <int N, typename AccessPattern, typename LanePattern, typename F>
 	void kernels(bool try_relaxed_atomics, F&& f)
 	{
-		f(test<load_volatile, store_volatile, N, pattern>, "v+v"sv);
-		f(test<load_volatile, store_atomic_exch, N, pattern>, "v+a"sv);
-		f(test<load_atomic_add, store_volatile, N, pattern>, "a+v"sv);
-		f(test<load_atomic_add, store_atomic_exch, N, pattern>, "a+a"sv);
+		f(test<load_volatile, store_volatile, N, AccessPattern, LanePattern>, "v+v"sv);
+		f(test<load_volatile, store_atomic_exch, N, AccessPattern, LanePattern>, "v+a"sv);
+		f(test<load_atomic_add, store_volatile, N, AccessPattern, LanePattern>, "a+v"sv);
+		f(test<load_atomic_add, store_atomic_exch, N, AccessPattern, LanePattern>, "a+a"sv);
 
 		if (try_relaxed_atomics)
 		{
-			f(test<load_relaxed, store_relaxed, N, pattern>, "relaxed"sv);
+			f(test<load_relaxed, store_relaxed, N, AccessPattern, LanePattern>, "relaxed"sv);
 		}
 	}
 }
@@ -300,9 +335,9 @@ int main(int argc, char** argv)
 
 		constexpr int col_width = 10;
 
-		std::cout << "\n              "sv;
+		std::cout << "\n                    "sv;
 
-		kernels<N, linear_pattern<1, 1>>(try_relaxed_atomics, []([[maybe_unused]] auto&& k, auto n)
+		kernels<N, single_element, all_lanes>(try_relaxed_atomics, []([[maybe_unused]] auto&& k, auto n)
 		{
 			int pad = col_width - n.length();
 
@@ -335,30 +370,79 @@ int main(int argc, char** argv)
 				std::cout << std::fixed << std::setprecision(2) << std::setw(col_width) << t << " ms "sv;
 			};
 
-			std::cout << "\n   <1, 1,  1>:"sv;
-			kernels<N, linear_pattern<1, 1,  1>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1, 1,  2>:"sv;
-			kernels<N, linear_pattern<1, 1,  2>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1, 1,  4>:"sv;
-			kernels<N, linear_pattern<1, 1,  4>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1, 1,  8>:"sv;
-			kernels<N, linear_pattern<1, 1,  8>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1, 1, 16>:"sv;
-			kernels<N, linear_pattern<1, 1, 16>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1, 1, 32>:"sv;
-			kernels<N, linear_pattern<1, 1, 32>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024,  1>:"sv;
-			kernels<N, linear_pattern<1024,  1>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024,  2>:"sv;
-			kernels<N, linear_pattern<1024,  2>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024,  4>:"sv;
-			kernels<N, linear_pattern<1024,  4>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024,  8>:"sv;
-			kernels<N, linear_pattern<1024,  8>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024, 16>:"sv;
-			kernels<N, linear_pattern<1024, 16>>(try_relaxed_atomics, print_results);
-			std::cout << "\n   <1024, 32>:"sv;
-			kernels<N, linear_pattern<1024, 32>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] full:"sv;
+			kernels<N, single_element, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
+
+			std::cout << "\n           [1] <  1:"sv;
+			kernels<N, single_element, lower_lanes< 1>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] <  2:"sv;
+			kernels<N, single_element, lower_lanes< 2>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] <  4:"sv;
+			kernels<N, single_element, lower_lanes< 4>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] <  8:"sv;
+			kernels<N, single_element, lower_lanes< 8>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] < 16:"sv;
+			kernels<N, single_element, lower_lanes<16>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] < 32:"sv;
+			kernels<N, single_element, lower_lanes<32>>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
+
+			std::cout << "\n           [1] %  1:"sv;
+			kernels<N, single_element, skip_lanes< 1>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] %  2:"sv;
+			kernels<N, single_element, skip_lanes< 2>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] %  4:"sv;
+			kernels<N, single_element, skip_lanes< 4>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] %  8:"sv;
+			kernels<N, single_element, skip_lanes< 8>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] % 16:"sv;
+			kernels<N, single_element, skip_lanes<16>>(try_relaxed_atomics, print_results);
+			std::cout << "\n           [1] % 32:"sv;
+			kernels<N, single_element, skip_lanes<32>>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
+
+			std::cout << "\n   [1024 :  1] <  1:"sv;
+			kernels<N, strided_access<1024,  1>, lower_lanes< 1>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  2] <  2:"sv;
+			kernels<N, strided_access<1024,  2>, lower_lanes< 2>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  4] <  4:"sv;
+			kernels<N, strided_access<1024,  4>, lower_lanes< 4>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  8] <  8:"sv;
+			kernels<N, strided_access<1024,  8>, lower_lanes< 8>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 16] < 16:"sv;
+			kernels<N, strided_access<1024, 16>, lower_lanes<16>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 32] < 32:"sv;
+			kernels<N, strided_access<1024, 32>, lower_lanes<32>>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
+
+			std::cout << "\n   [1024 :  1] %  1:"sv;
+			kernels<N, strided_access<1024,  1>, skip_lanes< 1>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  2] %  2:"sv;
+			kernels<N, strided_access<1024,  2>, skip_lanes< 2>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  4] %  4:"sv;
+			kernels<N, strided_access<1024,  4>, skip_lanes< 4>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  8] %  8:"sv;
+			kernels<N, strided_access<1024,  8>, skip_lanes< 8>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 16] % 16:"sv;
+			kernels<N, strided_access<1024, 16>, skip_lanes<16>>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 32] % 32:"sv;
+			kernels<N, strided_access<1024, 32>, skip_lanes<32>>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
+
+			std::cout << "\n   [1024 :  1] full:"sv;
+			kernels<N, strided_access<1024,  1>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  2] full:"sv;
+			kernels<N, strided_access<1024,  2>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  4] full:"sv;
+			kernels<N, strided_access<1024,  4>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 :  8] full:"sv;
+			kernels<N, strided_access<1024,  8>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 16] full:"sv;
+			kernels<N, strided_access<1024, 16>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << "\n   [1024 : 32] full:"sv;
+			kernels<N, strided_access<1024, 32>, all_lanes>(try_relaxed_atomics, print_results);
+			std::cout << '\n';
 
 			std::cout << '\n' << std::flush;
 		}
