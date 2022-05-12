@@ -67,6 +67,11 @@
 				margin: 3px;
 			}
 
+			.plot-save-btn .btn {
+				margin-left: 10px;
+				margin-right: 10px;
+			}
+
 		</style>
 	</head>
 	<body>
@@ -184,7 +189,7 @@
 
 				let line_style_map = new Map();
 
-				plots.each(function (idx, elem) { createPlot($(elem), menu, line_style_map); });
+				plots.each(function (idx, elem) { elem.plot = createPlot($(elem), menu, line_style_map); });
 
 				$('.nav .nav-link').on('shown.bs.tab', function(event){
 					body.css('margin-top', menu.height() + 40 + 'px');

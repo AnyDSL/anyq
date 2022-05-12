@@ -8,6 +8,12 @@ class LineParams {
 		this.p_deq = p_deq;
 		this.workload_size = workload_size;
 	}
+
+	toString() {
+		let prop = ['device', 'queue_type', 'queue_size', 'block_size', 'p_enq', 'p_deq', 'workload_size'];
+		let obj = this;
+		return 'LineParams {' + $(prop).map(function () { return this + ': ' + obj[this] }).get().join(', ') + '}';
+	}
 };
 
 class Result {
@@ -75,6 +81,10 @@ class Line {
 		//this.y_min = d3.min(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 	}
 
+	map_x_data(d) {
+		return d.num_threads;
+	}
+
 	map_y_data(d) {
 		return NaN;
 	}
@@ -84,7 +94,7 @@ class Line {
 	}
 
 	update(x, y, line_style_map) {
-		const line = d3.line().defined(this.defined).x(d => x(d.num_threads)).y(d => y(this.map_y_data(d)));
+		const line = d3.line().defined(this.defined).x(d => x(this.map_x_data(d))).y(d => y(this.map_y_data(d)));
 
 		this.path.attr("d", line(this.data));
 
@@ -584,9 +594,10 @@ function createPlot(plotElem, menuElem, line_style_map)
 
 	fillButtonTable(menuElem, line_map, line_style_map, plot);
 
-	let saveBtn = $('<div class="plot-save-btn d-flex justify-content-end"><a class="btn btn-outline-secondary">Download</a></div>')
-		.appendTo(plotElem)
-		.find('.btn').click(function(e) {
+	let btnPanel = $('<div class="plot-save-btn d-flex justify-content-end"></div>').appendTo(plotElem);
+	let saveBtn = $('<a class="btn btn-outline-secondary">Download</a>')
+		.appendTo(btnPanel)
+		.click(function(e) {
 			let active = $("label.checkbox")
 				.filter(function(idx, label) {
 					return $(label).find("input[type='checkbox']").prop("checked");
@@ -606,6 +617,71 @@ function createPlot(plotElem, menuElem, line_style_map)
 			let a = $(this);
 			a.attr('href', window.URL.createObjectURL(blob));
 			a.attr('download', 'plot.svg');
+		});
+
+	let csvBtn = $('<a class="btn btn-outline-secondary">CSV</a>')
+		.appendTo(btnPanel)
+		.click(function(e) {
+			let active = $("label.checkbox")
+				.filter(function(idx, label) {
+					return $(label).find("input[type='checkbox']").prop("checked");
+				})
+				.map(function () {
+					let label = $(this);
+					return label.attr("data-category") + ':' + label.attr("data-value");
+				})
+				.get().join(', ');
+
+			let lines = $(plot.lines)
+				.filter(function(idx, line) { return line.is_visible(); });
+
+			let data = {};
+			let num_lines = lines.length;
+			lines.each(function(idx, l) {
+				//console.log(l);
+				for(var d of l.data) {
+					//console.log(d);
+					let x = l.map_x_data(d);
+					let y = l.map_y_data(d);
+					data[x] = data[x] || { 'x': x };
+					data[x]['line'+idx] = y;
+				}
+			});
+			// console.log(data);
+
+			let indices = Object.values(data)
+				.map(function(value) { return value.x; })
+				.sort((a,b) => a-b);
+			// console.log(indices);
+
+			let linedata = indices.map(function(x) {
+				let entry = data[x];
+				let row = '' + x;
+				for (var i = 0; i < num_lines; i++) {
+					let value = entry['line' + i].toFixed(4);
+					if (isNaN(value)) { value = ''; }
+					row += ',' + value;
+				}
+				return row;
+			});
+
+			let headers = ['x'].concat(lines.map(function (idx) { return 'line' + idx; }).get());
+			// console.log(headers);
+			// console.log(linedata);
+
+			let blob = new Blob([
+					'# ', 'csv export of "', plotElem.parent().find('h2').text(), '"\n',
+					'# params: ', active, '\n',
+					'# x-axis: ', plot.label.x.text(), '\n',
+					'# y-axis: ', plot.label.y.text(), '\n',
+					lines.map(function (idx) { return '# line' + idx + ' -- ' + this.params; }).get().join('\n'), '\n',
+					headers.join(','), '\n',
+					linedata.join('\n'), '\n'
+				], {type: 'text/csv'});
+
+			let a = $(this);
+			a.attr('href', window.URL.createObjectURL(blob));
+			a.attr('download', 'plot.csv');
 		});
 
 	return plot;
