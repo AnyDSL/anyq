@@ -34,7 +34,6 @@ set(COMMON_BENCHMARK_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/benchmark.art
 	${CMAKE_CURRENT_SOURCE_DIR}/queue-benchmark.art
 	${CMAKE_CURRENT_SOURCE_DIR}/queue-instrumentation.art
-	${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art
 )
 
 source_group("Source Files" FILES ${COMMON_BENCHMARK_FILES})
@@ -73,11 +72,11 @@ function(add_benchmark _target _testfile _mapping)
 	target_sources(${_target} PRIVATE ${_target_fingerprint})
 endfunction()
 
-function(generate_benchmarks template_file platform)
+function(generate_benchmarks template_file benchmark_file platform queue_types queue_sizes)
 	get_filename_component(benchmark_name ${template_file} NAME_WE)
 
-	foreach(queue_type ${queue_types_${platform}})
-		foreach(queue_size 10000 100000 1000000)
+	foreach(queue_type ${queue_types})
+		foreach(queue_size ${queue_sizes})
 			set(queue_short_name "${${queue_type}_short_name}")
 			set(variant_name "${benchmark_name}-${${queue_type}_short_name}-${queue_size}")
 			set(dest_file "${CMAKE_CURRENT_BINARY_DIR}/${variant_name}.art")
@@ -88,7 +87,7 @@ function(generate_benchmarks template_file platform)
 				configure_file(${template_file} ${dest_file})
 
 				set(target_name "${variant_name}-${platform}")
-				add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources})
+				add_benchmark(${target_name} ${dest_file} ${platform} ${benchmark_file} ${${queue_type}_sources})
 
 				if (DEFINED ${queue_type}_configure_target)
 					cmake_language(CALL ${${queue_type}_configure_target} ${target_name})
@@ -121,6 +120,10 @@ foreach(_platform ${AnyQ_PLATFORMS})
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	foreach(_benchmark ${BENCHMARK_FILES})
-		generate_benchmarks(${_benchmark} ${_platform})
+		generate_benchmarks(${_benchmark} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;100000;1000000")
 	endforeach()
+
+	if (${_platform} STREQUAL "cuda")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art "cuda" "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000")
+	endif()
 endforeach()

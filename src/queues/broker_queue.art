@@ -9,26 +9,41 @@ struct BrokerWorkDistributorQueue {
 	size: i32,
 }
 
-fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64) -> Buffer, dealloc: fn(Buffer) -> ()) -> ProducerConsumerQueue[T] {
-	let tickets_offset = round_up_i64(sizeof[BrokerWorkDistributorQueue](), alignof[u32]());
+fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64) -> Buffer, dealloc: fn(Buffer) -> (), reference_impl: bool) -> ProducerConsumerQueue[T] {
+	let tickets_offset = 0 as i64;
 	let buffer_offset = round_up_i64(tickets_offset + queue_size as i64 * sizeof[u32](), alignof[T]());
+	let queue_offset = round_up_i64(buffer_offset + queue_size as i64 * sizeof[T](), sizeof[BrokerWorkDistributorQueue]());
 
-	let alloc_size = buffer_offset + queue_size as i64 * sizeof[T]();
+	let alloc_size = queue_offset + sizeof[BrokerWorkDistributorQueue]();
 
 	let queue_device_alloc = alloc(alloc_size);
 	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
 
-	let queue = &mut queue_device_memory(0) as &mut addrspace(1) BrokerWorkDistributorQueue;
 	let tickets = &mut queue_device_memory(tickets_offset) as &mut addrspace(1) [u32];
 	let buffer = &mut queue_device_memory(buffer_offset) as &mut addrspace(1) [T];
+	let queue = &mut queue_device_memory(queue_offset) as &mut addrspace(1) BrokerWorkDistributorQueue;
 
 
 	fn @wait_for_ticket(i: u32, number: u32, thread: gpu_thread_context) -> () {
-		thread.wait(@|| tickets(i) == number, "BWD waiting for ticket");
+		let load_ticket = if reference_impl {
+			@|| thread.atomic_load_global_u32_coalesced(tickets(i), memory_order::relaxed)
+		}
+		else {
+			@|| thread.atomic_load_global_u32(tickets(i), memory_order::relaxed)
+		};
+
+		thread.wait(@|| load_ticket() == number, "BWD waiting for ticket");
 	}
 
 	fn @ensure_dequeue(thread: gpu_thread_context) -> bool {
-		let mut num = thread.atomic_load_global_i32(queue.size, memory_order::relaxed);
+		let load_size = if reference_impl {
+			@|| queue.size
+		}
+		else {
+			@|| thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+		};
+
+		let mut num = load_size();
 
 		let mut ensurance = false;
 
@@ -45,7 +60,14 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 	}
 
 	fn @ensure_enqueue(thread: gpu_thread_context) -> bool {
-		let mut num = thread.atomic_load_global_i32(queue.size, memory_order::relaxed);
+		let load_size = if reference_impl {
+			@|| queue.size
+		}
+		else {
+			@|| thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+		};
+
+		let mut num = load_size();
 
 		let mut ensurance = false;
 
@@ -62,18 +84,32 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 	}
 
 	fn @read_data(sink: fn(T) -> (), thread: gpu_thread_context) -> () {
+		let store_ticket = if reference_impl {
+			@|p:u32, value:u32| { thread.atomic_store_global_u32_coalesced(tickets(p), value, memory_order::relaxed); }
+		}
+		else {
+			@|p:u32, value:u32| { tickets(p) = value; }
+		};
+
 		let pos = thread.atomic_add_global_u32(queue.head, 1, memory_order::relaxed);
 		let p = pos % queue_size as u32;
 
 		wait_for_ticket(p, 2 * (pos / queue_size as u32) + 1, thread);
 		let val = buffer(p);
-		thread.memory_barrier(memory_order::acquire);
-		tickets(p) = 2 * ((pos + queue_size as u32) / queue_size as u32);
+		thread.memory_barrier(memory_order::acq_rel);
+		store_ticket(p, 2 * ((pos + queue_size as u32) / queue_size as u32));
 
 		sink(val);
 	}
 
 	fn @put_data(source: fn() -> T, thread: gpu_thread_context) -> () {
+		let store_ticket = if reference_impl {
+			@|p:u32, value:u32| { thread.atomic_store_global_u32_coalesced(tickets(p), value, memory_order::relaxed); }
+		}
+		else {
+			@|p:u32, value:u32| { tickets(p) = value; }
+		};
+
 		let pos = thread.atomic_add_global_u32(queue.tail, 1, memory_order::relaxed);
 		let p = pos % queue_size as u32;
 		let b = 2 * (pos / queue_size as u32);
@@ -83,7 +119,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		wait_for_ticket(p, b, thread);
 		buffer(p) = val;
 		thread.memory_barrier(memory_order::release);
-		tickets(p) = b + 1;
+		store_ticket(p, b + 1);
 	}
 
 	ProducerConsumerQueue[T] {
@@ -108,7 +144,12 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		},
 
 		size = @|thread| {
-			thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+			if reference_impl {
+				queue.size
+			}
+			else {
+				thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+			}
 		},
 
 		reset = @|grid| {
@@ -137,21 +178,25 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 }
 
 fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) {
-	createBrokerWorkDistributorQueue_internal[T](queue_size, device.alloc, @|buffer| release(buffer))
+	createBrokerWorkDistributorQueue_internal[T](queue_size, device.alloc, @|buffer| release(buffer), false)
 }
 
 static mut static_queue_buffer: [u8 * 268435456];
 
-fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, queue_size: i32) {
-	fn alloc(size: i64) {
-		assert(size <= 268435456, "size of statically-allocated queue exceeds static allocation size");
+fn @bwd_static_alloc(size: i64) {
+	assert(size <= 268435456, "size of statically-allocated queue exceeds static allocation size");
 
-		Buffer {
-			data = &mut static_queue_buffer as &mut [i8],
-			size = -1,
-			device = -1
-		}
+	Buffer {
+		data = &mut static_queue_buffer as &mut [i8],
+		size = -1,
+		device = -1
 	}
+}
 
-	createBrokerWorkDistributorQueue_internal[T](queue_size, alloc, @|_|{})
+fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, queue_size: i32) {
+	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, false)
+}
+
+fn @createBrokerWorkDistributorQueueOrig[T](_device: AccDevice, queue_size: i32) {
+	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, true)
 }
