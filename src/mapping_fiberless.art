@@ -109,9 +109,17 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		atomic_load_global_u32 = cpu_atomic_load[u32],
 		atomic_load_global_u64 = cpu_atomic_load[u64],
 
+		atomic_load_global_i32_coalesced = cpu_atomic_load[i32],
+		atomic_load_global_u32_coalesced = cpu_atomic_load[u32],
+		atomic_load_global_u64_coalesced = cpu_atomic_load[u64],
+
 		atomic_store_global_i32 = cpu_atomic_store[i32],
 		atomic_store_global_u32 = cpu_atomic_store[u32],
 		atomic_store_global_u64 = cpu_atomic_store[u64],
+
+		atomic_store_global_i32_coalesced = cpu_atomic_store[i32],
+		atomic_store_global_u32_coalesced = cpu_atomic_store[u32],
+		atomic_store_global_u64_coalesced = cpu_atomic_store[u64],
 
 		atomic_add_global_i32 = cpu_atomic_rmw[i32](1),
 		atomic_add_global_u32 = cpu_atomic_rmw[u32](1),
