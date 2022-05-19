@@ -24,6 +24,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 	let rand_mask = @|p: f32| (((-1 as u32) as f64 * p as f64) as u32);
 	let c_enq = magic_p_id(rand_mask(p_enq));
 	let c_deq = magic_p_id(rand_mask(p_deq));
+	let c_enqdeq = magic_p_id(rand_mask(0.5));
 
 	QueueBenchmark {
 		reset = @|| {
@@ -65,7 +66,7 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 								next_value
 							};
 
-							for _ in range(0, attempts_per_thread) {
+							let enqueue = @|| {
 								if sample(c_enq) {
 									next_value = simulate_workload();
 
@@ -73,9 +74,9 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 										next_value
 									};
 								}
+							};
 
-								wave.barrier();
-
+							let dequeue = @|| {
 								if sample(c_deq) {
 									if for value in q.pop(thread) {
 										next_value = value;
@@ -83,8 +84,19 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 										simulate_workload();
 									}
 								}
+							};
 
-								wave.barrier();
+							for _ in range(0, attempts_per_thread) {
+								if wave.barrier_count(sample(c_enqdeq)) <= wave.num_threads() as i32 / 2 {
+									enqueue();
+									wave.barrier();
+									dequeue();
+								}
+								else {
+									dequeue();
+									wave.barrier();
+									enqueue();
+								}
 							}
 
 							accumulate_benchmark_stats(stats_buffer, stats, thread);
