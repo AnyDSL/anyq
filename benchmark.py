@@ -152,7 +152,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	num_threads_min = 1
 	num_threads_max = 1 << 21
 
-	for workload_size in (1, 8, 32, 128, 2048):
+	for workload_size in (1, 512):
 		for binary in selected_binaries:
 			for device in devices.get(binary.platform):
 				device_name = device_name_cache.get((binary.platform, device))
@@ -163,7 +163,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 				for p_enq in (0.25, 0.5, 1.0):
 					for p_deq in (0.25, 0.5, 1.0):
-						for block_size in [32, 256, 1024]:
+						for block_size in [32, 512]:
 
 							output_path = results_dir/results_file_name(binary.test_name, binary.queue_type, binary.queue_size, block_size, p_enq, p_deq, workload_size, device_name, binary.platform)
 							bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
