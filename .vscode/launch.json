@@ -37,6 +37,24 @@
 			]
 		},
 		{
+			"name": "debug benchmark_atomic_load_store",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/benchmark_atomic_load_store",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
 			"name": "Python: Current File",
 			"type": "python",
 			"request": "launch",

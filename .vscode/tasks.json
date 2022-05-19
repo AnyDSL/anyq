@@ -50,6 +50,18 @@
 			"type": "shell",
 			"command": "nvdisasm -g ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-cuda.cu.cubin > ${workspaceFolder}/build/src/Release/${fileBasenameNoExtension}-cuda.cubin.asm",
 			"problemMatcher": []
+		},
+		{
+			"label": "build benchmark_atomic_load_store",
+			"type": "shell",
+			"command": "nvcc -std=c++17 -arch=sm_61 -ccbin g++-11 -Xcompiler \"-ggdb -Og\" --keep -o benchmark_atomic_load_store ${workspaceFolder}/src/benchmark/benchmark_atomic_load_store.cu",
+			"options": {
+				"cwd": "${workspaceFolder}/build"
+			},
+			"group": "build",
+			"problemMatcher": [
+				"$nvcc"
+			]
 		}
 	]
 }
