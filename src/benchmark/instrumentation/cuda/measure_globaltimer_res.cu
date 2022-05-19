@@ -6,7 +6,6 @@
 
 #include <cupti.h>
 #include <cupti_profiler_target.h>
-#include <stdexcept>
 
 
 __device__ unsigned long long timestamp()
