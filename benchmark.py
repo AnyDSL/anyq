@@ -32,7 +32,7 @@ class QueueBenchmarkBinary:
 		self.fingerprint = None
 
 	def __repr__(self):
-		return f"QueueBenchmarkBinary(path={self.path}, test_name={self.test_name}, queue_type={self.queue_type}, queue_size={self.queue_size}, platform={self.platform}')"
+		return f"QueueBenchmarkBinary(path={self.path}, test_name={self.test_name}, queue_type={self.queue_type}, queue_size={self.queue_size}, platform={self.platform}, fingerprint={self.fingerprint}')"
 
 	async def capture_benchmark_info(self, p):
 		device_name = None
@@ -155,11 +155,13 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	for workload_size in (1, 512):
 		for binary in selected_binaries:
 			for device in devices.get(binary.platform):
-				device_name = device_name_cache.get((binary.platform, device))
+				# device_name = device_name_cache.get((binary.platform, device))
 
-				if not device_name:
-					device_name = binary.info(device)
-					device_name_cache[(binary.platform, device)] = device_name
+				# if not device_name:
+				device_name = binary.info(device)
+				# device_name_cache[(binary.platform, device)] = device_name
+
+				# print(binary)
 
 				for p_enq in (0.25, 0.5, 1.0):
 					for p_deq in (0.25, 0.5, 1.0):
