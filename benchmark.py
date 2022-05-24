@@ -35,14 +35,8 @@ class QueueBenchmarkBinary:
 		return f"QueueBenchmarkBinary(path={self.path}, test_name={self.test_name}, queue_type={self.queue_type}, queue_size={self.queue_size}, platform={self.platform}, fingerprint={self.fingerprint}')"
 
 	async def capture_benchmark_info(self, p):
-		device_name = None
-		fingerprint = None
-
 		device_name = codecs.decode(await p.stdout.readline()).strip()
 		fingerprint = codecs.decode(await p.stdout.readline()).strip()
-
-		if not device_name or not fingerprint:
-			raise Exception("failed to parse device name or fingerprint of benchmark executable")
 
 		return device_name, fingerprint
 
@@ -57,7 +51,10 @@ class QueueBenchmarkBinary:
 			device_name, self.fingerprint = await self.capture_benchmark_info(p)
 
 			if await p.wait() != 0:
-				raise Exception("benchmark info failed to run")
+				return None
+
+			if not device_name or not self.fingerprint:
+				raise Exception("failed to parse device name or fingerprint of benchmark executable")
 
 			return device_name
 		return asyncio.run(run())
@@ -160,6 +157,9 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 				# if not device_name:
 				device_name = binary.info(device)
 				# device_name_cache[(binary.platform, device)] = device_name
+
+				if not device_name:
+					continue
 
 				# print(binary)
 
@@ -537,6 +537,7 @@ def main(args):
 			"cpu": [0],
 			"fiberless": [0],
 			"cuda": device_list(args.cuda_device),
+			"cudaits": device_list(args.cuda_device),
 			"nvvm": device_list(args.cuda_device),
 			"amdgpu": device_list(args.amdgpu_device)
 		}

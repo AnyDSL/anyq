@@ -3,8 +3,8 @@
 
 #include <iosfwd>
 
-#include "CUDA/error.h"
-#include "CUDA/event.h"
+#include <CUDA/error.h>
+#include <CUDA/event.h>
 
 
 class Instrumentation
@@ -13,6 +13,8 @@ class Instrumentation
 	CU::unique_event event_end;
 
 	int device;
+
+	static void init_profiler();
 
 public:
 	Instrumentation(int device);

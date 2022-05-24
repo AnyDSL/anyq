@@ -9,8 +9,7 @@
 #include "instrumentation.h"
 
 
-Instrumentation::Instrumentation(int device)
-	: device(device)
+void Instrumentation::init_profiler()
 {
 	// initialize CUPTI Profiling API in order to get increased %globaltimer resolution
 
