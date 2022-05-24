@@ -10,7 +10,7 @@ if (cuda IN_LIST AnyQ_PLATFORMS OR nvvm IN_LIST AnyQ_PLATFORMS)
 endif()
 
 if (nvvm IN_LIST AnyQ_PLATFORMS)
-    add_library(instrumentation_nvvm ALIAS instrumentation_cuda)
+	add_library(instrumentation_nvvm ALIAS instrumentation_cuda)
 endif()
 
 if (amdgpu IN_LIST AnyQ_PLATFORMS)
