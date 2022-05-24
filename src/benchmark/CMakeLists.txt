@@ -41,8 +41,8 @@ source_group("Source Files" FILES ${COMMON_BENCHMARK_FILES})
 find_package(Python3 COMPONENTS Interpreter)
 
 
-function(add_benchmark _target _testfile _mapping)
-	add_anydsl_executable(${_target} ${COMMON_BENCHMARK_FILES} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${_testfile} ${ARGN})
+function(add_benchmark _target _benchmark_file _mapping)
+	add_anyq_executable(${_target} ${_mapping} ${COMMON_BENCHMARK_FILES} ${_benchmark_file} ${ARGN})
 
 	get_target_property(_target_sources ${_target} SOURCES)
 	list(APPEND _target_sources

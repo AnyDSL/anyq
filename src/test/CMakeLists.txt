@@ -30,7 +30,7 @@ function(add_test_executable _target _mapping)
 
 	# message("add_test_executable ${_target} ${_mapping} ${ARGN}")
 
-	add_anydsl_executable(${_target} ${COMMON_TEST_FILES} ${COMMON_ARTIC_FILES} "${AnyQ_SOURCE_DIR}/mapping_${_mapping}.art" ${ARGN})
+	add_anyq_executable(${_target} ${_mapping} ${COMMON_TEST_FILES} ${ARGN})
 	set_target_properties(${_target} PROPERTIES FOLDER "tests/${_mapping}" )
 	set(ADDITIONAL_LINK_DEPENDENCY ${ADDITIONAL_LINK_DEPENDENCY_${_mapping}})
 	# message(STATUS "ADDITIONAL_LINK_DEPENDENCY: ${ADDITIONAL_LINK_DEPENDENCY}")

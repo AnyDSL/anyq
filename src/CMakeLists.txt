@@ -31,6 +31,16 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<IF:$<CONFIG:Debug>,debug,release>.art
 )
 
+set(mapping_source_files_amdgpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_amdgpu.art")
+set(mapping_source_files_cpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cpu.art")
+set(mapping_source_files_fiberless "${CMAKE_CURRENT_SOURCE_DIR}/mapping_fiberless.art")
+set(mapping_source_files_cuda "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art" "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cudanoits.art")
+set(mapping_source_files_nvvm "${CMAKE_CURRENT_SOURCE_DIR}/mapping_nvvm.art")
+
+function(add_anyq_executable target_name mapping)
+	add_anydsl_executable(${target_name} ${COMMON_ARTIC_FILES} "${mapping_source_files_${mapping}}" ${ARGN})
+endfunction()
+
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
 source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
