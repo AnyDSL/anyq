@@ -2,7 +2,7 @@
 #[import(cc = "device")] fn magic_p_id(u32) -> u32;  // HACK to force evaluation of expression on the host
 
 
-fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_size: i32, attempts_per_thread: i32, p_enq: f32, p_deq: f32, workload_size: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
+fn @producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_size: i32, attempts_per_thread: i32, p_enq: f32, p_deq: f32, workload_size: i32, queue_size: i32, its: bool, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
 	print_string("queue;queue_size;block_size;p_enq;p_deq;workload_size\n");
 	print_string(queue_name); print_char(';');
 	print_i32(queue_size); print_char(';');
@@ -87,15 +87,27 @@ fn producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_s
 							};
 
 							for _ in range(0, attempts_per_thread) {
-								if wave.barrier_count(sample(c_enqdeq)) <= wave.num_threads() as i32 / 2 {
-									enqueue();
-									wave.barrier();
-									dequeue();
+								if its {
+									if sample(c_enqdeq) {
+										enqueue();
+										dequeue();
+									}
+									else {
+										dequeue();
+										enqueue();
+									}
 								}
 								else {
-									dequeue();
-									wave.barrier();
-									enqueue();
+									if wave.barrier_count(sample(c_enqdeq)) <= wave.num_threads() as i32 / 2 {
+										enqueue();
+										wave.barrier();
+										dequeue();
+									}
+									else {
+										dequeue();
+										wave.barrier();
+										enqueue();
+									}
 								}
 							}
 
