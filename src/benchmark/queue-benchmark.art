@@ -60,6 +60,7 @@ fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics,
 
 
 struct QueueBenchmark {
+	print_info: fn() -> (),
 	reset: fn() -> (),
 	run: fn(i32, i32) -> (),
 	read_stats: fn() -> QueueBenchmarkStatistics
@@ -69,9 +70,9 @@ struct QueueBenchmark {
 fn @run_queue_benchmark(device: i32, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
 	let instrumentation = create_instrumentation(device);
 
-	print_string("platform;device_name;fingerprint\n");
+	benchmark.print_info();
+	print_flush();
 	instrumentation.print_device_info();
-	print_char('\n');
 	print_char('\n');
 
 	print_string("num_threads;t/ms;num_enqueues;t_enqueues;t_enqueue_min;t_enqueue_max;num_enqueues_failed;t_enqueues_failed;t_enqueue_failed_min;t_enqueue_failed_max;num_dequeues;t_dequeues;t_dequeue_min;t_dequeue_max;num_dequeues_failed;t_dequeues_failed;t_dequeue_failed_min;t_dequeue_failed_max\n");

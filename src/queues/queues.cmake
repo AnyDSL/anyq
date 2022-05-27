@@ -81,7 +81,7 @@ function (BrokerWorkDistributorQueueCUDA_configure_target target patch_includes)
 	get_target_property(_bin_dir ${target} BINARY_DIR)
 	get_target_property(_name ${target} NAME)
 
-	set(cuda_src "${_bin_dir}/${CMAKE_CFG_INTDIR}/${_name}")
+	set(cuda_src "${_bin_dir}/$<CONFIG>/${_name}")
 
 	add_custom_command(
 		OUTPUT ${cuda_src}.ll

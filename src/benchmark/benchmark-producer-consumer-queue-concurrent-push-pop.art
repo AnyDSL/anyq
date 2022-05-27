@@ -3,14 +3,6 @@
 
 
 fn @producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_size: i32, attempts_per_thread: i32, p_enq: f32, p_deq: f32, workload_size: i32, queue_size: i32, its: bool, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
-	print_string("queue;queue_size;block_size;p_enq;p_deq;workload_size\n");
-	print_string(queue_name); print_char(';');
-	print_i32(queue_size); print_char(';');
-	print_i32(block_size); print_char(';');
-	print_f32(p_enq); print_char(';');
-	print_f32(p_deq); print_char(';');
-	print_i32(workload_size); print_char('\n'); print_char('\n');
-
 	let device = createAccDevice(device_id);
 
 	let stats_buffer_alloc = device.alloc(sizeof[QueueBenchmarkStatistics]());
@@ -27,6 +19,16 @@ fn @producer_consumer_queue_concurrent_push_pop_benchmark(device_id: i32, block_
 	let c_enqdeq = magic_p_id(rand_mask(0.5));
 
 	QueueBenchmark {
+		print_info = @|| {
+			print_string("queue;queue_size;block_size;p_enq;p_deq;workload_size\n");
+			print_string(queue_name); print_char(';');
+			print_i32(queue_size); print_char(';');
+			print_i32(block_size); print_char(';');
+			print_f32(p_enq); print_char(';');
+			print_f32(p_deq); print_char(';');
+			print_i32(workload_size); print_char('\n'); print_char('\n');
+		},
+
 		reset = @|| {
 			for grid in device.launch_1d(1, 1) {
 				for thread in grid.threads() {

@@ -1,12 +1,6 @@
 
 
 fn bwd_comparison_benchmark(device_id: i32, block_size: i32, attempts_per_thread: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
-	print_string("queue;queue_size;block_size;attempts_per_thread\n");
-	print_string(queue_name); print_char(';');
-	print_i32(queue_size); print_char(';');
-	print_i32(block_size); print_char(';');
-	print_i32(attempts_per_thread); print_char('\n'); print_char('\n');
-
 	let device = createAccDevice(device_id);
 
 	let queue = create_queue(device, queue_size);
@@ -15,6 +9,14 @@ fn bwd_comparison_benchmark(device_id: i32, block_size: i32, attempts_per_thread
 
 
 	QueueBenchmark {
+		print_info = @|| {
+			print_string("queue;queue_size;block_size;attempts_per_thread\n");
+			print_string(queue_name); print_char(';');
+			print_i32(queue_size); print_char(';');
+			print_i32(block_size); print_char(';');
+			print_i32(attempts_per_thread); print_char('\n'); print_char('\n');
+		},
+
 		reset = @|| {
 			for grid in device.launch_1d(1, 1) {
 				queue.reset(grid);

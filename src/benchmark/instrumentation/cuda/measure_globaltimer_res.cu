@@ -45,8 +45,8 @@ int main()
 	try
 	{
 		CUpti_Profiler_Initialize_Params params = {
-			.structSize = sizeof(params),
-			.pPriv = nullptr
+			/*.structSize =*/ sizeof(params),
+			/*.pPriv =*/ nullptr
 		};
 
 		if (cuptiProfilerInitialize(&params) != CUPTI_SUCCESS)

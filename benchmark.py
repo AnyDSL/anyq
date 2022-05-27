@@ -101,7 +101,7 @@ class QueueBenchmarkBinary:
 
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
-		if f.name.startswith("benchmark-queue-concurrent-") and include.match(f.name):
+		if f.name.startswith("benchmark-queue-concurrent-") and f.suffix in ['', '.exe'] and include.match(f.name):
 			test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
 			yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
 

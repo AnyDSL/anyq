@@ -24,7 +24,8 @@ extern "C"
 
 	void instrumentation_print_device_info(void* ctx)
 	{
-		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';') << ';' << FINGERPRINT;
+		std::cout << "platform;device_name;fingerprint\n";
+		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';') << ';' << FINGERPRINT << '\n' << std::flush;
 	}
 
 	void instrumentation_begin(void* ctx)
@@ -104,7 +105,7 @@ int main(int argc, char* argv[])
 
 			int device = parse_argument<int>(argv[2]);
 
-			Instrumentation(device).print_device_info(std::cout) << std::endl << FINGERPRINT;
+			Instrumentation(device).print_device_info(std::cout) << '\n' << FINGERPRINT << '\n' << std::flush;
 
 			return 0;
 		}
