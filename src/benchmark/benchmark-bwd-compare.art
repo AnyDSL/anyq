@@ -21,7 +21,7 @@ fn bwd_comparison_benchmark(device_id: i32, block_size: i32, attempts_per_thread
 			}
 		},
 
-		run = @|num_threads: i32, i: i32| {
+		run = @|num_threads: i32, _i: i32| {
 			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {
@@ -33,7 +33,7 @@ fn bwd_comparison_benchmark(device_id: i32, block_size: i32, attempts_per_thread
 
 								wave.barrier();
 
-								for value in queue.pop(thread) {};
+								for _value in queue.pop(thread) {};
 
 								wave.barrier();
 							}

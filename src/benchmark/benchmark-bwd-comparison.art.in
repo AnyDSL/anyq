@@ -1,7 +1,7 @@
 
 
 #[export]
-fn run(device: i32, num_threads_min: i32, num_threads_max: i32, block_size: i32, p_enq: f32, p_deq: f32, workload_size: i32) {
+fn run(device: i32, num_threads_min: i32, num_threads_max: i32, block_size: i32, _p_enq: f32, _p_deq: f32, _workload_size: i32) {
 	run_queue_benchmark(
 		device,
 		num_threads_min,
