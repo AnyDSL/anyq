@@ -97,6 +97,24 @@ function(generate_benchmarks template_file benchmark_file platform queue_types q
 	endforeach()
 endfunction()
 
+function(add_sass_output target)
+	get_target_property(_bin_dir ${target} ANYDSL_BINARY_DIR)
+	get_target_property(_name ${target} NAME)
+
+	set(cuda_src "${_bin_dir}/${_name}")
+
+	add_custom_command(
+		OUTPUT "${cuda_src}.asm"
+		COMMAND ${CMAKE_COMMAND} -E echo "SASSing up ${cuda_src}.cu"
+		COMMAND nvcc -arch=sm_61 --cubin "${cuda_src}.cu"
+		COMMAND nvdisasm "${cuda_src}.cubin" > "${cuda_src}.asm"
+		DEPENDS ${target}
+	)
+
+	add_custom_target(${target}_sass ALL DEPENDS "${cuda_src}.asm")
+endfunction()
+
+
 
 
 option(AnyQ_BENCHMARK_AUTO OFF)
@@ -123,5 +141,8 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	if (${_platform} STREQUAL "cuda")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art ${_platform} "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000")
+		add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-100000-cuda)
+		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
+		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)
 	endif()
 endforeach()
