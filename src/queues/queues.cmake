@@ -78,10 +78,10 @@ set(BrokerWorkDistributorQueueCUDA_configure_target BrokerWorkDistributorQueueCU
 set(BrokerWorkDistributorQueueCUDAIndirect_configure_target BrokerWorkDistributorQueueCUDAIndirect_configure)
 
 function (BrokerWorkDistributorQueueCUDA_configure_target target patch_includes)
-	get_target_property(_bin_dir ${target} BINARY_DIR)
+	get_target_property(_bin_dir ${target} ANYDSL_BINARY_DIR)
 	get_target_property(_name ${target} NAME)
 
-	set(cuda_src "${_bin_dir}/$<CONFIG>/${_name}")
+	set(cuda_src "${_bin_dir}/${_name}")
 
 	add_custom_command(
 		OUTPUT ${cuda_src}.ll

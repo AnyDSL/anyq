@@ -16,6 +16,16 @@ function(add_anydsl_executable _target)
 
 	add_executable(${_target} ${ARGN} ${_${_target}_PROGRAM})
 	add_anydsl_runtime(${_target})
+
+	get_property(_multi_config_generator GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+	get_target_property(_bin_dir ${_target} BINARY_DIR)
+
+	if (${_multi_config_generator})
+		set_target_properties(${_target} PROPERTIES ANYDSL_BINARY_DIR "${_bin_dir}/$<CONFIG>")
+	else()
+		set_target_properties(${_target} PROPERTIES ANYDSL_BINARY_DIR "${_bin_dir}")
+	endif()
+
 	set_target_properties(${_target} PROPERTIES
 		LINKER_LANGUAGE CXX
 		VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
