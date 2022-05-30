@@ -106,7 +106,7 @@ function(add_sass_output target)
 	add_custom_command(
 		OUTPUT "${cuda_src}.asm"
 		COMMAND ${CMAKE_COMMAND} -E echo "SASSing up ${cuda_src}.cu"
-		COMMAND nvcc -arch=sm_61 --cubin "${cuda_src}.cu"
+		COMMAND nvcc -arch=sm_61 --cubin -o "${cuda_src}.cubin" "${cuda_src}.cu"
 		COMMAND nvdisasm "${cuda_src}.cubin" > "${cuda_src}.asm"
 		DEPENDS ${target}
 	)
