@@ -18,8 +18,16 @@ void Instrumentation::init_profiler()
 		nullptr
 	};
 
-	if (cuptiProfilerInitialize(&params) != CUPTI_SUCCESS)
+	if (auto err = cuptiProfilerInitialize(&params); err != CUPTI_SUCCESS)
+	{
+		if (err == CUPTI_ERROR_OLD_PROFILER_API_INITIALIZED)
+		{
+			std::cerr << "WARNING: legacy CUPTI Profiling API was initialized\n";
+			return;
+		}
+
 		throw std::runtime_error("cuptiProfilerInitialize() failed");
+	}
 }
 
 std::ostream& Instrumentation::print_device_info(std::ostream& out)
