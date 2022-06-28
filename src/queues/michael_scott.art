@@ -23,10 +23,10 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 	let buffer_data_offset = round_up_i64(sizeof[MichaelScottQueue](), buffer_alignment);
 
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
-	let queue_device_memory = bitcast[&mut addrspace(1) [u8]](queue_device_state_alloc.data);
+	let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
 
-	let queue = bitcast[&mut addrspace(1) MichaelScottQueue](&mut queue_device_memory(0));
-	let node = bitcast[&mut addrspace(1) [MichaelScottQueueNode[T]]](&mut queue_device_memory(buffer_data_offset));
+	let queue = &mut queue_device_memory(0) as &mut addrspace(1) MichaelScottQueue;
+	let node = &mut queue_device_memory(buffer_data_offset) as &mut addrspace(1) [MichaelScottQueueNode[T]];
 
 	let nil:u32 = -1;
 

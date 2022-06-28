@@ -6,12 +6,12 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 	let queue_test = createQueueTest(device, create_queue, (pushed_buffer_size as i64 + 5) * sizeof[u32]());
 
 	for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);
-		let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 0));
-		let num_not_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 1));
-		let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 2));
-		let num_not_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 3));
-		let num_left_in_push_buffer = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(pushed_buffer_size + 4));
+		let pushed_buffer = device_memory as &mut addrspace(1) [i32];
+		let num_pushed = &mut pushed_buffer(pushed_buffer_size + 0) as &mut addrspace(1) i32;
+		let num_not_pushed = &mut pushed_buffer(pushed_buffer_size + 1) as &mut addrspace(1) i32;
+		let num_popped = &mut pushed_buffer(pushed_buffer_size + 2) as &mut addrspace(1) i32;
+		let num_not_popped = &mut pushed_buffer(pushed_buffer_size + 3) as &mut addrspace(1) i32;
+		let num_left_in_push_buffer = &mut pushed_buffer(pushed_buffer_size + 4) as &mut addrspace(1) i32;
 
 		fn pushed_buffer_addr(idx: u32) -> &mut addrspace(1) i32 { &mut pushed_buffer(idx) };
 		fn set_pushed_buffer(thread: gpu_thread_context, idx: u32, value: i32) -> () {

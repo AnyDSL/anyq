@@ -90,22 +90,22 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 }
 
 fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
-	= atomic_load[T](bitcast[&T](location), builtin_memory_order(order), "");
+	= atomic_load[T](location as &T, builtin_memory_order(order), "");
 
 fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
-	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(order), "");
+	= atomic_store[T](location as &mut T, value, builtin_memory_order(order), "");
 
 fn @cpu_atomic_rmw[T](op: u32) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(order), "")
+		atomic[T](op, location as &mut T, value, builtin_memory_order(order), "")
 	}
 }
 
 fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
-	= cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+	= cmpxchg[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
 fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
-	= cmpxchg_weak[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+	= cmpxchg_weak[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
 // fn @cpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
 // 	while !cpu_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
@@ -182,7 +182,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			/*
-			let ptr = bitcast[&mut u32](addr);
+			let ptr = addr as &mut u32;
 
 			// this is the generic version
 			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
@@ -220,7 +220,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 			*/
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
-			let ptr = bitcast[&mut u32](addr);
+			let ptr = addr as &mut u32;
 
 			// this is the generic version
 			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
@@ -406,7 +406,7 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> (
 	// we need a buffer to accumulate block level results of barriers
 	let num_block_variables = 4; // output, all, any, count
 	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks_in_flight as i64 * sizeof[i32]());
-	let addr = bitcast[&mut[i32]](block_pred_buffer.data);
+	let addr = block_pred_buffer.data as &mut[i32];
 
 	// reset all variables
 	for i in range(0, num_blocks_in_flight) {

@@ -69,22 +69,22 @@ fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
 }
 
 fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
-	= atomic_load[T](bitcast[&T](location), builtin_memory_order(order), "");
+	= atomic_load[T](location as &T, builtin_memory_order(order), "");
 
 fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
-	= atomic_store[T](bitcast[&mut T](location), value, builtin_memory_order(order), "");
+	= atomic_store[T](location as &mut T, value, builtin_memory_order(order), "");
 
 fn @cpu_atomic_rmw[T](op: u32) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
-		atomic[T](op, bitcast[&mut T](location), value, builtin_memory_order(order), "")
+		atomic[T](op, location as &mut T, value, builtin_memory_order(order), "")
 	}
 }
 
 fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
-	= cmpxchg[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+	= cmpxchg[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
 fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
-	= cmpxchg_weak[T](bitcast[&mut T](location), expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+	= cmpxchg_weak[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
 // fn @cpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
 // 	while !cpu_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
@@ -169,7 +169,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		},
 		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
 			let wrap_around = (val + 1);
-			let old = bitcast[i32](atomic_sub(addr, 1, memory_order::relaxed));
+			let old = atomic_sub(addr, 1, memory_order::relaxed) as i32;
 			if old <= 0 { atomic_add(addr, wrap_around, memory_order::relaxed); }
 			let result = (old % wrap_around as i32);
 			assert(result >= 0, "casting between i32/u32 shall not effect the result being >= 0");

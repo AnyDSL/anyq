@@ -3,7 +3,7 @@ static group_size = 512;
 static num_groups = 80;
 
 fn atomic_inc(addr: &mut addrspace(1) i32) -> i32 {
-	cpu_atomic_add(bitcast[&mut i32](addr), 1)
+	cpu_atomic_add(addr as &mut i32, 1)
 }
 
 #[export]

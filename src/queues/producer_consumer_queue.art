@@ -23,12 +23,12 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let buffer_data_offset = round_up_i64(sizeof[i32]() + 3 * sizeof[u32](), buffer_alignment);
 
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
-	let queue_device_memory = bitcast[&mut addrspace(1) [u8]](queue_device_state_alloc.data);
+	let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
 
-	let size =   bitcast[&mut addrspace(1) i32](&mut queue_device_memory(0));
-	let head =   bitcast[&mut addrspace(1) u32](&mut queue_device_memory(sizeof[i32]()));
-	let tail =   bitcast[&mut addrspace(1) u32](&mut queue_device_memory(sizeof[i32]() + sizeof[u32]()));
-	let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_device_memory(buffer_data_offset));
+	let size =   &mut queue_device_memory(0) as &mut addrspace(1) i32;
+	let head =   &mut queue_device_memory(sizeof[i32]()) as &mut addrspace(1) u32;
+	let tail =   &mut queue_device_memory(sizeof[i32]() + sizeof[u32]()) as &mut addrspace(1) u32;
+	let buffer = &mut queue_device_memory(buffer_data_offset) as &mut addrspace(1) [u8];
 
 	let buffer_element = @|i:u32| -> QueueElement[T] { element_type.buffer_element(buffer, i) };
 
@@ -158,7 +158,7 @@ fn @genericQueueElementType[T]() {
 		buffer_alignment = @|| element_alignment,
 		buffer_element = @|buffer, i| {
 
-			let element_ptr = bitcast[&mut addrspace(1) [QueueBufferElement[T]]](buffer);
+			let element_ptr = buffer as &mut addrspace(1) [QueueBufferElement[T]];
 			let lock:&mut addrspace(1) lock_type = &mut (element_ptr(i).lock);
 			let data:&mut addrspace(1) T = &mut (element_ptr(i).data);
 
@@ -193,7 +193,7 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 	buffer_size = @|num_elements| num_elements as i64 * sizeof[u32](),
 	buffer_alignment = @|| alignof[u32](),
 	buffer_element = @|buffer, i| {
-		let element = &mut bitcast[&mut addrspace(1) [u32]](buffer)(i);
+		let element = &mut (buffer as &mut addrspace(1) [u32])(i);
 		let FREE: u32 = -1;
 
 		QueueElement[u32] {

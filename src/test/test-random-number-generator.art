@@ -8,11 +8,11 @@ fn main() {
 	let num_iterations = 10000;
 
 	let device_alloc = device.alloc(33 * sizeof[u64]());
-	let global_histogram_device = bitcast[&mut addrspace(1) [u64]](device_alloc.data);
+	let global_histogram_device = device_alloc.data as &mut addrspace(1) [u64];
 	let failed_flag_device = &mut global_histogram_device(32);
 
 	let host_alloc = runtime_alloc(0, device_alloc.size);
-	let global_histogram_host = bitcast[&mut [u64]](host_alloc);
+	let global_histogram_host = host_alloc as &mut [u64];
 	let failed_flag_host = &mut global_histogram_host(32);
 
 

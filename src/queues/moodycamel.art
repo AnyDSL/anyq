@@ -15,10 +15,10 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 	let buffer_size = pool_size as i64 * sizeof[T]();
 
 	let buffer = device.alloc(buffer_size);
-	let memory = bitcast[&mut addrspace(1) [T]](buffer.data);
+	let memory = buffer.data as &mut addrspace(1) [T];
 
 	let mut alloc_next:u32 = 0;
-	let alloc_ptr = bitcast[&mut addrspace(1) u32](&mut alloc_next);
+	let alloc_ptr = &mut alloc_next as &mut addrspace(1) u32;
 
 	let nil:u32 = -1;
 	let alloc_slot = @|thread:gpu_thread_context| -> u32 {
@@ -109,10 +109,10 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 	let buffer_size = pool_size as i64 * sizeof[T]();
 
 	let buffer = device.alloc(buffer_size);
-	let memory = bitcast[&mut addrspace(1) [T]](buffer.data);
+	let memory = buffer.data as &mut addrspace(1) [T];
 	*/
 	//let mut alloc_next:u32 = 0;
-	//let alloc_ptr = bitcast[&mut addrspace(1) u32](&mut alloc_next);
+	//let alloc_ptr = &mut alloc_next as &mut addrspace(1) u32;
 
 	let nil:u32 = -1;
 	let alloc_slot = @|_thread:gpu_thread_context| -> u32 {

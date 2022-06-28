@@ -18,10 +18,10 @@ fn main() -> i32 {
 	}
 
 	for device_memory, _ in ref_test.run_test() {
-		let _ref_output = bitcast[&mut addrspace(1) [u32]](device_memory);
+		let _ref_output = device_memory as &mut addrspace(1) [u32];
 
 		for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-			let output = bitcast[&mut addrspace(1) [u32]](device_memory);
+			let output = device_memory as &mut addrspace(1) [u32];
 			let next_input = &mut output(num_elements);
 			let next_output = &mut output(num_elements + 1);
 

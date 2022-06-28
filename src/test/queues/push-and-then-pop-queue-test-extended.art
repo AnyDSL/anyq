@@ -6,9 +6,9 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 	let queue_test = createQueueTest(device, create_queue, (queue_size + 2) as i64 * sizeof[u32]());
 
 	for queue, device_memory, device_failed_flag in queue_test.run_test(queue_size) {
-		let pushed_buffer = bitcast[&mut addrspace(1) [i32]](device_memory);
-		let num_pushed = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(queue_size + 0));
-		let num_popped = bitcast[&mut addrspace(1) i32](&mut pushed_buffer(queue_size + 1));
+		let pushed_buffer = device_memory as &mut addrspace(1) [i32];
+		let num_pushed = &mut pushed_buffer(queue_size + 0) as &mut addrspace(1) i32;
+		let num_popped = &mut pushed_buffer(queue_size + 1) as &mut addrspace(1) i32;
 
 		print_string("initialize debug pushed_buffer ...\n");
 

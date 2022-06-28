@@ -15,11 +15,11 @@ fn @createRingbufferAllocator(_device: AccDevice, _element_size: i32, _element_a
 
 	// let queue_device_state_alloc = device.alloc(buffer_data_offset + num_elements * element_stride);
 	// let queue_device_memory = queue_device_state_alloc.data;
-	// let queue_counters = bitcast[&mut addrspace(1) [u32]](queue_device_memory);
+	// let queue_counters = queue_device_memory as &mut addrspace(1) [u32];
 
-	// let next = bitcast[&mut addrspace(1) u32](&mut queue_counters(0));
-	// let ref_count = bitcast[&mut addrspace(1) [u32]](&mut queue_counters(4));
-	// let buffer = bitcast[&mut addrspace(1) [u8]](&mut queue_counters(buffer_data_offset));
+	// let next = &mut queue_counters(0) as &mut addrspace(1) u32;
+	// let ref_count = &mut queue_counters(4) as &mut addrspace(1) [u32];
+	// let buffer = &mut queue_counters(buffer_data_offset) as &mut addrspace(1) [u8];
 
 
 	RingbufferAllocator {

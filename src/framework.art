@@ -125,10 +125,10 @@ struct BaseTest {
 fn createBaseTest(device: AccDevice, additional_mem: i64) -> BaseTest {
 	let memory_size = round_up_i64(additional_mem + sizeof[u32](), sizeof[u32]());
 	let device_test_state_alloc = device.alloc(memory_size);
-	let device_memory = bitcast[&mut addrspace(1) [i8]](device_test_state_alloc.data);
-	let device_failed_flag = bitcast[&mut addrspace(1) u32](&mut device_memory((memory_size - sizeof[u32]()) as i32));
+	let device_memory = device_test_state_alloc.data as &mut addrspace(1) [i8];
+	let device_failed_flag = &mut device_memory((memory_size - sizeof[u32]()) as i32) as &mut addrspace(1) u32;
 
-	let gpu_result = bitcast[&mut u32](runtime_alloc(0, sizeof[u32]()));
+	let gpu_result = runtime_alloc(0, sizeof[u32]()) as &mut u32;
 	*gpu_result = 0;
 	runtime_copy(0, gpu_result as &[i8], 0, device.platform_device, device_failed_flag as &mut[i8], 0, sizeof[u32]());
 
@@ -180,7 +180,7 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 	let test = createBaseTest(device, additional_mem);
 
 	let buffer = alloc_cpu(additional_mem);
-	let data = bitcast[&mut[i32]](buffer.data);
+	let data = buffer.data as &mut[i32];
 
 	let mut validation_result = true;
 
@@ -196,9 +196,9 @@ fn createIntrinsicsTest(device: AccDevice, num_globals: i32, init_global: fn(i32
 			for device_memory, device_failed_flag in test.run_test() {
 				runtime_copy(0, buffer.data, 0, device.platform_device, device_memory as &mut[i8], 0, additional_mem);
 
-				let read = @|idx:i32| -> i32 { let ptr = bitcast[& addrspace(1) [i32]](device_memory); ptr(idx + num_globals) };
-				let write = @|idx:i32, value:i32| -> () { let ptr = bitcast[&mut addrspace(1) [i32]](device_memory); ptr(idx + num_globals) = value; };
-				let global = @|idx:i32| -> &mut addrspace(1)  i32 { let ptr = bitcast[&mut addrspace(1) [i32]](device_memory); &mut(ptr(idx)) };
+				let read = @|idx:i32| -> i32 { let ptr = device_memory as & addrspace(1) [i32]; ptr(idx + num_globals) };
+				let write = @|idx:i32, value:i32| -> () { let ptr = device_memory as &mut addrspace(1) [i32]; ptr(idx + num_globals) = value; };
+				let global = @|idx:i32| -> &mut addrspace(1)  i32 { let ptr = device_memory as &mut addrspace(1) [i32]; &mut(ptr(idx)) };
 
 				let result = body(read, write, global, device_failed_flag);
 				device.synchronize();

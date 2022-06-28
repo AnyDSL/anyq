@@ -236,18 +236,18 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
 
     let block_size = wrap_dim(@|i| {
         match i {
-            0 => if ?block_dim_x { block_dim_x as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(2) as u32 },
-            1 => if ?block_dim_y { block_dim_y as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(3) as u32 },
-            2 => if ?block_dim_z { block_dim_z as u32 } else { bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(4) as u32 },
+            0 => if ?block_dim_x { block_dim_x as u32 } else { (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(2) as u32 },
+            1 => if ?block_dim_y { block_dim_y as u32 } else { (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(3) as u32 },
+            2 => if ?block_dim_z { block_dim_z as u32 } else { (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(4) as u32 },
             _ => 1
         }
     });
 
     let num_blocks = wrap_dim(@|i| {
         match i {
-            0 => if ?grid_dim_x { grid_dim_x as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(3) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(2) as i32) as u32 },
-            1 => if ?grid_dim_y { grid_dim_y as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(4) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(3) as i32) as u32 },
-            2 => if ?grid_dim_y { grid_dim_z as u32 } else { div_up(bitcast[&addrspace(4)[u32]](amdgcn_dispatch_ptr())(5) as i32, bitcast[&addrspace(4)[u16]](amdgcn_dispatch_ptr())(4) as i32) as u32 },
+            0 => if ?grid_dim_x { grid_dim_x as u32 } else { div_up((amdgcn_dispatch_ptr() as &addrspace(4)[u32])(3) as i32, (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(2) as i32) as u32 },
+            1 => if ?grid_dim_y { grid_dim_y as u32 } else { div_up((amdgcn_dispatch_ptr() as &addrspace(4)[u32])(4) as i32, (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(3) as i32) as u32 },
+            2 => if ?grid_dim_y { grid_dim_z as u32 } else { div_up((amdgcn_dispatch_ptr() as &addrspace(4)[u32])(5) as i32, (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(4) as i32) as u32 },
             _ => 1
         }
     });

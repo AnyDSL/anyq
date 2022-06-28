@@ -45,7 +45,7 @@ fn main() -> i32 {
 	}
 
 	let buffer = alloc_cpu(vec_width as i64 * sizeof[i32]());
-	let data = bitcast[&mut[i32]](buffer.data);
+	let data = buffer.data as &mut[i32];
 
 	for i in range(0, vec_width) {
 		data(i) = i;

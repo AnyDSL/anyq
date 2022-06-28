@@ -6,17 +6,17 @@ fn @createAccDevice(device: i32) = AccDevice {
 	platform_device = runtime_device(1, device),
 
 	print_i32 = @|format: &[u8], arg: i32| {
-		nvvm_vprintf(format, bitcast[&[u8]](&arg));
+		nvvm_vprintf(format, &arg as &[u8]);
 	},
 
 	print_2xi32 = @|format: &[u8], arg1: i32, arg2: i32| {
 		let args:&[i32] = [arg1, arg2];
-		nvvm_vprintf(format, bitcast[&[u8]](args));
+		nvvm_vprintf(format, args as &[u8]);
 	},
 
 	print_3xi32 = @|format: &[u8], arg1: i32, arg2: i32, arg3: i32| {
 		let args:&[i32] = [arg1, arg2, arg3];
-		nvvm_vprintf(format, bitcast[&[u8]](args));
+		nvvm_vprintf(format, args as &[u8]);
 	}
 };
 

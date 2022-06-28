@@ -12,7 +12,7 @@ fn main() -> i32 {
 	let test = createBaseTest(device, num_slots * sizeof[u32]());
 
 	for device_memory, device_failed_flag in test.run_test() {
-		let buffer = bitcast[&mut addrspace(1) [u32]](device_memory);
+		let buffer = device_memory as &mut addrspace(1) [u32];
 
 		let clear_bits = @|| {
 			for grid in device.launch_1d(num_groups, group_size) {

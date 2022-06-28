@@ -23,7 +23,7 @@ type work_dist = fn(AccDevice) -> WorkDistribution;
 fn @inputDistributor(_stage: Stage) -> work_dist {
 	@|device| {
 		let device_state_alloc = device.alloc(sizeof[u32]());
-		let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+		let device_memory = device_state_alloc.data as &mut addrspace(1) [i8];
 		let _next_input = &mut device_memory(0);
 
 		// fn producer(thread: gpu_thread_context, sink: fn(u32) -> ()) -> bool {
@@ -58,7 +58,7 @@ fn @inputDistributor(_stage: Stage) -> work_dist {
 fn @persistentRedistributor(_stage: Stage, queue_size: i32) -> work_dist {
 	@|device| {
 		// let device_state_alloc = device.alloc(2 * sizeof[u32]());
-		// let device_memory = bitcast[&mut addrspace(1) [i8]](device_state_alloc.data);
+		// let device_memory = device_state_alloc.data as &mut addrspace(1) [i8];
 
 		let queue = createConcurrentProducerConsumerIndexQueue(device, queue_size);
 

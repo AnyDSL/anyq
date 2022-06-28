@@ -11,7 +11,7 @@ fn main() -> i32 {
 	let vec_width = warp_size;
 
 	let buffer = alloc_cpu((2*warp_size) as i64 *sizeof[i32]());
-	let data = bitcast[&mut[i32]](rv_align_i8(buffer.data, vec_width));
+	let data = rv_align_i8(buffer.data, vec_width) as &mut[i32];
 
 	for i in range(0, warp_size) {
 		data(i) = i;
