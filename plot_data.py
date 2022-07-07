@@ -38,9 +38,9 @@ class LineDataWriter:
 		self.params = params
 
 	def __enter__(self):
-		params = self.params.properties.copy()
-		params['device'] = f'{self.params.device}-{self.params.platform}'
-		params['foo'] = 'bar'
+		params = { 'device': f'{self.params.device}-{self.params.platform}' }
+		for key, value in self.params.properties.items():
+			params[key] = value
 		self.file.write(f'{{ "params": {json.dumps(params)}, "results": [')
 		return LineDataScope(self.file)
 
