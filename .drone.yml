@@ -6,7 +6,7 @@ steps:
   - name: export
     image: python:3
     commands:
-      - python benchmark.py export > data.js
+      - python benchmark.py export --out baseline
 
   - name: upload
     image: beeblebrox.cg.uni-saarland.de/alpine/drone-plugin-sftp
@@ -19,9 +19,9 @@ steps:
         from_secret: EGON_PASSWORD
       destination_path: /anyq
       files:
-        - index.html
-        - plot_data/*.js
-        - main.js
+        - baseline/index.html
+        - baseline/main.js
+        - baseline/*.json
     when:
       branch:
         - master
