@@ -1,57 +1,57 @@
-class LineParams {
-	constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
-		this.device = device;
-		this.queue_type = queue_type;
-		this.queue_size = queue_size;
-		this.block_size = block_size;
-		this.p_enq = p_enq;
-		this.p_deq = p_deq;
-		this.workload_size = workload_size;
-	}
+// class LineParams {
+	// constructor(device, queue_type, queue_size, block_size, p_enq, p_deq, workload_size) {
+		// this.device = device;
+		// this.queue_type = queue_type;
+		// this.queue_size = queue_size;
+		// this.block_size = block_size;
+		// this.p_enq = p_enq;
+		// this.p_deq = p_deq;
+		// this.workload_size = workload_size;
+	// }
 
-	toString() {
-		let prop = ['device', 'queue_type', 'queue_size', 'block_size', 'p_enq', 'p_deq', 'workload_size'];
-		let obj = this;
-		return 'LineParams {' + $(prop).map(function () { return this + ': ' + obj[this] }).get().join(', ') + '}';
-	}
-};
+	// toString() {
+		// let prop = ['device', 'queue_type', 'queue_size', 'block_size', 'p_enq', 'p_deq', 'workload_size'];
+		// let obj = this;
+		// return 'LineParams {' + $(prop).map(function () { return this + ': ' + obj[this] }).get().join(', ') + '}';
+	// }
+// };
 
-class Result {
-	constructor(num_threads, t_avg, t_min, t_max) {
-		this.num_threads = num_threads;
-		this.t_avg = t_avg;
-		this.t_min = t_min;
-		this.t_max = t_max;
-	}
-};
+// class Result {
+	// constructor(num_threads, t_avg, t_min, t_max) {
+		// this.num_threads = num_threads;
+		// this.t_avg = t_avg;
+		// this.t_min = t_min;
+		// this.t_max = t_max;
+	// }
+// };
 
-class QueueOperationStatistics {
-	constructor(num_operations, t_total, t_min, t_max) {
-		this.num_operations = num_operations
-		this.t_total = t_total
-		this.t_min = t_min
-		this.t_max = t_max
-	}
-};
+// class QueueOperationStatistics {
+	// constructor(num_operations, t_total, t_min, t_max) {
+		// this.num_operations = num_operations
+		// this.t_total = t_total
+		// this.t_min = t_min
+		// this.t_max = t_max
+	// }
+// };
 
-class QueueOpStatsResult {
-	constructor(num_threads, t, n, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail) {
-		this.num_threads = num_threads;
-		this.t = t;
-		this.n = n;
-		this.enqueue_stats_succ = enqueue_stats_succ;
-		this.enqueue_stats_fail = enqueue_stats_fail;
-		this.dequeue_stats_succ = dequeue_stats_succ;
-		this.dequeue_stats_fail = dequeue_stats_fail;
-	}
-};
+// class QueueOpStatsResult {
+	// constructor(num_threads, t, n, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail) {
+		// this.num_threads = num_threads;
+		// this.t = t;
+		// this.n = n;
+		// this.enqueue_stats_succ = enqueue_stats_succ;
+		// this.enqueue_stats_fail = enqueue_stats_fail;
+		// this.dequeue_stats_succ = dequeue_stats_succ;
+		// this.dequeue_stats_fail = dequeue_stats_fail;
+	// }
+// };
 
-class LineData {
-	constructor(params, results) {
-		this.params = params;
-		this.results = results;
-	}
-};
+// class LineData {
+	// constructor(params, results) {
+		// this.params = params;
+		// this.results = results;
+	// }
+// };
 
 
 class DefaultMap extends Map {
@@ -73,16 +73,19 @@ class Line {
 	constructor(graph, params, data) {
 		this.params = params;
 		this.data = data;
-		this.path = $(graph.append("path").node());
+		this.path = graph.append("path");
 		this.vis = 0;
-		this.path.css("visibility", "visible");
-		this.x_max = d3.max(data, d => d.num_threads);
+		this.path.style("visibility", "visible");
+		// this.x_max = d3.max(data, d => d.num_threads);
+		// this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
+		this.x_max = d3.max(data, d => this.map_x_data(d));
 		this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 		//this.y_min = d3.min(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 	}
 
 	map_x_data(d) {
-		return d.num_threads;
+		//return d.num_threads;
+		return d[0]
 	}
 
 	map_y_data(d) {
@@ -115,33 +118,34 @@ class Line {
 	}
 
 	is_visible() {
-		return this.path.css("visibility") == "visible";
+		return this.path.style("visibility") == "visible";
 	}
 
 	hide() {
 		--this.vis;
-		this.path.css("visibility", "hidden");
+		this.path.style("visibility", "hidden");
 	}
 
 	show() {
 		// lines need to match all previously deselected features to become visible again
 		++this.vis;
 		if (this.vis == 0)
-			this.path.css("visibility", "visible");
+			this.path.style("visibility", "visible");
 	}
 
 	highlight() {
-		this.path.attr("stroke-width", 5.0);
+		this.path.style("stroke-width", 5.0);
 	}
 
 	unhighlight() {
-		this.path.attr("stroke-width", this.stroke_width);
+		this.path.style("stroke-width", this.stroke_width);
 	}
 };
 
 class TimingLine extends Line {
 	map_y_data(d) {
-		return d.t_avg
+		//return d.t_avg
+		return d[1]
 	}
 }
 
@@ -414,16 +418,16 @@ function fillButtonTable(menuElem, line_map, line_style_map, plot)
 				plot.update();
 			});
 
-			label.mouseenter(e => {
-				for (let line of lines) {
-					line.highlight();
-				}
-			});
-			label.mouseleave(e => {
-				for (let line of lines) {
-					line.unhighlight();
-				}
-			});
+			// label.mouseenter(e => {
+				// for (let line of lines) {
+					// line.highlight();
+				// }
+			// });
+			// label.mouseleave(e => {
+				// for (let line of lines) {
+					// line.unhighlight();
+				// }
+			// });
 		}
 	}
 }
@@ -440,10 +444,11 @@ function createOpsPlot(svgElem)
 	class OpsLine extends Line {
 		map_y_data(d) {
 			// t_avg in nanoseconds
-			return 1000000000 / d.t_avg / d.num_threads;
+			// return 1000000000 / d.t_avg / d.num_threads;
+			return 1000000000 / d[1] / d[0];
 		}
 		defined(d) {
-			return d.t_avg > 0;
+			return d[1] > 0;
 		}
 	}
 
@@ -457,12 +462,20 @@ function createOpsPlot(svgElem)
 function createThroughputPlot(svgElem)
 {
 	class ThroughputLine extends Line {
+		map_x_data(d) {
+			//return d.num_threads;
+			return d.num;
+		}
 		map_y_data(d) {
-			let deq = d.dequeue_stats_succ;
-			return 1000.0 * deq.num_operations / d.t;
+			// let deq = d.dequeue_stats_succ;
+			// return 1000.0 * deq.num_operations / d.t;
+			let deq = d.stats[2];
+			return 1000.0 * deq[0] / d.t;
 		}
 		defined(d) {
-			let deq = d.dequeue_stats_succ.num_operations;
+			// let deq = d.dequeue_stats_succ.num_operations;
+			// return Number.isInteger(deq) && deq > 0 && d.t > 0;
+			let deq = d.stats[2][0];
 			return Number.isInteger(deq) && deq > 0 && d.t > 0;
 		}
 	}
@@ -477,14 +490,20 @@ function createThroughputPlot(svgElem)
 function createLatencyPlot(svgElem, opField)
 {
 	class LatencyLine extends Line {
+		map_x_data(d) {
+			//return d.num_threads;
+			return d.num;
+		}
 		map_y_data(d) {
 			let f = opField(d);
-			return 0.001 * f.t_total / f.num_operations;
+			// return 0.001 * f.t_total / f.num_operations;
+			return 0.001 * f[1] / f[0];
 		}
 		defined(d) {
 			let f = opField(d);
 			//if (!f) return false;
-			return f.num_operations > 0 && f.t_total > 0;
+			// return f.num_operations > 0 && f.t_total > 0;
+			return f[0] > 0 && f[1] > 0;
 		}
 	}
 
@@ -498,16 +517,23 @@ function createLatencyPlot(svgElem, opField)
 function createRatioPlot(svgElem, opField1, opField2)
 {
 	class RatioLine extends Line {
+		map_x_data(d) {
+			//return d.num_threads;
+			return d.num;
+		}
 		map_y_data(d) {
 			let f1 = opField1(d);
 			let f2 = opField2(d);
-			let total = f1.num_operations + f2.num_operations;
-			return 100.0 * f1.num_operations / total;
+			// let total = f1.num_operations + f2.num_operations;
+			// return 100.0 * f1.num_operations / total;
+			let total = f1[0] + f2[0];
+			return 100.0 * f1[0] / total;
 		}
 		defined(d) {
 			let f1 = opField1(d);
 			let f2 = opField2(d);
-			return f1.num_operations > 0 || f2.num_operations > 0;
+			// return f1.num_operations > 0 || f2.num_operations > 0;
+			return f1[0] > 0 || f2[0] > 0;
 		}
 	}
 
@@ -515,6 +541,8 @@ function createRatioPlot(svgElem, opField1, opField2)
 
 	return plot;
 }
+
+var resources = {};
 
 function createPlot(plotElem, menuElem, line_style_map)
 {
@@ -530,13 +558,17 @@ function createPlot(plotElem, menuElem, line_style_map)
 	} else if (plotElem.hasClass("plot-latency")) {
 		let field;
 		if (plotElem.hasClass("plot-latency-enq-success")) {
-			field = d => d.enqueue_stats_succ;
+			// field = d => d.enqueue_stats_succ;
+			field = d => d.stats[0];
 		} else if (plotElem.hasClass("plot-latency-enq-failure")) {
-			field = d => d.enqueue_stats_fail;
+			// field = d => d.enqueue_stats_fail;
+			field = d => d.stats[1];
 		} else if (plotElem.hasClass("plot-latency-deq-success")) {
-			field = d => d.dequeue_stats_succ;
+			// field = d => d.dequeue_stats_succ;
+			field = d => d.stats[2];
 		} else if (plotElem.hasClass("plot-latency-deq-failure")) {
-			field = d => d.dequeue_stats_fail;
+			// field = d => d.dequeue_stats_fail;
+			field = d => d.stats[3];
 		}
 		if (!field) return;
 
@@ -544,11 +576,15 @@ function createPlot(plotElem, menuElem, line_style_map)
 	} else if (plotElem.hasClass("plot-percent")) {
 		let f1, f2;
 		if (plotElem.hasClass("plot-ratio-enq-success")) {
-			f1 = d => d.enqueue_stats_succ;
-			f2 = d => d.enqueue_stats_fail;
+			// f1 = d => d.enqueue_stats_succ;
+			// f2 = d => d.enqueue_stats_fail;
+			f1 = d => d.stats[0];
+			f2 = d => d.stats[1];
 		} else if (plotElem.hasClass("plot-ratio-deq-success")) {
-			f1 = d => d.dequeue_stats_succ;
-			f2 = d => d.dequeue_stats_fail;
+			// f1 = d => d.dequeue_stats_succ;
+			// f2 = d => d.dequeue_stats_fail;
+			f1 = d => d.stats[2];
+			f2 = d => d.stats[3];
 		}
 		if (!f1 || !f2) return;
 
@@ -556,133 +592,156 @@ function createPlot(plotElem, menuElem, line_style_map)
 	}
 	if (!plot) return;
 
-	let data = window[plotElem.attr('data-src')];
+	// let data = window[plotElem.attr('data-src')];
 	//console.log(plotElem, "data:", data);
-	if (!data) return;
 
-	const line_map = plot.add_lines(data);
+	let plot_url = plotElem.attr('data-src');
+
+	let loadDataSource = (url) => new Promise((resolve, reject) => {
+		if (url in resources) {
+			console.log("using data from cached", url);
+			return resources[url].then(resolve);
+		}
+
+		resources[url] = $.getJSON(plot_url)
+			.fail(() => { reject(); })
+			.done((data) => { return Promise.resolve(data); });
+
+		return resources[url].then(resolve);
+	});
+
+	loadDataSource(plot_url)
+		.catch(() => { console.log("could not load", plot_url); })
+		.then((data) => {
+
+		//console.log(plotElem, "data:", data);
+		//return;
+		if (!data) return;
+
+		const line_map = plot.add_lines(data);
 
 
-	for (const [param, values] of line_map) {
-		let style = line_style_map.get(param);
-		if (style)
-			continue;
+		for (const [param, values] of line_map) {
+			let style = line_style_map.get(param);
+			if (style)
+				continue;
 
-		style = line_styles.get(param);
-		if (style) {
-			const style_map = new Map();
+			style = line_styles.get(param);
+			if (style) {
+				const style_map = new Map();
 
-			let i = 0;
-			for (const value of values.keys()) {
-				let style_attr = style.attr;
-				let style_value = style.values[i % style.values.length];
+				let i = 0;
+				for (const value of values.keys()) {
+					let style_attr = style.attr;
+					let style_value = style.values[i % style.values.length];
 
-				style_map.set(value, path => {
-					path.attr(style_attr, style_value);
-					path.attr("fill", "none");
+					style_map.set(value, path => {
+						path.attr(style_attr, style_value);
+						path.attr("fill", "none");
+					});
+
+					++i;
+				}
+
+				line_style_map.set(param, style_map);
+			}
+		}
+
+		plot.line_style_map = line_style_map;
+		plot.update();
+
+		fillButtonTable(menuElem, line_map, line_style_map, plot);
+
+		let btnPanel = $('<div class="plot-save-btn d-flex justify-content-end"></div>').appendTo(plotElem);
+		let saveBtn = $('<a class="btn btn-outline-secondary">Download</a>')
+			.appendTo(btnPanel)
+			.click(function(e) {
+				let active = $("label.checkbox")
+					.filter(function(idx, label) {
+						return $(label).find("input[type='checkbox']").prop("checked");
+					})
+					.map(function () {
+						let label = $(this);
+						return label.attr("data-category") + ':' + label.attr("data-value");
+					})
+					.get().join(', ');
+
+				let blob = new Blob([
+						'<?xml version="1.0" encoding="UTF-8" standalone="no"?>', '\n',
+						'<!-- ', active, ' -->', '\n',
+						svg.prop('outerHTML')
+					], {type: 'image/svg+xml'});
+
+				let a = $(this);
+				a.attr('href', window.URL.createObjectURL(blob));
+				a.attr('download', 'plot.svg');
+			});
+
+		let csvBtn = $('<a class="btn btn-outline-secondary">CSV</a>')
+			.appendTo(btnPanel)
+			.click(function(e) {
+				let active = $("label.checkbox")
+					.filter(function(idx, label) {
+						return $(label).find("input[type='checkbox']").prop("checked");
+					})
+					.map(function () {
+						let label = $(this);
+						return label.attr("data-category") + ':' + label.attr("data-value");
+					})
+					.get().join(', ');
+
+				let lines = $(plot.lines)
+					.filter(function(idx, line) { return line.is_visible(); });
+
+				let data = {};
+				let num_lines = lines.length;
+				lines.each(function(idx, l) {
+					//console.log(l);
+					for(var d of l.data) {
+						//console.log(d);
+						let x = l.map_x_data(d);
+						let y = l.map_y_data(d);
+						data[x] = data[x] || { 'x': x };
+						data[x]['line'+idx] = y;
+					}
+				});
+				// console.log(data);
+
+				let indices = Object.values(data)
+					.map(function(value) { return value.x; })
+					.sort((a,b) => a-b);
+				// console.log(indices);
+
+				let linedata = indices.map(function(x) {
+					let entry = data[x];
+					let row = '' + x;
+					for (var i = 0; i < num_lines; i++) {
+						let value = entry['line' + i].toFixed(4);
+						if (isNaN(value)) { value = ''; }
+						row += ',' + value;
+					}
+					return row;
 				});
 
-				++i;
-			}
+				let headers = ['x'].concat(lines.map(function (idx) { return 'line' + idx; }).get());
+				// console.log(headers);
+				// console.log(linedata);
 
-			line_style_map.set(param, style_map);
-		}
-	}
+				let blob = new Blob([
+						'# ', 'csv export of "', plotElem.parent().find('h2').text(), '"\n',
+						'# params: ', active, '\n',
+						'# x-axis: ', plot.label.x.text(), '\n',
+						'# y-axis: ', plot.label.y.text(), '\n',
+						lines.map(function (idx) { return '# line' + idx + ' -- ' + this.params; }).get().join('\n'), '\n',
+						headers.join(','), '\n',
+						linedata.join('\n'), '\n'
+					], {type: 'text/csv'});
 
-	plot.line_style_map = line_style_map;
-	plot.update();
-
-	fillButtonTable(menuElem, line_map, line_style_map, plot);
-
-	let btnPanel = $('<div class="plot-save-btn d-flex justify-content-end"></div>').appendTo(plotElem);
-	let saveBtn = $('<a class="btn btn-outline-secondary">Download</a>')
-		.appendTo(btnPanel)
-		.click(function(e) {
-			let active = $("label.checkbox")
-				.filter(function(idx, label) {
-					return $(label).find("input[type='checkbox']").prop("checked");
-				})
-				.map(function () {
-					let label = $(this);
-					return label.attr("data-category") + ':' + label.attr("data-value");
-				})
-				.get().join(', ');
-
-			let blob = new Blob([
-					'<?xml version="1.0" encoding="UTF-8" standalone="no"?>', '\n',
-					'<!-- ', active, ' -->', '\n',
-					svg.prop('outerHTML')
-				], {type: 'image/svg+xml'});
-
-			let a = $(this);
-			a.attr('href', window.URL.createObjectURL(blob));
-			a.attr('download', 'plot.svg');
-		});
-
-	let csvBtn = $('<a class="btn btn-outline-secondary">CSV</a>')
-		.appendTo(btnPanel)
-		.click(function(e) {
-			let active = $("label.checkbox")
-				.filter(function(idx, label) {
-					return $(label).find("input[type='checkbox']").prop("checked");
-				})
-				.map(function () {
-					let label = $(this);
-					return label.attr("data-category") + ':' + label.attr("data-value");
-				})
-				.get().join(', ');
-
-			let lines = $(plot.lines)
-				.filter(function(idx, line) { return line.is_visible(); });
-
-			let data = {};
-			let num_lines = lines.length;
-			lines.each(function(idx, l) {
-				//console.log(l);
-				for(var d of l.data) {
-					//console.log(d);
-					let x = l.map_x_data(d);
-					let y = l.map_y_data(d);
-					data[x] = data[x] || { 'x': x };
-					data[x]['line'+idx] = y;
-				}
+				let a = $(this);
+				a.attr('href', window.URL.createObjectURL(blob));
+				a.attr('download', 'plot.csv');
 			});
-			// console.log(data);
-
-			let indices = Object.values(data)
-				.map(function(value) { return value.x; })
-				.sort((a,b) => a-b);
-			// console.log(indices);
-
-			let linedata = indices.map(function(x) {
-				let entry = data[x];
-				let row = '' + x;
-				for (var i = 0; i < num_lines; i++) {
-					let value = entry['line' + i].toFixed(4);
-					if (isNaN(value)) { value = ''; }
-					row += ',' + value;
-				}
-				return row;
-			});
-
-			let headers = ['x'].concat(lines.map(function (idx) { return 'line' + idx; }).get());
-			// console.log(headers);
-			// console.log(linedata);
-
-			let blob = new Blob([
-					'# ', 'csv export of "', plotElem.parent().find('h2').text(), '"\n',
-					'# params: ', active, '\n',
-					'# x-axis: ', plot.label.x.text(), '\n',
-					'# y-axis: ', plot.label.y.text(), '\n',
-					lines.map(function (idx) { return '# line' + idx + ' -- ' + this.params; }).get().join('\n'), '\n',
-					headers.join(','), '\n',
-					linedata.join('\n'), '\n'
-				], {type: 'text/csv'});
-
-			let a = $(this);
-			a.attr('href', window.URL.createObjectURL(blob));
-			a.attr('download', 'plot.csv');
-		});
+	});
 
 	return plot;
 }

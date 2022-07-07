@@ -12,6 +12,9 @@ from results import *
 
 
 default_bin_dir = Path(__file__).parent / "build" / "bin"
+default_results_dir = Path(__file__).parent / "results"
+default_export_dir = Path(__file__).parent / "plot_data"
+default_template_file = Path(__file__).parent / "index.html"
 
 
 def device_id(name):
@@ -483,28 +486,47 @@ class DatasetAggregationVisitor(DatasetVisitor):
 	def visit_op_stats(self):
 		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
 
-def export(out_dir, results_dir, include):
+def export(out_dir, results_dir, template_file, include):
 	import plot_data
+	import shutil
 
 	datasets = [d for d in collect_datasets(results_dir, include)]
 
 	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
-	datasets.sort(key=lambda d: d.params.workload_size)
-	datasets.sort(key=lambda d: d.params.p_deq)
-	datasets.sort(key=lambda d: d.params.p_enq)
-	datasets.sort(key=lambda d: d.params.block_size)
-	datasets.sort(key=lambda d: d.params.queue_size)
-	datasets.sort(key=lambda d: d.params.queue_type)
+	# TODO: what specifies the sort order? and why do we sort here at all?
+	datasets.sort(key=lambda d: d.params.properties['workload_size'])
+	datasets.sort(key=lambda d: d.params.properties['p_deq'])
+	datasets.sort(key=lambda d: d.params.properties['p_enq'])
+	datasets.sort(key=lambda d: d.params.properties['block_size'])
+	datasets.sort(key=lambda d: d.params.properties['queue_size'])
+	datasets.sort(key=lambda d: d.params.properties['queue_type'])
 	datasets.sort(key=lambda d: d.params.device)
 	datasets.sort(key=lambda d: d.params.platform)
 
-	with open(out_dir/"kernel_run_time.js", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.js", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.js", "wt") as dequeue_time_out, open(out_dir/"queue_op_stats.js", "wt") as queue_op_stats_out:
+	with open(out_dir/"kernel_run_time.json", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.json", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.json", "wt") as dequeue_time_out, open(out_dir/"queue_op_stats.json", "wt") as queue_op_stats_out:
 		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer, plot_data.Writer(queue_op_stats_out, "queue_op_stats") as queue_op_stats_writer:
+
 			for d in datasets:
 				with kernel_run_time_writer.line_data(d.params) as kernel_run_time, enqueue_time_writer.line_data(d.params) as enqueue_time, dequeue_time_writer.line_data(d.params) as dequeue_time, queue_op_stats_writer.line_data(d.params) as queue_op_stats:
 					op_time_scale = 10 if d.params.platform == "amdgpu" else 1  # timestamps on AMDGPU count in units of 10 ns
 					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale))
 
+	shutil.copy(template_file, out_dir / "index.html")
+	shutil.copy(Path(__file__).parent / "main.js", out_dir / "main.js")
+
+
+def serve(port):
+	import http.server
+	import socketserver
+
+	Handler = http.server.SimpleHTTPRequestHandler
+
+	with socketserver.TCPServer(("", port), Handler) as httpd:
+		print("serving at port", port)
+		try:
+			httpd.serve_forever()
+		except KeyboardInterrupt:
+			print("\n[CTRL+C detected]")
 
 
 def fixup(results_dir, include):
@@ -520,8 +542,7 @@ def fixup(results_dir, include):
 
 
 def main(args):
-	this_dir = Path(__file__).parent.absolute()
-	results_dir = this_dir/"results"
+	results_dir = default_results_dir
 
 	include = re.compile(args.include)
 
@@ -547,11 +568,14 @@ def main(args):
 	elif args.command == plot:
 		plot(results_dir, include)
 	elif args.command == export:
-		plot_data_dir = this_dir/"plot_data"
-		plot_data_dir.mkdir(exist_ok=True, parents=True)
-		export(plot_data_dir, results_dir, include)
+		out_dir = args.out
+		if not out_dir.is_dir():
+			out_dir.mkdir(exist_ok=True, parents=True)
+		export(out_dir, results_dir, args.template, include)
 	elif args.command == fixup:
 		fixup(results_dir, include)
+	elif args.command == serve:
+		serve(args.port)
 
 
 if __name__ == "__main__":
@@ -563,6 +587,7 @@ if __name__ == "__main__":
 		args.add_argument("include", nargs="?", type=str, default=".*")
 		args.set_defaults(command=function)
 		return args
+
 
 	run_cmd = add_command("run", run, help="run benchmarks")
 	run_cmd.add_argument("--bin-dir", type=Path, default=default_bin_dir)
@@ -577,8 +602,13 @@ if __name__ == "__main__":
 	plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
 
 	export_cmd = add_command("export", export, help="export benchmark data as JavaScript")
+	export_cmd.add_argument("--out", "-o", type=Path, default=default_export_dir)
+	export_cmd.add_argument("--template", "-t", type=Path, default=default_template_file)
 
 	fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
+
+	serve_cmd = add_command("serve", serve, help="serve the exported benchmark results using a local server")
+	serve_cmd.add_argument("-p", "--port", type=int, default=8000)
 
 	try:
 		main(args.parse_args())

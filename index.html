@@ -5,10 +5,6 @@
 		<script type="application/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
 		<script type="application/javascript" src="https://d3js.org/d3.v7.min.js"></script>
 		<script type="application/javascript" src="main.js"></script>
-		<script type="application/javascript" src="plot_data/kernel_run_time.js"></script>
-		<script type="application/javascript" src="plot_data/enqueue_time.js"></script>
-		<script type="application/javascript" src="plot_data/dequeue_time.js"></script>
-		<script type="application/javascript" src="plot_data/queue_op_stats.js"></script>
 		<script>
 			let line_styles = new Map([
 				// ["device", { attr: "stroke", values: ["red", "green", "blue"]}],
@@ -110,7 +106,7 @@
 			<div class="row justify-content-center">
 				<div class="col">
 					<h2>Total benchmark runtimes</h2>
-					<div class="plot plot-time" data-src="kernel_run_time"></div>
+					<div class="plot plot-time" data-src="kernel_run_time.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -118,14 +114,14 @@
 			<div class="row justify-content-center">
 				<div class="col">
 					<h2>Enqueue performance</h2>
-					<div class="plot plot-ops" data-src="enqueue_time"></div>
+					<div class="plot plot-ops" data-src="enqueue_time.json"></div>
 					<hr/>
 				</div>
 			</div>
 			<div class="row justify-content-center">
 				<div class="col">
 					<h2>Dequeue performance</h2>
-					<div class="plot plot-ops" data-src="dequeue_time"></div>
+					<div class="plot plot-ops" data-src="dequeue_time.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -133,12 +129,12 @@
 			<div class="row justify-content-center">
 				<div class="col-12 col-xl-6">
 					<h2>Enqueue Latency (success)</h2>
-					<div class="plot plot-latency plot-latency-enq-success" data-src="queue_op_stats"></div>
+					<div class="plot plot-latency plot-latency-enq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 				<div class="col-12 col-xl-6">
 					<h2>Enqueue Latency (failed)</h2>
-					<div class="plot plot-latency plot-latency-enq-failure" data-src="queue_op_stats"></div>
+					<div class="plot plot-latency plot-latency-enq-failure" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -146,12 +142,12 @@
 			<div class="row justify-content-center">
 				<div class="col-12 col-xl-6">
 					<h2>Enqueue success ratio</h2>
-					<div class="plot plot-percent plot-ratio-enq-success" data-src="queue_op_stats"></div>
+					<div class="plot plot-percent plot-ratio-enq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 				<div class="col-12 col-xl-6">
 					<h2>Dequeue success ratio</h2>
-					<div class="plot plot-percent plot-ratio-deq-success" data-src="queue_op_stats"></div>
+					<div class="plot plot-percent plot-ratio-deq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -159,12 +155,12 @@
 			<div class="row justify-content-center">
 				<div class="col-12 col-xl-6">
 					<h2>Dequeue Latency (success)</h2>
-					<div class="plot plot-latency plot-latency-deq-success" data-src="queue_op_stats"></div>
+					<div class="plot plot-latency plot-latency-deq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 				<div class="col-12 col-xl-6">
 					<h2>Dequeue Latency (failed)</h2>
-					<div class="plot plot-latency plot-latency-deq-failure" data-src="queue_op_stats"></div>
+					<div class="plot plot-latency plot-latency-deq-failure" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -172,7 +168,7 @@
 			<div class="row justify-content-center">
 				<div class="col">
 					<h2>Overall throughput</h2>
-					<div class="plot plot-throughput" data-src="queue_op_stats"></div>
+					<div class="plot plot-throughput" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 			</div>
@@ -189,21 +185,24 @@
 
 				let line_style_map = new Map();
 
-				plots.each(function (idx, elem) { elem.plot = createPlot($(elem), menu, line_style_map); });
-
 				$('.nav .nav-link').on('shown.bs.tab', function(event){
+					console.log('set margin-top to', menu.height());
 					body.css('margin-top', menu.height() + 40 + 'px');
 				});
+
+				plots.each(function (idx, elem) { elem.plot = createPlot($(elem), menu, line_style_map); });
 
 				let url = new window.URL(document.location);
 				let params = url.searchParams;
 
+				/*
 				for (key of new Set(params.keys())) {
 					let boxes = $("div[data-category=" + key + "]").find("label.checkbox").click();
 					$.each(params.getAll(key), function(i, val) {
 						boxes.filter("[data-value=" + val + "]").click();
 					});
 				}
+				*/
 
 				$("#share-btn").click(function() {
 
