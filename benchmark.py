@@ -75,17 +75,11 @@ class QueueBenchmarkBinary:
 
 		sys.stdout.write('\n')
 
-	def run(self, dest, *, device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size, timeout = None):
+	def run(self, dest, *, args, timeout = None):
 		async def run():
 			p = await asyncio.create_subprocess_exec(
 				self.path.as_posix(),
-				str(device),
-				str(num_threads_min),
-				str(num_threads_max),
-				str(block_size),
-				str(p_enq),
-				str(p_deq),
-				str(workload_size),
+				*[str(arg) for arg in args.values()],
 				stdout=asyncio.subprocess.PIPE)
 
 			try:
@@ -104,12 +98,9 @@ class QueueBenchmarkBinary:
 
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
-		if f.name.startswith("benchmark-queue-concurrent-") and f.suffix in ['', '.exe'] and include.match(f.name):
+		if f.name.startswith("benchmark-") and f.suffix in ['', '.exe'] and include.match(f.name):
 			test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
 			yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
-
-def results_file_name(test_name, queue_type, queue_size, block_size, p_enq, p_deq, workload_size, device_name, platform):
-	return f"{test_name}--{queue_type}-{queue_size}-{block_size}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}-{device_id(device_name)}-{platform}.csv"
 
 class QueueBenchmarkRun:
 	def __init__(self, output_path, device_name, binary, **args):
@@ -122,6 +113,8 @@ class QueueBenchmarkRun:
 		return f"{self.binary.path.stem} -- {' '.join([str(v) for v in self.args.values()])}"
 
 def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False, timeout = None, retry_timeout = None, verbose = False):
+	import benchmarks
+
 	results_dir.mkdir(exist_ok=True, parents=True)
 
 	def result_outdated(results_file, binary):
@@ -136,7 +129,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 				# print(header.fingerprint, binary.fingerprint, binary.path)
 				return header.fingerprint != binary.fingerprint
 		except:
-			raise
+			raise  # TODO: ???
 			if verbose:
 				print("cannot determine whether", results_file, "is up-to-date - thus, rerun")
 			return True
@@ -149,36 +142,29 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	# we want to keep a persistent list of binaries since we amend it with info, such as fingerprint
 	selected_binaries = list(benchmark_binaries(bin_dir, include))
 
-	num_threads_min = 1
-	num_threads_max = 1 << 21
+	for binary in selected_binaries:
+		for device in devices.get(binary.platform):
+			# device_name = device_name_cache.get((binary.platform, device))
 
-	for workload_size in (1, 512):
-		for binary in selected_binaries:
-			for device in devices.get(binary.platform):
-				# device_name = device_name_cache.get((binary.platform, device))
+			# if not device_name:
+			device_name = binary.info(device)
+			# device_name_cache[(binary.platform, device)] = device_name
 
-				# if not device_name:
-				device_name = binary.info(device)
-				# device_name_cache[(binary.platform, device)] = device_name
+			if not device_name:
+				continue
 
-				if not device_name:
-					continue
+			# print(binary)
 
-				# print(binary)
+			for args, file_name_args in benchmarks.generate_benchmark_variants(binary.test_name):
+				output_path = results_dir/f"{binary.test_name}--{binary.queue_type}-{binary.queue_size}-{file_name_args}-{device_id(device_name)}-{binary.platform}.csv"
+				bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, **args)
 
-				for p_enq in (0.25, 0.5, 1.0):
-					for p_deq in (0.25, 0.5, 1.0):
-						for block_size in [32, 512]:
-
-							output_path = results_dir/results_file_name(binary.test_name, binary.queue_type, binary.queue_size, block_size, p_enq, p_deq, workload_size, device_name, binary.platform)
-							bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, num_threads_min=num_threads_min, num_threads_max=num_threads_max, block_size=block_size, p_enq=p_enq, p_deq=p_deq, workload_size=workload_size)
-
-							if rerun or result_outdated(output_path, binary):
-								scheduled.append(bm)
-							else:
-								if verbose:
-									print("skipping", output_path)
-								skipped.append(bm)
+				if rerun or result_outdated(output_path, binary):
+					scheduled.append(bm)
+				else:
+					if verbose:
+						print("skipping", output_path)
+					skipped.append(bm)
 
 	failed = []
 	timeouted = []
@@ -206,22 +192,22 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 				try:
 					with io.BytesIO() as buffer:
 						print(iteration, "--", "[", pad(i+1, max_digits), "/", total, "]", bm)
-						bm.binary.run(buffer, **bm.args, timeout=current_timeout)
+						bm.binary.run(buffer, args=bm.args, timeout=current_timeout)
 
 						buffer.seek(0)
 						params_reported = parse_benchmark_output_header(buffer)
 						# print(params_reported.device, bm.device_name)
 
 						if params_reported.device != bm.device_name:
-							raise Exception("benchmark reported inconsistent device name")
+							raise Exception(f"benchmark reported inconsistent device name")
 
 						if params_reported.platform != bm.binary.platform:
 							raise Exception("benchmark reported inconsistent platform")
 
-						if params_reported.queue_type != bm.binary.queue_type:
+						if params_reported.properties['queue_type'] != bm.binary.queue_type:
 							raise Exception("benchmark reported inconsistent queue type")
 
-						if params_reported.queue_size != bm.binary.queue_size:
+						if int(params_reported.properties['queue_size']) != bm.binary.queue_size:
 							raise Exception("benchmark reported inconsistent queue size")
 
 						if not dryrun:
@@ -599,13 +585,13 @@ if __name__ == "__main__":
 	run_cmd.add_argument("--retry-timeout", type=float, default=2.0)
 	run_cmd.add_argument("-v", "--verbose", action="store_true")
 
-	plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
+	# plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
 
 	export_cmd = add_command("export", export, help="export benchmark data as JavaScript")
 	export_cmd.add_argument("--out", "-o", type=Path, default=default_export_dir)
 	export_cmd.add_argument("--template", "-t", type=Path, default=default_template_file)
 
-	fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
+	# fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
 
 	serve_cmd = add_command("serve", serve, help="serve the exported benchmark results using a local server")
 	serve_cmd.add_argument("-p", "--port", type=int, default=8000)
