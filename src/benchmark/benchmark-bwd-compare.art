@@ -1,8 +1,6 @@
 
 
-fn bwd_comparison_benchmark(device_id: i32, block_size: i32, attempts_per_thread: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
-	let device = createAccDevice(device_id);
-
+fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thread: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
 	let queue = create_queue(device, queue_size);
 
 	// TODO: release resources

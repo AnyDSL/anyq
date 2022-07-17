@@ -67,8 +67,9 @@ struct QueueBenchmark {
 }
 
 
-fn @run_queue_benchmark(device: i32, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
-	let instrumentation = create_instrumentation(device);
+fn @run_queue_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
+	let instrumentation = create_instrumentation(device.platform_device >> 4);
+	//                                                     ^ HACK!
 
 	benchmark.print_info();
 	print_flush();

@@ -1,4 +1,164 @@
 
+#[import(cc = "C")] fn parse_int_arg(&mut u8, i32) -> i32;
+#[import(cc = "C")] fn parse_float_arg(&mut u8, i32) -> f32;
+
+#[import(cc = "C")] fn enum_int_arg(&mut u8, &[u8]) -> ();
+#[import(cc = "C")] fn enum_float_arg(&mut u8, &[u8]) -> ();
+
+#[import(cc = "C")] fn throw_usage_error(&[u8]) -> ();
+
+
+struct CmdArgs {
+	parse_int: fn() -> i32,
+	parse_float: fn() -> f32
+}
+
+fn @make_cmd_args(argc: i32, argv: &mut u8) {
+	let mut i = 0;
+
+	let next_arg = @|| {
+		if i >= argc {
+			throw_usage_error("missing arguments");
+		}
+
+		let tmp = i;
+		i = i + 1;
+		tmp
+	};
+
+	CmdArgs {
+		parse_int = @|| parse_int_arg(argv, next_arg()),
+		parse_float = @|| parse_float_arg(argv, next_arg())
+	}
+}
+
+
+struct BenchmarkParamsVisitor {
+	visit_int_param: fn(&[u8]) -> bool,
+	visit_float_param: fn(&[u8]) -> bool
+}
+
+fn wrap_visit_func_int(visit_func: fn(BenchmarkParamsVisitor) -> bool, name: &[u8]) -> fn(BenchmarkParamsVisitor) -> bool {
+	@|visitor| if visit_func(visitor) { visitor.visit_int_param(name) } else { false }
+}
+
+fn wrap_visit_func_float(visit_func: fn(BenchmarkParamsVisitor) -> bool, name: &[u8]) -> fn(BenchmarkParamsVisitor) -> bool {
+	@|visitor| if visit_func(visitor) { visitor.visit_float_param(name) } else { false }
+}
+
+
+struct BenchmarkParams7[A1, A2, A3, A4, A5, A6, A7] {
+	// add_int: fn(&[u8]) -> BenchmarkParams8[A1, A2, A3, A4, A5, A6, A7, i32],
+	// add_float: fn(&[u8]) -> BenchmarkParams8[A1, A2, A3, A4, A5, A6, A7, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2, A3, A4, A5, A6, A7) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_7[A1, A2, A3, A4, A5, A6, A7](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2, A3, A4, A5, A6, A7) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams7[A1, A2, A3, A4, A5, A6, A7] {
+	// add_int = @|name| make_cmd_args_8[A1, A2, A3, A4, A5, A6, A7, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5, a6, a7| f(device, a1, a2, a3, a4, a5, a6, a7, args.parse_int()))(device, args)),
+	// add_float = @|name| make_cmd_args_8[A1, A2, A3, A4, A5, A6, A7, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5, a6, a7| f(device, a1, a2, a3, a4, a5, a6, a7, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams6[A1, A2, A3, A4, A5, A6] {
+	add_int: fn(&[u8]) -> BenchmarkParams7[A1, A2, A3, A4, A5, A6, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams7[A1, A2, A3, A4, A5, A6, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2, A3, A4, A5, A6) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_6[A1, A2, A3, A4, A5, A6](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2, A3, A4, A5, A6) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams6[A1, A2, A3, A4, A5, A6] {
+	add_int = @|name| make_cmd_args_7[A1, A2, A3, A4, A5, A6, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5, a6| f(device, a1, a2, a3, a4, a5, a6, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_7[A1, A2, A3, A4, A5, A6, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5, a6| f(device, a1, a2, a3, a4, a5, a6, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams5[A1, A2, A3, A4, A5] {
+	add_int: fn(&[u8]) -> BenchmarkParams6[A1, A2, A3, A4, A5, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams6[A1, A2, A3, A4, A5, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2, A3, A4, A5) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_5[A1, A2, A3, A4, A5](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2, A3, A4, A5) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams5[A1, A2, A3, A4, A5] {
+	add_int = @|name| make_cmd_args_6[A1, A2, A3, A4, A5, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5| f(device, a1, a2, a3, a4, a5, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_6[A1, A2, A3, A4, A5, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4, a5| f(device, a1, a2, a3, a4, a5, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams4[A1, A2, A3, A4] {
+	add_int: fn(&[u8]) -> BenchmarkParams5[A1, A2, A3, A4, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams5[A1, A2, A3, A4, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2, A3, A4) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_4[A1, A2, A3, A4](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2, A3, A4) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams4[A1, A2, A3, A4] {
+	add_int = @|name| make_cmd_args_5[A1, A2, A3, A4, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4| f(device, a1, a2, a3, a4, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_5[A1, A2, A3, A4, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3, a4| f(device, a1, a2, a3, a4, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams3[A1, A2, A3] {
+	add_int: fn(&[u8]) -> BenchmarkParams4[A1, A2, A3, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams4[A1, A2, A3, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2, A3) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_3[A1, A2, A3](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2, A3) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams3[A1, A2, A3] {
+	add_int = @|name| make_cmd_args_4[A1, A2, A3, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3| f(device, a1, a2, a3, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_4[A1, A2, A3, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2, a3| f(device, a1, a2, a3, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams2[A1, A2] {
+	add_int: fn(&[u8]) -> BenchmarkParams3[A1, A2, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams3[A1, A2, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1, A2) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_2[A1, A2](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1, A2) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams2[A1, A2] {
+	add_int = @|name| make_cmd_args_3[A1, A2, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1, a2| f(device, a1, a2, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_3[A1, A2, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1, a2| f(device, a1, a2, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams1[A1] {
+	add_int: fn(&[u8]) -> BenchmarkParams2[A1, i32],
+	add_float: fn(&[u8]) -> BenchmarkParams2[A1, f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice, A1) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_cmd_args_1[A1](visit: fn(BenchmarkParamsVisitor) -> bool, bind: fn(fn(AccDevice, A1) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)) = BenchmarkParams1[A1] {
+	add_int = @|name| make_cmd_args_2[A1, i32](wrap_visit_func_int(visit, name), @|f| @|device, args| bind(@|device, a1| f(device, a1, args.parse_int()))(device, args)),
+	add_float = @|name| make_cmd_args_2[A1, f32](wrap_visit_func_float(visit, name), @|f| @|device, args| bind(@|device, a1| f(device, a1, args.parse_float()))(device, args)),
+	visit = @|visitor| { visit(visitor); visitor },
+	bind = bind
+};
+
+struct BenchmarkParams {
+	add_int: fn(&[u8]) -> BenchmarkParams1[i32],
+	add_float: fn(&[u8]) -> BenchmarkParams1[f32],
+	visit: fn(BenchmarkParamsVisitor) -> BenchmarkParamsVisitor,
+	bind: fn(fn(AccDevice) -> i32) -> fn(AccDevice, CmdArgs) -> (i32, CmdArgs)
+}
+
+fn @make_benchmark_params() = BenchmarkParams {
+	add_int = @|name| make_cmd_args_1[i32](@|visitor| visitor.visit_int_param(name), @|f| @|device, args| (f(device, args.parse_int()), args)),
+	add_float = @|name| make_cmd_args_1[f32](@|visitor| visitor.visit_float_param(name), @|f| @|device, args| (f(device, args.parse_float()), args)),
+	visit = @|visitor| visitor,
+	bind = @|f| @|device, args| (f(device), args)
+};
+
 
 struct Instrumentation {
 	print_device_info: fn() -> (),
@@ -12,7 +172,7 @@ struct Instrumentation {
 #[import(cc = "C")] fn instrumentation_end(&mut u8) -> ();
 #[import(cc = "C")] fn instrumentation_destroy(&mut u8) -> ();
 
-fn create_instrumentation(device: i32) {
+fn @create_instrumentation(device: i32) {
 	let ctx = instrumentation_create(device);
 
 	Instrumentation {
@@ -24,4 +184,39 @@ fn create_instrumentation(device: i32) {
 		},
 		destroy = @|| instrumentation_destroy(ctx)
 	}
+}
+
+
+#[export]
+fn benchmark_enum_args(ctx: &mut u8) {
+	let params = describe_benchmark_params(make_benchmark_params());
+
+	params.visit(BenchmarkParamsVisitor {
+		visit_int_param = @|name| { enum_int_arg(ctx, name); true },
+		visit_float_param = @|name| { enum_float_arg(ctx, name); true },
+	});
+}
+
+#[export]
+fn benchmark_run(device: i32, argc: i32, argv: &mut u8) {
+	let params = describe_benchmark_params(make_benchmark_params());
+
+	let num_params = {
+		let mut n = 0;
+
+		params.visit(BenchmarkParamsVisitor {
+			visit_int_param = @|_name| { n = n + 1; true },
+			visit_float_param = @|_name| { n = n + 1; true },
+		});
+
+		n
+	};
+
+	if argc != num_params {
+		throw_usage_error("incorrect number of arguments");
+	}
+
+	let run = params.bind(run_benchmark);
+
+	run(createAccDevice(device), make_cmd_args(argc, argv)).0
 }

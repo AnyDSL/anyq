@@ -1,12 +1,12 @@
 #include <cstdint>
-#include <stdexcept>
-#include <system_error>
+#include <ostream>
 #include <string_view>
-#include <charconv>
 #include <iostream>
 #include <iomanip>
 
 #include <instrumentation.h>
+
+#include "benchmark_args.h"
 
 using namespace std::literals;
 
@@ -15,7 +15,33 @@ extern const char* FINGERPRINT;
 
 extern "C"
 {
-	int run(std::int32_t, std::int32_t, std::int32_t, std::int32_t, float, float, std::int32_t);
+	std::int32_t parse_int_arg(void* args, std::int32_t i)
+	{
+		return parse_argument<int>(static_cast<char**>(args)[i]);
+	}
+
+	float parse_float_arg(void* args, std::int32_t i)
+	{
+		return parse_argument<float>(static_cast<char**>(args)[i]);
+	}
+
+	[[noreturn]] void throw_usage_error(const char* msg)
+	{
+		throw usage_error(msg);
+	}
+
+	void enum_int_arg(void* ctx, const char* name)
+	{
+		*static_cast<std::ostream*>(ctx) << " <" << name << '>';
+	}
+
+	void enum_float_arg(void* ctx, const char* name)
+	{
+		*static_cast<std::ostream*>(ctx) << " <" << name << '>';
+	}
+
+	int benchmark_enum_args(void* ctx);
+	int benchmark_run(std::int32_t device, std::int32_t argc, void* argv);
 
 	void* instrumentation_create(std::int32_t device)
 	{
@@ -47,61 +73,30 @@ extern "C"
 
 namespace
 {
-	class usage_error : public std::runtime_error { using std::runtime_error::runtime_error; };
+	std::ostream& print_args(std::ostream& out)
+	{
+		benchmark_enum_args(&out);
+		return out;
+	}
 
 	std::ostream& print_usage(std::ostream& out)
 	{
-		return out << "usage: benchmark <device> <num-threads-min> <num-threads-max> <block-size> <p-enq> <p-deq> <workload-size>\n"sv;
+		return out << "usage: benchmark <device>"sv << print_args << '\n'
+		           << "       benchmark info <device>\n";
 	}
-
-	template <typename T>
-	T parse_argument(std::string_view arg)
-	{
-		T value;
-
-		if (auto [end, ec] = std::from_chars(&arg[0], &arg[0] + arg.length(), value); ec == std::errc::invalid_argument)
-			throw usage_error("argument must be a number");
-		else if (ec == std::errc::result_out_of_range)
-			throw usage_error("argument out of range");
-		else if (end != &arg[0] + arg.length())
-			throw usage_error("invalid argument");
-
-		return value;
-	}
-#if defined(__GNUC__) && __GNUC__ < 11
-// WORKAROUND for lack of std::from_chars support in GCC < 11
-}
-#include <cerrno>
-#include <cstdlib>
-namespace
-{
-	template <>
-	float parse_argument<float>(std::string_view arg)
-	{
-		char* end;
-		float value = std::strtof(&arg[0], &end);
-		//                           ^ HACK!
-
-		if (end == &arg[0])
-			throw usage_error("argument must be a number");
-		else if (errno == ERANGE)
-			errno = 0, throw usage_error("argument out of range");
-		else if (end != &arg[0] + arg.length())
-			throw usage_error("invalid argument");
-
-		return value;
-	}
-#endif
 }
 
 int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc == 3)
+		if (argc < 2)
+			throw usage_error("expected at least 1 argument");
+
+		if (argv[1] == "info"sv)
 		{
-			if (argv[1] != "info"sv)
-				throw usage_error("first argument must be `info`");
+			if (argc != 3)
+				throw usage_error("too many arguments");
 
 			int device = parse_argument<int>(argv[2]);
 
@@ -109,22 +104,10 @@ int main(int argc, char* argv[])
 
 			return 0;
 		}
-		else if (argc == 8)
-		{
-			int device = parse_argument<int>(argv[1]);
-			int num_threads_min = parse_argument<int>(argv[2]);
-			int num_threads_max = parse_argument<int>(argv[3]);
-			int block_size = parse_argument<int>(argv[4]);
-			float p_enq = parse_argument<float>(argv[5]);
-			float p_deq = parse_argument<float>(argv[6]);
-			int workload_size = parse_argument<int>(argv[7]);
 
-			return run(device, num_threads_min, num_threads_max, block_size, p_enq, p_deq, workload_size);
-		}
-		else
-		{
-			throw usage_error("expected 7 arguments");
-		}
+		int device = parse_argument<int>(argv[1]);
+
+		return benchmark_run(device, argc - 2, argv + 2);
 	}
 	catch (const usage_error& e)
 	{

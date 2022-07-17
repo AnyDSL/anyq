@@ -75,6 +75,13 @@ endfunction()
 function(generate_benchmarks template_file benchmark_file platform queue_types queue_sizes)
 	get_filename_component(benchmark_name ${template_file} NAME_WE)
 
+	if (${_platform} STREQUAL "cudaits")
+		set(use_its "true")
+		set(benchmark_name "${benchmark_name}-its")
+	else()
+		set(use_its "false")
+	endif()
+
 	foreach(queue_type ${queue_types})
 		foreach(queue_size ${queue_sizes})
 			set(queue_short_name "${${queue_type}_short_name}")
@@ -133,11 +140,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
-	if (${_platform} STREQUAL "cudaits")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
-	else()
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
-	endif()
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
 
 	if (${_platform} STREQUAL "cuda")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art ${_platform} "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000")

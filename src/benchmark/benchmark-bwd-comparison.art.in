@@ -1,10 +1,16 @@
 
+fn @describe_benchmark_params(params: BenchmarkParams) {
+	params.add_int("num-threads-min")
+	      .add_int("num-threads-max")
+	      .add_int("block-size")
+}
 
-#[export]
-fn run(device: i32, num_threads_min: i32, num_threads_max: i32, block_size: i32, _p_enq: f32, _p_deq: f32, _workload_size: i32) {
+fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, block_size: i32) {
+	let num_attempts = 20;
+
 	run_queue_benchmark(
 		device,
 		num_threads_min,
 		num_threads_max,
-		bwd_comparison_benchmark(device, block_size, 20, @queue_size@, "@queue_short_name@", @queue_constructor_name@))
+		bwd_comparison_benchmark(device, block_size, num_attempts, @queue_size@, "@queue_short_name@", @queue_constructor_name@))
 }
