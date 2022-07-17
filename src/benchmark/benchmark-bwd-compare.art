@@ -8,7 +8,7 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 
 	QueueBenchmark {
 		print_info = @|| {
-			print_string("queue;queue_size;block_size;attempts_per_thread\n");
+			print_string("queue_type;queue_size;block_size;attempts_per_thread\n");
 			print_string(queue_name); print_char(';');
 			print_i32(queue_size); print_char(';');
 			print_i32(block_size); print_char(';');
