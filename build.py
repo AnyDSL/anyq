@@ -13,7 +13,7 @@ class Boost:
 		self.build_dir = self.source_dir/"build"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/boostorg/boost.git", branch="boost-1.76.0")
+		pull_git_dependency(self.source_dir, "https://github.com/boostorg/boost.git", branch="boost-1.79.0")
 		git("-C", self.source_dir,"submodule", "update", "--init",
 			"tools",
 			"libs/algorithm",
@@ -105,12 +105,12 @@ class LLVM(Build):
 		self.rv_source_dir = self.source_dir/"rv"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-12.0.0")
+		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-12.0.1")
 		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/12.x")
 
 	def configure(self, configs, anydsl):
 		for patch in [
-			anydsl.source_dir/"patches"/"llvm"/"nvptx_feature_ptx60.patch"
+			anydsl.source_dir/"patches"/"llvm"/"nvptx_feature.patch"
 		]:
 			git_apply_patch(self.source_dir, patch)
 
