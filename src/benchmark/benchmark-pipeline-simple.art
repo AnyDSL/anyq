@@ -1,0 +1,106 @@
+
+
+fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elements: i32, workload_size_producer: i32, workload_size_consumer: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
+	let stats_buffer_alloc = device.alloc(sizeof[QueueBenchmarkStatistics]());
+	let stats_buffer = stats_buffer_alloc.data as &mut addrspace(1) QueueBenchmarkStatistics;
+
+	let queue = create_queue(device, queue_size);
+
+	let pipeline_state_alloc = device.alloc(1 * sizeof[i32]());
+	let pipeline_state = pipeline_state_alloc.data as &mut addrspace(1) [i32];
+	let input_elements = &mut pipeline_state(0);
+	let completed_elements = &mut pipeline_state(1);
+
+	// TODO: release resources
+
+
+	QueueBenchmark {
+		print_info = @|| {
+			print_string("queue_type;queue_size;block_size;num_input_elements;workload_size_producer;workload_size_consumer\n");
+			print_string(queue_name); print_char(';');
+			print_i32(queue_size); print_char(';');
+			print_i32(block_size); print_char(';');
+			print_i32(num_input_elements); print_char(';');
+			print_i32(workload_size_producer); print_char(';');
+			print_i32(workload_size_consumer); print_char('\n'); print_char('\n');
+		},
+
+		reset = @|| {
+			for grid in device.launch_1d(1, 1) {
+				for thread in grid.threads() {
+					if thread.idx(0) == 0 {
+						*stats_buffer = init_benchmark_stats();
+						*input_elements = num_input_elements;
+						*completed_elements = 0;
+					}
+				}
+
+				queue.reset(grid);
+			}
+		},
+
+		run = @|num_threads: i32, i: i32| {
+			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
+				for wave in grid.waves() {
+					for thread in wave.threads() {
+						let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
+
+						if thread_id < num_threads as u32 {
+							let mut stats = init_benchmark_stats();
+							let q = wrap_queue_instrumentation(queue, &mut stats);
+
+							let mut rand_state = rng::xorseed32(thread_id + i as u32 * num_threads as u32);
+
+							let mut next_value = rand_state;
+
+							let simulate_workload = @|workload_size: i32| {
+								for _ in range(0, workload_size) {
+									next_value = rng::xorshift32(next_value);
+								}
+
+								next_value
+							};
+
+							while (thread.atomic_load_global_i32(completed_elements, memory_order::relaxed) < num_input_elements) {
+								let should_drain = @|thread: gpu_thread_context| q.size(thread) >= wave.num_threads() as i32 || thread.atomic_load_global_i32(input_elements, memory_order::relaxed) <= 0;
+
+								if wave.barrier_any(if thread.idx(0) == 0 { should_drain(thread) } else { false }) {
+									if for value in q.pop(thread) {
+										next_value = value;
+									} > 0 {
+										simulate_workload(workload_size_consumer);
+										thread.atomic_add_global_i32(completed_elements, 1, memory_order::relaxed);
+									}
+								}
+								else {
+									if thread.atomic_sub_global_i32(input_elements, 1, memory_order::relaxed) > 0 {
+										next_value = simulate_workload(workload_size_producer);
+
+										while for q.push(thread) {
+											next_value
+										} < 1 {};
+									}
+									else {
+										thread.atomic_add_global_i32(input_elements, 0, memory_order::relaxed);
+									}
+								}
+							}
+
+							accumulate_benchmark_stats(stats_buffer, stats, thread);
+						}
+					}
+				}
+			}
+		},
+
+		read_stats = @|| {
+			let mut stats: QueueBenchmarkStatistics;
+			let stats_ref = &mut stats;
+
+			device.synchronize();
+			runtime_copy(device.platform_device, stats_buffer_alloc.data, 0, 0, stats_ref as &mut[i8], 0, sizeof[QueueBenchmarkStatistics]());
+
+			stats
+		}
+	}
+}

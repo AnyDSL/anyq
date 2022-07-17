@@ -123,7 +123,6 @@ endfunction()
 
 
 
-
 option(AnyQ_BENCHMARK_AUTO OFF)
 
 foreach(_platform ${AnyQ_PLATFORMS})
@@ -141,6 +140,10 @@ foreach(_platform ${AnyQ_PLATFORMS})
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
 	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
+
+	if (NOT ${_platform} STREQUAL "cudaits")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
+	endif()
 
 	if (${_platform} STREQUAL "cuda")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art ${_platform} "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000")
