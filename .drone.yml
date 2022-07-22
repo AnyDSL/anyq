@@ -6,7 +6,8 @@ steps:
   - name: export
     image: python:3
     commands:
-      - python benchmark.py export --out baseline
+      - python benchmark.py export --out baseline "benchmark-queue-concurrent--.*"
+      - python benchmark.py export --out cuda-its "benchmark-queue-concurrent-.*-cuda(its)?"
 
   - name: upload
     image: beeblebrox.cg.uni-saarland.de/alpine/drone-plugin-sftp
@@ -22,6 +23,9 @@ steps:
         - baseline/index.html
         - baseline/main.js
         - baseline/*.json
+        - cuda-its/index.html
+        - cuda-its/main.js
+        - cuda-its/*.json
     when:
       branch:
         - master
