@@ -480,10 +480,15 @@ def export(out_dir, results_dir, template_file, include):
 
 	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
 	# TODO: what specifies the sort order? and why do we sort here at all?
-	datasets.sort(key=lambda d: d.params.properties['workload_size'])
-	datasets.sort(key=lambda d: d.params.properties['p_deq'])
-	datasets.sort(key=lambda d: d.params.properties['p_enq'])
-	datasets.sort(key=lambda d: d.params.properties['block_size'])
+	# keys = datasets[0].params.properties.keys()
+	# print("sort datasets according to", keys)
+	try:
+		datasets.sort(key=lambda d: d.params.properties['workload_size'])
+		datasets.sort(key=lambda d: d.params.properties['p_deq'])
+		datasets.sort(key=lambda d: d.params.properties['p_enq'])
+		datasets.sort(key=lambda d: d.params.properties['block_size'])
+	except KeyError:
+		print("the selected dataset uses different sets of parameters! this may affect result aggregation.")
 	datasets.sort(key=lambda d: d.params.properties['queue_size'])
 	datasets.sort(key=lambda d: d.params.properties['queue_type'])
 	datasets.sort(key=lambda d: d.params.device)
