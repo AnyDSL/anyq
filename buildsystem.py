@@ -47,10 +47,12 @@ class CMakeBuild:
 
 	def configure(self, build_dir, src_dir, *args, **options):
 		build_dir.mkdir(parents=True, exist_ok=True)
+		print("-------- configuring", build_dir, "--------")
 		if cmd("cmake", *args, *list(self.__definition_args(**options)), str(src_dir), cwd=build_dir) != 0:
 			raise Exception(f"CMake failed for {build_dir}")
 
 	def build(self, build_dir, config, *targets):
+		print("-------- building", build_dir, "--------")
 		if cmd("cmake", "--build", ".", "--config", config, *[v for pair in zip(["-t"] * len(targets), targets) for v in pair], cwd=build_dir) != 0:
 			raise Exception(f"build failed for {build_dir}")
 

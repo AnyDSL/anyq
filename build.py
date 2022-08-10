@@ -60,6 +60,7 @@ class Boost:
 			"libs/system",
 			"libs/test",
 			"libs/thread",
+			"libs/throw_exception",
 			"libs/timer",
 			"libs/tuple",
 			"libs/type_index",
@@ -75,6 +76,7 @@ class Boost:
 		return cmd("./bootstrap.sh", shell=True, cwd=self.source_dir)
 
 	def configure(self, configs):
+		print("-------- configuring", self.build_dir, "--------")
 		if (self.source_dir/"b2").exists() or (self.source_dir/"b2.exe").exists():
 			return
 
@@ -85,6 +87,7 @@ class Boost:
 		rmtree(self.build_dir)
 
 	def build(self, config):
+		print("-------- building", self.build_dir, "--------")
 		if cmd(self.source_dir/"b2", "install", f"--prefix={self.build_dir}", "--with-fiber", cwd=self.source_dir) != 0:
 			raise Exception("failed to build boost")
 
