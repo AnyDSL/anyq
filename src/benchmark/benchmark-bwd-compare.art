@@ -1,8 +1,6 @@
 
 
-fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thread: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
-	let queue = create_queue(device, queue_size);
-
+fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thread: i32) {
 	// TODO: release resources
 
 
@@ -15,13 +13,13 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 			print_i32(attempts_per_thread); print_char('\n'); print_char('\n');
 		},
 
-		reset = @|| {
+		reset = @|queue| {
 			for grid in device.launch_1d(1, 1) {
 				queue.reset(grid);
 			}
 		},
 
-		run = @|num_threads: i32, _i: i32| {
+		run = @|queue, num_threads, _i| {
 			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {

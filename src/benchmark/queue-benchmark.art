@@ -61,13 +61,15 @@ fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics,
 
 struct QueueBenchmark {
 	print_info: fn() -> (),
-	reset: fn() -> (),
-	run: fn(i32, i32) -> (),
+	reset: fn(ProducerConsumerQueue[u32]) -> (),
+	run: fn(ProducerConsumerQueue[u32], i32, i32) -> (),
 	read_stats: fn() -> QueueBenchmarkStatistics
 }
 
 
-fn @run_queue_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
+fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
+	let queue = create_queue(device, queue_size);
+
 	let instrumentation = create_instrumentation(device.platform_device >> 4);
 	//                                                     ^ HACK!
 
@@ -84,10 +86,10 @@ fn @run_queue_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max
 		for i in range(0, N) {
 			print_i32(num_threads); print_char(';');
 
-			benchmark.reset();
+			benchmark.reset(queue);
 
 			for instrumentation.time() {
-				benchmark.run(num_threads, i);
+				benchmark.run(queue, num_threads, i);
 			}
 
 			let stats = benchmark.read_stats();

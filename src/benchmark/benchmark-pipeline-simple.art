@@ -1,10 +1,8 @@
 
 
-fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elements: i32, workload_size_producer: i32, workload_size_consumer: i32, queue_size: i32, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32]) {
+fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elements: i32, workload_size_producer: i32, workload_size_consumer: i32) {
 	let stats_buffer_alloc = device.alloc(sizeof[QueueBenchmarkStatistics]());
 	let stats_buffer = stats_buffer_alloc.data as &mut addrspace(1) QueueBenchmarkStatistics;
-
-	let queue = create_queue(device, queue_size);
 
 	let pipeline_state_alloc = device.alloc(1 * sizeof[i32]());
 	let pipeline_state = pipeline_state_alloc.data as &mut addrspace(1) [i32];
@@ -25,7 +23,7 @@ fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elem
 			print_i32(workload_size_consumer); print_char('\n'); print_char('\n');
 		},
 
-		reset = @|| {
+		reset = @|queue| {
 			for grid in device.launch_1d(1, 1) {
 				for thread in grid.threads() {
 					if thread.idx(0) == 0 {
@@ -39,7 +37,7 @@ fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elem
 			}
 		},
 
-		run = @|num_threads: i32, i: i32| {
+		run = @|queue, num_threads, i| {
 			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {

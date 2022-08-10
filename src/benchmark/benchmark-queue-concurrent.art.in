@@ -13,7 +13,10 @@ fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32,
 
 	run_queue_benchmark(
 		device,
+		"@queue_short_name@",
+		@queue_constructor_name@,
+		@queue_size@,
 		num_threads_min,
 		num_threads_max,
-		producer_consumer_queue_concurrent_push_pop_benchmark(device, block_size, num_attempts, p_enq, p_deq, workload_size, @queue_size@, @use_its@, "@queue_short_name@", @queue_constructor_name@))
+		producer_consumer_queue_concurrent_push_pop_benchmark(device, block_size, num_attempts, p_enq, p_deq, workload_size, @use_its@))
 }
