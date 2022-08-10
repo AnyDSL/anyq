@@ -45,9 +45,7 @@ fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elem
 							let mut stats = init_benchmark_stats();
 							let q = wrap_queue_instrumentation(queue, &mut stats);
 
-							let mut rand_state = rng::xorseed32(thread_id + i as u32 * num_threads as u32);
-
-							let mut next_value = rand_state;
+							let mut next_value = rng::xorseed32(thread_id + i as u32 * num_threads as u32);
 
 							let simulate_workload = @|workload_size: i32| {
 								for _ in range(0, workload_size) {
