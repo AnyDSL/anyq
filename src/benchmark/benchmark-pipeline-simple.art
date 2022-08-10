@@ -13,14 +13,12 @@ fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elem
 
 
 	QueueBenchmark {
-		print_info = @|| {
-			print_string("queue_type;queue_size;block_size;num_input_elements;workload_size_producer;workload_size_consumer\n");
-			print_string(queue_name); print_char(';');
-			print_i32(queue_size); print_char(';');
-			print_i32(block_size); print_char(';');
-			print_i32(num_input_elements); print_char(';');
-			print_i32(workload_size_producer); print_char(';');
-			print_i32(workload_size_consumer); print_char('\n'); print_char('\n');
+		enum_param_names = @|enum_param| {
+			enum_param("block_size"); enum_param("num_input_elements"); enum_param("workload_size_producer"); enum_param("workload_size_consumer");
+		},
+
+		enum_param_values = @|enum_param_i32, _enum_param_f32| {
+			enum_param_i32(block_size); enum_param_i32(num_input_elements); enum_param_i32(workload_size_producer); enum_param_i32(workload_size_consumer);
 		},
 
 		reset = @|queue| {

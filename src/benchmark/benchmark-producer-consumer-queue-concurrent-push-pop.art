@@ -15,15 +15,12 @@ fn @producer_consumer_queue_concurrent_push_pop_benchmark(device: AccDevice, blo
 	let c_enqdeq = magic_p_id(rand_mask(0.5));
 
 	QueueBenchmark {
-		print_info = @|| {
-			print_string("queue_type;queue_size;block_size;attempts_per_thread;p_enq;p_deq;workload_size\n");
-			print_string(queue_name); print_char(';');
-			print_i32(queue_size); print_char(';');
-			print_i32(block_size); print_char(';');
-			print_i32(attempts_per_thread); print_char(';');
-			print_f32(p_enq); print_char(';');
-			print_f32(p_deq); print_char(';');
-			print_i32(workload_size); print_char('\n'); print_char('\n');
+		enum_param_names = @|enum_param| {
+			enum_param("block_size"); enum_param("attempts_per_thread"); enum_param("p_enq"); enum_param("p_deq"); enum_param("workload_size");
+		},
+
+		enum_param_values = @|enum_param_i32, enum_param_f32| {
+			enum_param_i32(block_size); enum_param_i32(attempts_per_thread); enum_param_f32(p_enq); enum_param_f32(p_deq); enum_param_i32(workload_size);
 		},
 
 		reset = @|queue| {

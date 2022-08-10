@@ -60,7 +60,8 @@ fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics,
 
 
 struct QueueBenchmark {
-	print_info: fn() -> (),
+	enum_param_names: fn(fn(&[u8]) -> ()) -> (),
+	enum_param_values: fn(fn(i32) -> (), fn(f32) -> ()) -> (),
 	reset: fn(ProducerConsumerQueue[u32]) -> (),
 	run: fn(ProducerConsumerQueue[u32], i32, i32) -> (),
 	read_stats: fn() -> QueueBenchmarkStatistics
@@ -73,7 +74,13 @@ fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(A
 	let instrumentation = create_instrumentation(device.platform_device >> 4);
 	//                                                     ^ HACK!
 
-	benchmark.print_info();
+	print_string("queue_type;queue_size");
+	benchmark.enum_param_names(@|name| { print_char(';'); print_string(name); });
+	print_char('\n');
+	print_string(queue_name); print_char(';'); print_i32(queue_size);
+	benchmark.enum_param_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_f32(v); });
+	print_char('\n');
+	print_char('\n');
 	print_flush();
 	instrumentation.print_device_info();
 	print_char('\n');

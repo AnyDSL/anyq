@@ -5,12 +5,12 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 
 
 	QueueBenchmark {
-		print_info = @|| {
-			print_string("queue_type;queue_size;block_size;attempts_per_thread\n");
-			print_string(queue_name); print_char(';');
-			print_i32(queue_size); print_char(';');
-			print_i32(block_size); print_char(';');
-			print_i32(attempts_per_thread); print_char('\n'); print_char('\n');
+		enum_param_names = @|enum_param| {
+			enum_param("block_size"); enum_param("attempts_per_thread");
+		},
+
+		enum_param_values = @|enum_param_i32, _enum_param_f32| {
+			enum_param_i32(block_size); enum_param_i32(attempts_per_thread);
 		},
 
 		reset = @|queue| {
