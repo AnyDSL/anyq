@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from hashlib import sha1 as hashalgo
 from pathlib import Path

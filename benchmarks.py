@@ -1,4 +1,3 @@
-#!/usr/bin/env python3.9
 
 
 def generate_benchmark_variants(test_name):
