@@ -203,6 +203,7 @@ class AnyDSLRuntime(Build):
 			LLVM_DIR=llvm.build_dir/"lib"/"cmake"/"llvm",
 			Thorin_DIR=thorin.build_dir/"share"/"anydsl"/"cmake",
 			Artic_DIR=artic.build_dir/"share"/"anydsl"/"cmake",
+			AnyDSL_runtime_HAS_TBB_SUPPORT=False,
 			RUNTIME_JIT=True,
 			AnyDSL_runtime_CUDA_CXX_STANDARD=17
 		)
