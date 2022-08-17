@@ -18,6 +18,8 @@ fn @createAccDevice(device: i32) {
 		alloc = |size| alloc_cuda(device, size),
 		platform_device = platform_device,
 
+		platform_name = "cuda",
+
 		print_i32 = @|format: &[u8], arg: i32| {
 			cuda_vprintf(format, &arg as &[u8]);
 		},

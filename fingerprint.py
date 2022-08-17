@@ -52,5 +52,5 @@ if __name__ == "__main__":
 		print(result)
 	else:
 		with open(args.out, 'w') as file:
-			file.write('\nconst char* FINGERPRINT = "' + result + '";\n')
+			file.write('\nextern "C" const char* FINGERPRINT() { return "' + result + '"; }\n')
 			print('Saved', result, 'to', args.out)

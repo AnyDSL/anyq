@@ -5,6 +5,7 @@ fn @createAccDevice(device: i32) = AccDevice {
     synchronize = || synchronize_hsa(device),
     alloc = |size| alloc_hsa(device, size),
     platform_device = runtime_device(3, device),
+    platform_name = "amdgpu",
     print_i32 = @|_format: &[u8], _arg: i32| { /*trap()*/ },
     print_2xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32| { /*trap()*/ },
     print_3xi32 = @|_format: &[u8], _arg1: i32, _arg2: i32, _arg3: i32| { /*trap()*/ }

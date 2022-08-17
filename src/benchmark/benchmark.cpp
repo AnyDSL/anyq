@@ -1,8 +1,6 @@
 #include <cstdint>
-#include <ostream>
 #include <string_view>
 #include <iostream>
-#include <iomanip>
 
 #include <instrumentation.h>
 
@@ -10,11 +8,11 @@
 
 using namespace std::literals;
 
-extern const char* FINGERPRINT;
-
 
 extern "C"
 {
+	int benchmark_print_info(std::int32_t device);
+
 	std::int32_t parse_int_arg(void* args, std::int32_t i)
 	{
 		return parse_argument<int>(static_cast<char**>(args)[i]);
@@ -43,15 +41,10 @@ extern "C"
 	int benchmark_enum_args(void* ctx);
 	int benchmark_run(std::int32_t device, std::int32_t argc, void* argv);
 
+
 	void* instrumentation_create(std::int32_t device)
 	{
 		return new Instrumentation(device);
-	}
-
-	void instrumentation_print_device_info(void* ctx)
-	{
-		std::cout << "platform;device_name;fingerprint\n";
-		static_cast<Instrumentation*>(ctx)->print_device_info(std::cout << PLATFORM << ';') << ';' << FINGERPRINT << '\n' << std::flush;
 	}
 
 	void instrumentation_begin(void* ctx)
@@ -59,10 +52,9 @@ extern "C"
 		static_cast<Instrumentation*>(ctx)->begin();
 	}
 
-	void instrumentation_end(void* ctx)
+	float instrumentation_end(void* ctx)
 	{
-		float dt = static_cast<Instrumentation*>(ctx)->end();
-		std::cout /*<< std::fixed << std::setprecision(2)*/ << dt; // << '\n' << std::flush;
+		return static_cast<Instrumentation*>(ctx)->end();
 	}
 
 	void instrumentation_destroy(void* ctx)
@@ -81,8 +73,8 @@ namespace
 
 	std::ostream& print_usage(std::ostream& out)
 	{
-		return out << "usage: benchmark <device>"sv << print_args << '\n'
-		           << "       benchmark info <device>\n";
+		return out << "usage: benchmark <device>"sv << print_args << "\n"
+		              "       benchmark info <device>\n"sv;
 	}
 }
 
@@ -100,9 +92,7 @@ int main(int argc, char* argv[])
 
 			int device = parse_argument<int>(argv[2]);
 
-			Instrumentation(device).print_device_info(std::cout) << '\n' << FINGERPRINT << '\n' << std::flush;
-
-			return 0;
+			return benchmark_print_info(device);
 		}
 
 		int device = parse_argument<int>(argv[1]);

@@ -1,8 +1,6 @@
 #ifndef INCLUDED_INSTRUMENTATION_AMDGPU
 #define INCLUDED_INSTRUMENTATION_AMDGPU
 
-#include <iosfwd>
-
 #include <anydsl_runtime.hpp>
 
 
@@ -17,8 +15,6 @@ public:
 		: device(device)
 	{
 	}
-
-	std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{

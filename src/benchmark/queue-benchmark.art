@@ -81,8 +81,11 @@ fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(A
 	benchmark.enum_param_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_f32(v); });
 	print_char('\n');
 	print_char('\n');
-	print_flush();
-	instrumentation.print_device_info();
+	print_string("platform;device_name;fingerprint\n");
+	print_string(device.platform_name); print_char(';');
+	print_string(runtime_device_name(device.platform_device)); print_char(';');
+	print_string(FINGERPRINT());
+	print_char('\n');
 	print_char('\n');
 
 	print_string("num_threads;t/ms;num_enqueues;t_enqueues;t_enqueue_min;t_enqueue_max;num_enqueues_failed;t_enqueues_failed;t_enqueue_failed_min;t_enqueue_failed_max;num_dequeues;t_dequeues;t_dequeue_min;t_dequeue_max;num_dequeues_failed;t_dequeues_failed;t_dequeue_failed_min;t_dequeue_failed_max\n");
@@ -95,9 +98,11 @@ fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(A
 
 			benchmark.reset(queue);
 
-			for instrumentation.time() {
+			let t = for instrumentation.time() {
 				benchmark.run(queue, num_threads, i);
-			}
+			};
+
+			print_f32(t);
 
 			let stats = benchmark.read_stats();
 

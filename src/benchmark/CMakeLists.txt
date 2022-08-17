@@ -21,8 +21,6 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		FOLDER "benchmarks"
 	)
 
-	target_compile_definitions(${_target} PRIVATE -DPLATFORM=\"${_platform}\")
-
 	# if (MSVC)
 	# 	target_compile_options(${_target} PRIVATE /W4 /WX /permissive-)
 	# 	target_compile_definitions(${_target} PRIVATE -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)

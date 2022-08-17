@@ -1,8 +1,6 @@
 #ifndef INCLUDED_INSTRUMENTATION_CUDA
 #define INCLUDED_INSTRUMENTATION_CUDA
 
-#include <iosfwd>
-
 #include <CUDA/error.h>
 #include <CUDA/event.h>
 
@@ -14,12 +12,8 @@ class Instrumentation
 
 	int device;
 
-	static void init_profiler();
-
 public:
 	Instrumentation(int device);
-
-	std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{

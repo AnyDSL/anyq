@@ -11,6 +11,8 @@ fn @createAccDevice(device: i32) = AccDevice {
 	alloc = @|size| alloc_cpu(size),
 	platform_device = runtime_device(0, device),
 
+	platform_name = "cpu",
+
 	print_i32 = @|msg: &[u8], i: i32| {
 		anyq_print_3xi32(msg, i, 0, 0);
 	},

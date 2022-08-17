@@ -112,6 +112,7 @@ struct AccDevice {
 	synchronize: fn() -> (),
 	alloc: fn(i64) -> Buffer,
 	platform_device: i32,
+	platform_name: &[u8],
 	print_i32: fn(&[u8], i32) -> (),
 	print_2xi32: fn(&[u8], i32, i32) -> (),
 	print_3xi32: fn(&[u8], i32, i32, i32) -> ()

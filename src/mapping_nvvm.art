@@ -18,6 +18,8 @@ fn @createAccDevice(device: i32) {
 		alloc = |size| alloc_cuda(device, size),
 		platform_device = platform_device,
 
+		platform_name = "nvvm",
+
 		print_i32 = @|format: &[u8], arg: i32| {
 			nvvm_vprintf(format, &arg as &[u8]);
 		},

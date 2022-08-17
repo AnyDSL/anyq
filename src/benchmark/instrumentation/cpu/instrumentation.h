@@ -2,7 +2,6 @@
 #define INCLUDED_INSTRUMENTATION_CPU
 
 #include <chrono>
-#include <iosfwd>
 
 
 class Instrumentation
@@ -16,8 +15,6 @@ public:
 		: device(device)
 	{
 	}
-
-	std::ostream& print_device_info(std::ostream&);
 
 	void begin()
 	{
