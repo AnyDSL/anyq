@@ -1,5 +1,8 @@
 
 
+find_package(Python3 COMPONENTS Interpreter)
+
+
 add_subdirectory(instrumentation)
 
 foreach(_platform ${AnyQ_PLATFORMS})
@@ -38,9 +41,6 @@ set(COMMON_BENCHMARK_FILES
 
 source_group("Source Files" FILES ${COMMON_BENCHMARK_FILES})
 
-find_package(Python3 COMPONENTS Interpreter)
-
-
 function(add_benchmark _target _benchmark_file _mapping)
 	add_anyq_executable(${_target} ${_mapping} ${COMMON_BENCHMARK_FILES} ${_benchmark_file} ${ARGN})
 
@@ -72,15 +72,8 @@ function(add_benchmark _target _benchmark_file _mapping)
 	target_sources(${_target} PRIVATE ${_target_fingerprint})
 endfunction()
 
-function(generate_benchmarks template_file benchmark_file platform queue_types queue_sizes)
+function(generate_benchmarks template_file queue_types queue_sizes platform)
 	get_filename_component(benchmark_name ${template_file} NAME_WE)
-
-	if (${_platform} STREQUAL "cudaits")
-		set(use_its "true")
-		set(benchmark_name "${benchmark_name}-its")
-	else()
-		set(use_its "false")
-	endif()
 
 	foreach(queue_type ${queue_types})
 		foreach(queue_size ${queue_sizes})
@@ -94,7 +87,7 @@ function(generate_benchmarks template_file benchmark_file platform queue_types q
 				configure_file(${template_file} ${dest_file})
 
 				set(target_name "${variant_name}-${platform}")
-				add_benchmark(${target_name} ${dest_file} ${platform} ${benchmark_file} ${${queue_type}_sources})
+				add_benchmark(${target_name} ${dest_file} ${platform} ${${queue_type}_sources} ${ARGN})
 
 				if (DEFINED ${queue_type}_configure_target)
 					cmake_language(CALL ${${queue_type}_configure_target} ${target_name})
@@ -113,14 +106,13 @@ function(add_sass_output target)
 	add_custom_command(
 		OUTPUT "${cuda_src}.asm"
 		COMMAND ${CMAKE_COMMAND} -E echo "SASSing up ${cuda_src}.cu"
-		COMMAND nvcc -arch=sm_61 --cubin -o "${cuda_src}.cubin" "${cuda_src}.cu"
+		COMMAND nvcc -arch=sm_75 --cubin -o "${cuda_src}.cubin" "${cuda_src}.cu"
 		COMMAND nvdisasm -c "${cuda_src}.cubin" > "${cuda_src}.asm"
 		DEPENDS ${target}
 	)
 
 	add_custom_target(${target}_sass ALL DEPENDS "${cuda_src}.asm")
 endfunction()
-
 
 
 option(AnyQ_BENCHMARK_AUTO OFF)
@@ -139,14 +131,13 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
-	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 
-	if (NOT ${_platform} STREQUAL "cudaits")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art ${_platform} "${queue_types_${_platform}}" "10000;1000000")
-	endif()
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art)
 
 	if (${_platform} STREQUAL "cuda")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art ${_platform} "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
 		add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)

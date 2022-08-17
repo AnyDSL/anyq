@@ -549,7 +549,6 @@ def main(args):
 			"cpu": [0],
 			"fiberless": [0],
 			"cuda": device_list(args.cuda_device),
-			"cudaits": device_list(args.cuda_device),
 			"nvvm": device_list(args.cuda_device),
 			"amdgpu": device_list(args.amdgpu_device)
 		}

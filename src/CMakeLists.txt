@@ -44,8 +44,7 @@ set(COMMON_ARTIC_FILES
 set(mapping_source_files_amdgpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_amdgpu.art")
 set(mapping_source_files_cpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cpu.art")
 set(mapping_source_files_fiberless "${CMAKE_CURRENT_SOURCE_DIR}/mapping_fiberless.art")
-set(mapping_source_files_cuda "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art" "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cudanoits.art")
-set(mapping_source_files_cudaits "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art" "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cudaits.art")
+set(mapping_source_files_cuda "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art")
 set(mapping_source_files_nvvm "${CMAKE_CURRENT_SOURCE_DIR}/mapping_nvvm.art")
 
 function(add_anyq_executable target_name mapping)
@@ -85,7 +84,7 @@ set(AnyQ_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	find_package(CUDAToolkit REQUIRED)
-	list(APPEND AnyQ_PLATFORMS cuda cudaits nvvm)
+	list(APPEND AnyQ_PLATFORMS cuda)# nvvm)
 	set(AnyQ_CUDA_ALL_SANITIZER_TOOLS memcheck racecheck initcheck synccheck)
 	set(AnyQ_CUDA_SANITIZER_TOOLS "all" CACHE STRING "values from all|${AnyQ_CUDA_ALL_SANITIZER_TOOLS} to select cuda sanitizer tools for AnyQ tests on CUDA")
 	if(AnyQ_CUDA_SANITIZER_TOOLS STREQUAL "all")

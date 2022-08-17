@@ -1,24 +1,38 @@
 
-fn @createAccDevice(device: i32) = AccDevice {
-	launch_1d = @|body|@|num_groups, group_size| cuda_launch_1d(device, num_groups, group_size, body),
-	synchronize = || synchronize_cuda(device),
-	alloc = |size| alloc_cuda(device, size),
-	platform_device = runtime_device(1, device),
+fn @createAccDevice(device: i32) {
+	let platform_device = runtime_device(1, device);
+	let its = runtime_device_check_feature_support(platform_device, "ITS");
 
-	print_i32 = @|format: &[u8], arg: i32| {
-		cuda_vprintf(format, &arg as &[u8]);
-	},
+	AccDevice {
+		launch_1d = if its {
+			@|body|@|num_groups, group_size| {
+				cuda_launch(device, true, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
+			}
+		}
+		else {
+			@|body|@|num_groups, group_size| {
+				cuda_launch(device, false, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
+			}
+		},
+		synchronize = || synchronize_cuda(device),
+		alloc = |size| alloc_cuda(device, size),
+		platform_device = platform_device,
 
-	print_2xi32 = @|format: &[u8], arg1: i32, arg2: i32| {
-		let args:&[i32] = [arg1, arg2];
-		cuda_vprintf(format, args as &[u8]);
-	},
+		print_i32 = @|format: &[u8], arg: i32| {
+			cuda_vprintf(format, &arg as &[u8]);
+		},
 
-	print_3xi32 = @|format: &[u8], arg1: i32, arg2: i32, arg3: i32| {
-		let args:&[i32] = [arg1, arg2, arg3];
-		cuda_vprintf(format, args as &[u8]);
+		print_2xi32 = @|format: &[u8], arg1: i32, arg2: i32| {
+			let args:&[i32] = [arg1, arg2];
+			cuda_vprintf(format, args as &[u8]);
+		},
+
+		print_3xi32 = @|format: &[u8], arg1: i32, arg2: i32, arg3: i32| {
+			let args:&[i32] = [arg1, arg2, arg3];
+			cuda_vprintf(format, args as &[u8]);
+		}
 	}
-};
+}
 
 fn @createDefaultAccDevice() = createAccDevice(0);
 
@@ -98,7 +112,9 @@ fn @cuda_atomic_wait_and_transition[T](f: fn(&mut addrspace(1) T, T, T) -> T, cm
 	}
 }
 
-fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, yield: fn() -> (), body: fn(gpu_thread_context) -> ()) -> () {
+fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(gpu_thread_context) -> ()) -> () {
+	let yield = if its { @|| cuda_nanosleep(0) } else { cuda_threadfence };
+
 	@body(gpu_thread_context {
 		idx = idx,
 
@@ -177,7 +193,7 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, yield: fn() -> (), body: 
 	});
 }
 
-fn @cuda_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, yield: fn() -> (), body: fn(gpu_wave_context) -> ()) -> () {
+fn @cuda_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, its: bool, body: fn(gpu_wave_context) -> ()) -> () {
 	let thread_idx = @|i: i32| match i { 0 => cuda_laneid(), _ => 0 };
 
 	@body(gpu_wave_context{
@@ -185,7 +201,7 @@ fn @cuda_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 
 		membermask = @|| membermask as u64,
 
-		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads + thread_idx(0), yield, body),
+		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads + thread_idx(0), its, body),
 
 		num_threads = @|| num_threads,
 
@@ -247,7 +263,7 @@ fn @cuda_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 	});
 }
 
-fn @cuda_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, yield: fn() -> (), body: fn(gpu_group_context) -> ()) -> () {
+fn @cuda_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, its: bool, body: fn(gpu_group_context) -> ()) -> () {
 	let linear_thread_idx = @|| {
 		(thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0)
 	};
@@ -261,8 +277,8 @@ fn @cuda_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 
 	@body(gpu_group_context {
 		idx = idx,
-		waves = @|body|@|| cuda_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, yield, body),
-		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), yield, body),
+		waves = @|body|@|| cuda_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, its, body),
+		threads = @|body|@|| cuda_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), its, body),
 		num_waves = num_warps,
 		num_threads = block_size,
 		barrier = cuda_block_sync,
@@ -320,13 +336,11 @@ fn @cuda_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_
 
 	let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / warp_size;
 
-	let yield = if its { @|| cuda_nanosleep(0) } else { cuda_threadfence };
-
 	cuda(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(gpu_grid_context {
 		device = device,
-		groups = @|body|@|| cuda_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, yield, body),
-		waves = @|body|@|| cuda_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, yield, body),
-		threads = @|body|@|| cuda_thread(global_thread_idx, global_linear_thread_idx, yield, body),
+		groups = @|body|@|| cuda_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, its, body),
+		waves = @|body|@|| cuda_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, its, body),
+		threads = @|body|@|| cuda_thread(global_thread_idx, global_linear_thread_idx, its, body),
 		num_groups = num_blocks,
 		num_waves = num_warps,
 		num_threads = num_threads
