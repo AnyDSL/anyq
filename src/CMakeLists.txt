@@ -84,7 +84,7 @@ set(AnyQ_PLATFORMS)
 
 if (AnyDSL_runtime_HAS_CUDA_SUPPORT)
 	find_package(CUDAToolkit REQUIRED)
-	list(APPEND AnyQ_PLATFORMS cuda)# nvvm)
+	list(APPEND AnyQ_PLATFORMS cuda nvvm)
 	set(AnyQ_CUDA_ALL_SANITIZER_TOOLS memcheck racecheck initcheck synccheck)
 	set(AnyQ_CUDA_SANITIZER_TOOLS "all" CACHE STRING "values from all|${AnyQ_CUDA_ALL_SANITIZER_TOOLS} to select cuda sanitizer tools for AnyQ tests on CUDA")
 	if(AnyQ_CUDA_SANITIZER_TOOLS STREQUAL "all")

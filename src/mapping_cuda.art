@@ -1,7 +1,7 @@
 
 fn @createAccDevice(device: i32) {
 	let platform_device = runtime_device(1, device);
-	let its = runtime_device_check_feature_support(platform_device, "ITS");
+	let its = false; // runtime_device_check_feature_support(platform_device, "ITS");
 
 	AccDevice {
 		launch_1d = if its {
