@@ -1,12 +1,61 @@
+struct QueueOperationStatistics {
+	num_operations: i64,
+	t_total: i64,
+	t_min: i32,
+	t_max: i32,
+}
 
-fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut QueueBenchmarkStatistics) -> ProducerConsumerQueue[T] {
+struct QueueBenchmarkStatistics {
+	enqueue_stats_succ: QueueOperationStatistics,
+	enqueue_stats_fail: QueueOperationStatistics,
+	dequeue_stats_succ: QueueOperationStatistics,
+	dequeue_stats_fail: QueueOperationStatistics
+}
+
+fn @init_queue_operation_stats() = QueueOperationStatistics {
+	num_operations = 0,
+	t_total = 0,
+	t_min = ((1 as u32 << 31) - 1) as i32,
+	t_max = 0
+};
+
+fn @record_queue_operation(stats: &mut QueueOperationStatistics, t: i32) {
+	++stats.num_operations;
+	stats.t_total += t as i64;
+	stats.t_min = min(stats.t_min, t);
+	stats.t_max = max(stats.t_max, t);
+}
+
+fn @init_benchmark_stats() = QueueBenchmarkStatistics {
+	enqueue_stats_succ = init_queue_operation_stats(),
+	enqueue_stats_fail = init_queue_operation_stats(),
+	dequeue_stats_succ = init_queue_operation_stats(),
+	dequeue_stats_fail = init_queue_operation_stats(),
+};
+
+fn @accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: gpu_thread_context) {
+	thread.atomic_add_global_i64(dest.num_operations, stats.num_operations, memory_order::relaxed);
+	thread.atomic_add_global_i64(dest.t_total, stats.t_total, memory_order::relaxed);
+	thread.atomic_min_global_i32(dest.t_min, stats.t_min, memory_order::relaxed);
+	thread.atomic_max_global_i32(dest.t_max, stats.t_max, memory_order::relaxed);
+}
+
+fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: gpu_thread_context) {
+	accumulate_queue_operation_stats(&mut dest.enqueue_stats_succ, stats.enqueue_stats_succ, thread);
+	accumulate_queue_operation_stats(&mut dest.enqueue_stats_fail, stats.enqueue_stats_fail, thread);
+	accumulate_queue_operation_stats(&mut dest.dequeue_stats_succ, stats.dequeue_stats_succ, thread);
+	accumulate_queue_operation_stats(&mut dest.dequeue_stats_fail, stats.dequeue_stats_fail, thread);
+}
+
+
+fn @wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut QueueBenchmarkStatistics) -> ProducerConsumerQueue[T] {
 	let wrapped_queue = ProducerConsumerQueue[T] {
 		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
 
 			let t_begin = thread.timestamp32();
 
 			let num_pushed = for queue.push(thread) {
-				source()
+				@source()
 			};
 
 			let t_end = thread.timestamp32();
@@ -28,7 +77,7 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 			let t_begin = thread.timestamp32();
 
 			let num_poppped = for el in queue.pop(thread) {
-				sink(el);
+				@sink(el);
 			};
 
 			let t_end = thread.timestamp32();
@@ -52,4 +101,94 @@ fn wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Qu
 	};
 
 	wrapped_queue
+}
+
+
+struct QueueInstrumentationResults {
+	enum_values: fn(fn(i32) -> (), fn(i64) -> ()) -> ()
+}
+
+struct QueueInstrumentationScope {
+	record: fn(fn(ProducerConsumerQueue[u32]) -> ()) -> fn(gpu_thread_context) -> ()
+}
+
+struct QueueInstrumentation {
+	enum_result_names: fn(fn(&[u8]) -> ()) -> (),
+	reset: fn(gpu_grid_context) -> (),
+	record: fn(fn(QueueInstrumentationScope) -> ()) -> fn(ProducerConsumerQueue[u32]) -> (),
+	results: fn() -> QueueInstrumentationResults,
+}
+
+fn @create_queue_instrumentation_full(device: AccDevice) {
+	let stats_buffer_alloc = device.alloc(sizeof[QueueBenchmarkStatistics]());
+	let stats_buffer = stats_buffer_alloc.data as &mut addrspace(1) QueueBenchmarkStatistics;
+
+	// TODO: release resources
+
+	QueueInstrumentation {
+		enum_result_names = enum_queue_instrumentation_result_names,
+
+		reset = @|grid| {
+			for thread in grid.threads() {
+				if thread.idx(0) == 0 {
+					*stats_buffer = init_benchmark_stats();
+				}
+			}
+		},
+
+		record = @|body|@|queue| {
+			@body(QueueInstrumentationScope {
+				record = @|body|@|thread| {
+					let mut stats = init_benchmark_stats();
+					let q = wrap_queue_instrumentation(queue, &mut stats);
+					@body(q);
+					accumulate_benchmark_stats(stats_buffer, stats, thread);
+				}
+			});
+		},
+
+		results = @|| {
+			let mut stats: QueueBenchmarkStatistics;
+			runtime_copy(device.platform_device, stats_buffer_alloc.data, 0, 0, &mut stats as &mut[i8], 0, sizeof[QueueBenchmarkStatistics]());
+
+			QueueInstrumentationResults {
+				enum_values = enum_queue_instrumentation_result_values(stats)
+			}
+		}
+	}
+}
+
+fn @enum_queue_instrumentation_result_names(enum_name: fn(&[u8]) -> ()) {
+	enum_name("num_enqueues");        enum_name("t_enqueues");        enum_name("t_enqueue_min");        enum_name("t_enqueue_max");
+	enum_name("num_enqueues_failed"); enum_name("t_enqueues_failed"); enum_name("t_enqueue_failed_min"); enum_name("t_enqueue_failed_max");
+	enum_name("num_dequeues");        enum_name("t_dequeues");        enum_name("t_dequeue_min");        enum_name("t_dequeue_max");
+	enum_name("num_dequeues_failed"); enum_name("t_dequeues_failed"); enum_name("t_dequeue_failed_min"); enum_name("t_dequeue_failed_max");
+}
+
+fn @enum_queue_instrumentation_result_values(stats: QueueBenchmarkStatistics) {
+	@|enum_i32: fn(i32) -> (), enum_i64: fn(i64) -> ()| {
+		enum_i64(stats.enqueue_stats_succ.num_operations); enum_i64(stats.enqueue_stats_succ.t_total); enum_i32(stats.enqueue_stats_succ.t_min); enum_i32(stats.enqueue_stats_succ.t_max);
+		enum_i64(stats.enqueue_stats_fail.num_operations); enum_i64(stats.enqueue_stats_fail.t_total); enum_i32(stats.enqueue_stats_fail.t_min); enum_i32(stats.enqueue_stats_fail.t_max);
+		enum_i64(stats.dequeue_stats_succ.num_operations); enum_i64(stats.dequeue_stats_succ.t_total); enum_i32(stats.dequeue_stats_succ.t_min); enum_i32(stats.dequeue_stats_succ.t_max);
+		enum_i64(stats.dequeue_stats_fail.num_operations); enum_i64(stats.dequeue_stats_fail.t_total); enum_i32(stats.dequeue_stats_fail.t_min); enum_i32(stats.dequeue_stats_fail.t_max);
+	}
+}
+
+fn @create_queue_instrumentation_none(_device: AccDevice) {
+	QueueInstrumentation {
+		enum_result_names = @|_| {},
+		reset = @|_| {},
+		record = @|body|@|queue| {
+			@body(QueueInstrumentationScope {
+				record = @|body|@|_| {
+					@body(queue);
+				}
+			});
+		},
+		results = @|| {
+			QueueInstrumentationResults {
+				enum_values = @|_, _| {}
+			}
+		}
+	}
 }

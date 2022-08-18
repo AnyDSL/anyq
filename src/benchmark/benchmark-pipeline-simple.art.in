@@ -11,10 +11,11 @@ fn @describe_benchmark_params(params: BenchmarkParams) {
 fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, block_size: i32, num_input_elements: i32, workload_size_producer: i32, workload_size_consumer: i32) {
 	run_queue_benchmark(
 		device,
+		simple_pipeline_benchmark(device, block_size, num_input_elements, workload_size_producer, workload_size_consumer),
 		"@queue_short_name@",
 		@queue_constructor_name@,
 		@queue_size@,
 		num_threads_min,
 		num_threads_max,
-		simple_pipeline_benchmark(device, block_size, num_input_elements, workload_size_producer, workload_size_consumer))
+		create_queue_instrumentation_full)
 }

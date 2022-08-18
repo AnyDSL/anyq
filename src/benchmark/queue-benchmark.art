@@ -9,86 +9,33 @@ fn @upsweep_exponential(body: fn(i32) -> ()) {
 	loop
 }
 
-struct QueueOperationStatistics {
-	num_operations: i64,
-	t_total: i64,
-	t_min: i32,
-	t_max: i32,
-}
-
-struct QueueBenchmarkStatistics {
-	enqueue_stats_succ: QueueOperationStatistics,
-	enqueue_stats_fail: QueueOperationStatistics,
-	dequeue_stats_succ: QueueOperationStatistics,
-	dequeue_stats_fail: QueueOperationStatistics
-}
-
-fn @init_queue_operation_stats() = QueueOperationStatistics {
-	num_operations = 0,
-	t_total = 0,
-	t_min = ((1 as u32 << 31) - 1) as i32,
-	t_max = 0
-};
-
-fn @record_queue_operation(stats: &mut QueueOperationStatistics, t: i32) {
-	++stats.num_operations;
-	stats.t_total += t as i64;
-	stats.t_min = min(stats.t_min, t);
-	stats.t_max = max(stats.t_max, t);
-}
-
-fn @init_benchmark_stats() = QueueBenchmarkStatistics {
-	enqueue_stats_succ = init_queue_operation_stats(),
-	enqueue_stats_fail = init_queue_operation_stats(),
-	dequeue_stats_succ = init_queue_operation_stats(),
-	dequeue_stats_fail = init_queue_operation_stats(),
-};
-
-fn @accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: gpu_thread_context) {
-	thread.atomic_add_global_i64(dest.num_operations, stats.num_operations, memory_order::relaxed);
-	thread.atomic_add_global_i64(dest.t_total, stats.t_total, memory_order::relaxed);
-	thread.atomic_min_global_i32(dest.t_min, stats.t_min, memory_order::relaxed);
-	thread.atomic_max_global_i32(dest.t_max, stats.t_max, memory_order::relaxed);
-}
-
-fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: gpu_thread_context) {
-	accumulate_queue_operation_stats(&mut dest.enqueue_stats_succ, stats.enqueue_stats_succ, thread);
-	accumulate_queue_operation_stats(&mut dest.enqueue_stats_fail, stats.enqueue_stats_fail, thread);
-	accumulate_queue_operation_stats(&mut dest.dequeue_stats_succ, stats.dequeue_stats_succ, thread);
-	accumulate_queue_operation_stats(&mut dest.dequeue_stats_fail, stats.dequeue_stats_fail, thread);
-}
-
 
 struct QueueBenchmark {
 	enum_param_names: fn(fn(&[u8]) -> ()) -> (),
 	enum_param_values: fn(fn(i32) -> (), fn(f32) -> ()) -> (),
-	reset: fn(ProducerConsumerQueue[u32]) -> (),
-	run: fn(ProducerConsumerQueue[u32], i32, i32) -> (),
-	read_stats: fn() -> QueueBenchmarkStatistics
+	reset: fn(gpu_grid_context) -> (),
+	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
 
-
-fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, benchmark: QueueBenchmark) -> i32 {
+fn @run_queue_benchmark(device: AccDevice, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
 	let queue = create_queue(device, queue_size);
 
-	let instrumentation = create_instrumentation(device.platform_device >> 4);
-	//                                                     ^ HACK!
+	let instrumentation = create_instrumentation(device);
+	let queue_instrumentation = create_queue_instrumentation(device);
 
 	print_string("queue_type;queue_size");
 	benchmark.enum_param_names(@|name| { print_char(';'); print_string(name); });
 	print_char('\n');
 	print_string(queue_name); print_char(';'); print_i32(queue_size);
 	benchmark.enum_param_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_f32(v); });
-	print_char('\n');
-	print_char('\n');
-	print_string("platform;device_name;fingerprint\n");
+	print_string("\n\nplatform;device_name;fingerprint\n");
 	print_string(device.platform_name); print_char(';');
 	print_string(runtime_device_name(device.platform_device)); print_char(';');
 	print_string(FINGERPRINT());
-	print_char('\n');
-	print_char('\n');
 
-	print_string("num_threads;t/ms;num_enqueues;t_enqueues;t_enqueue_min;t_enqueue_max;num_enqueues_failed;t_enqueues_failed;t_enqueue_failed_min;t_enqueue_failed_max;num_dequeues;t_dequeues;t_dequeue_min;t_dequeue_max;num_dequeues_failed;t_dequeues_failed;t_dequeue_failed_min;t_dequeue_failed_max\n");
+	print_string("\n\nnum_threads;t/ms");
+	queue_instrumentation.enum_result_names(@|name| { print_char(';'); print_string(name); });
+	print_char('\n');
 
 	let N = 10;
 
@@ -96,28 +43,26 @@ fn @run_queue_benchmark(device: AccDevice, queue_name: &[u8], create_queue: fn(A
 		for i in range(0, N) {
 			print_i32(num_threads); print_char(';');
 
-			benchmark.reset(queue);
+			// TODO: better launch config (launch based on occupancy?)
+			for grid in device.launch_1d(1, 512) {
+				queue.reset(grid);
+				queue_instrumentation.reset(grid);
+				benchmark.reset(grid);
+			}
+
+			device.synchronize();
 
 			let t = for instrumentation.time() {
-				benchmark.run(queue, num_threads, i);
+				for qis in queue_instrumentation.record(queue) {
+					benchmark.run(qis, num_threads, i);
+				}
 			};
+
+			device.synchronize();
 
 			print_f32(t);
 
-			let stats = benchmark.read_stats();
-
-			let print_stat = @|stats:QueueOperationStatistics| {
-				print_char(';');
-				print_i64(stats.num_operations); print_char(';');
-				print_i64(stats.t_total); print_char(';');
-				print_i32(stats.t_min); print_char(';');
-				print_i32(stats.t_max);
-			};
-
-			print_stat(stats.enqueue_stats_succ);
-			print_stat(stats.enqueue_stats_fail);
-			print_stat(stats.dequeue_stats_succ);
-			print_stat(stats.dequeue_stats_fail);
+			queue_instrumentation.results().enum_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_i64(v); });
 			print_char('\n');
 			print_flush();
 		}

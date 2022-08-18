@@ -1,9 +1,6 @@
 
 
 fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thread: i32) {
-	// TODO: release resources
-
-
 	QueueBenchmark {
 		enum_param_names = @|enum_param| {
 			enum_param("block_size"); enum_param("attempts_per_thread");
@@ -13,13 +10,9 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 			enum_param_i32(block_size); enum_param_i32(attempts_per_thread);
 		},
 
-		reset = @|queue| {
-			for grid in device.launch_1d(1, 1) {
-				queue.reset(grid);
-			}
-		},
+		reset = @|_| {},
 
-		run = @|queue, num_threads, _i| {
+		run = @|queue_instrumentation, num_threads, _i| {
 			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {
@@ -27,22 +20,20 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 
 						if thread_id < num_threads as u32 {
 							for _ in range(0, attempts_per_thread) {
-								for queue.push(thread) { 42 };
+								for q in queue_instrumentation.record(thread) {
+									for q.push(thread) { 42 };
 
-								wave.barrier();
+									wave.barrier();
 
-								for _value in queue.pop(thread) {};
+									for _value in q.pop(thread) {};
 
-								wave.barrier();
+									wave.barrier();
+								}
 							}
 						}
 					}
 				}
 			}
-		},
-
-		read_stats = @|| {
-			init_benchmark_stats()
 		}
 	}
 }

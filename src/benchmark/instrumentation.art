@@ -1,0 +1,23 @@
+#[import(cc = "C")] fn instrumentation_create(i32) -> &mut u8;
+#[import(cc = "C")] fn instrumentation_begin(&mut u8) -> ();
+#[import(cc = "C")] fn instrumentation_end(&mut u8) -> f32;
+#[import(cc = "C")] fn instrumentation_destroy(&mut u8) -> ();
+
+struct Instrumentation {
+	time: fn(fn() -> ()) -> fn() -> f32,
+	destroy: fn() -> ()
+}
+
+fn @create_instrumentation(device: AccDevice) {
+	let ctx = instrumentation_create(device.platform_device >> 4);
+	//                                         ^ HACK!
+
+	Instrumentation {
+		time = @|body|@|| {
+			instrumentation_begin(ctx);
+			@body();
+			instrumentation_end(ctx)
+		},
+		destroy = @|| instrumentation_destroy(ctx)
+	}
+}
