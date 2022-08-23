@@ -10,9 +10,16 @@ fn @upsweep_exponential(body: fn(i32) -> ()) {
 }
 
 
+struct ValueVisitor {
+	enum_string: fn(&[u8]) -> (),
+	enum_i32: fn(i32) -> (),
+	enum_i64: fn(i64) -> (),
+	enum_f32: fn(f32) -> (),
+}
+
 struct QueueBenchmark {
 	enum_param_names: fn(fn(&[u8]) -> ()) -> (),
-	enum_param_values: fn(fn(i32) -> (), fn(f32) -> ()) -> (),
+	enum_param_values: fn(ValueVisitor) -> (),
 	reset: fn(gpu_grid_context) -> (),
 	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
@@ -23,48 +30,50 @@ fn @run_queue_benchmark(device: AccDevice, benchmark: QueueBenchmark, queue_name
 	let instrumentation = create_instrumentation(device);
 	let queue_instrumentation = create_queue_instrumentation(device);
 
-	print_string("queue_type;queue_size");
-	benchmark.enum_param_names(@|name| { print_char(';'); print_string(name); });
-	print_char('\n');
-	print_string(queue_name); print_char(';'); print_i32(queue_size);
-	benchmark.enum_param_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_f32(v); });
-	print_string("\n\nplatform;device_name;fingerprint\n");
-	print_string(device.platform_name); print_char(';');
-	print_string(runtime_device_name(device.platform_device)); print_char(';');
-	print_string(FINGERPRINT());
 
-	print_string("\n\nnum_threads;t/ms");
-	queue_instrumentation.enum_result_names(@|name| { print_char(';'); print_string(name); });
-	print_char('\n');
+	let csv = make_csv_printer();
+
+	// doing this during printing messes with the PE, probably due to the external calls
+	let device_name = runtime_device_name(device.platform_device);
+	let fingerprint = FINGERPRINT();
+
+	for r in csv.row() { r.enum_string("queue_type"); r.enum_string("queue_size"); benchmark.enum_param_names(r.enum_string); }
+	for r in csv.row() { r.enum_string(queue_name); r.enum_i32(queue_size); benchmark.enum_param_values(r); }
+	for _ in csv.row() { }
+	for r in csv.row() { r.enum_string("platform"); r.enum_string("device_name"); r.enum_string("fingerprint"); }
+	for r in csv.row() { r.enum_string(device.platform_name); r.enum_string(device_name); r.enum_string(fingerprint); }
+	for _ in csv.row() { }
+	for r in csv.row() { r.enum_string("num_threads"); r.enum_string("t/ms"); queue_instrumentation.enum_result_names(r.enum_string); }
 
 	let N = 10;
 
 	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
 		for i in range(0, N) {
-			print_i32(num_threads); print_char(';');
+			for r in csv.row() {
+				r.enum_i32(num_threads);
 
-			// TODO: better launch config (launch based on occupancy?)
-			for grid in device.launch_1d(1, 512) {
-				queue.reset(grid);
-				queue_instrumentation.reset(grid);
-				benchmark.reset(grid);
-			}
-
-			device.synchronize();
-
-			let t = for instrumentation.time() {
-				for qis in queue_instrumentation.record(queue) {
-					benchmark.run(qis, num_threads, i);
+				// TODO: better launch config (launch based on occupancy?)
+				for grid in device.launch_1d(1, 512) {
+					queue.reset(grid);
+					queue_instrumentation.reset(grid);
+					benchmark.reset(grid);
 				}
-			};
 
-			device.synchronize();
+				device.synchronize();
 
-			print_f32(t);
+				let t = for instrumentation.time() {
+					for qis in queue_instrumentation.record(queue) {
+						benchmark.run(qis, num_threads, i);
+					}
+				};
 
-			queue_instrumentation.results().enum_values(@|v| { print_char(';'); print_i32(v); }, @|v| { print_char(';'); print_i64(v); });
-			print_char('\n');
-			print_flush();
+				device.synchronize();
+
+				r.enum_f32(t);
+
+				queue_instrumentation.results().enum_values(r);
+			}
+			csv.flush();
 		}
 	}
 

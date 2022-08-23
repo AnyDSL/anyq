@@ -1,0 +1,19 @@
+
+struct CSVPrinter {
+	row: fn(fn(ValueVisitor) -> ()) -> fn() -> (),
+	flush: fn() -> ()
+}
+
+fn @make_csv_printer() = CSVPrinter {
+	row = @|body|@|| {
+		let mut b = false;
+		@body(ValueVisitor {
+			enum_string = @|v| { if b { print_char(';'); } print_string(v); b = true; },
+			enum_i32 = @|v| { if b { print_char(';'); } print_i32(v); b = true; },
+			enum_i64 = @|v| { if b { print_char(';'); } print_i64(v); b = true; },
+			enum_f32 = @|v| { if b { print_char(';'); } print_f32(v); b = true; }
+		});
+		print_char('\n');
+	},
+	flush = print_flush
+};

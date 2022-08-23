@@ -13,8 +13,8 @@ fn @producer_consumer_queue_concurrent_push_pop_benchmark(device: AccDevice, blo
 			enum_param("block_size"); enum_param("attempts_per_thread"); enum_param("p_enq"); enum_param("p_deq"); enum_param("workload_size");
 		},
 
-		enum_param_values = @|enum_param_i32, enum_param_f32| {
-			enum_param_i32(block_size); enum_param_i32(attempts_per_thread); enum_param_f32(p_enq); enum_param_f32(p_deq); enum_param_i32(workload_size);
+		enum_param_values = @|v| {
+			v.enum_i32(block_size); v.enum_i32(attempts_per_thread); v.enum_f32(p_enq); v.enum_f32(p_deq); v.enum_i32(workload_size);
 		},
 
 		reset = @|_| {},

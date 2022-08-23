@@ -105,7 +105,7 @@ fn @wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Q
 
 
 struct QueueInstrumentationResults {
-	enum_values: fn(fn(i32) -> (), fn(i64) -> ()) -> ()
+	enum_values: fn(ValueVisitor) -> ()
 }
 
 struct QueueInstrumentationScope {
@@ -166,11 +166,11 @@ fn @enum_queue_instrumentation_result_names(enum_name: fn(&[u8]) -> ()) {
 }
 
 fn @enum_queue_instrumentation_result_values(stats: QueueBenchmarkStatistics) {
-	@|enum_i32: fn(i32) -> (), enum_i64: fn(i64) -> ()| {
-		enum_i64(stats.enqueue_stats_succ.num_operations); enum_i64(stats.enqueue_stats_succ.t_total); enum_i32(stats.enqueue_stats_succ.t_min); enum_i32(stats.enqueue_stats_succ.t_max);
-		enum_i64(stats.enqueue_stats_fail.num_operations); enum_i64(stats.enqueue_stats_fail.t_total); enum_i32(stats.enqueue_stats_fail.t_min); enum_i32(stats.enqueue_stats_fail.t_max);
-		enum_i64(stats.dequeue_stats_succ.num_operations); enum_i64(stats.dequeue_stats_succ.t_total); enum_i32(stats.dequeue_stats_succ.t_min); enum_i32(stats.dequeue_stats_succ.t_max);
-		enum_i64(stats.dequeue_stats_fail.num_operations); enum_i64(stats.dequeue_stats_fail.t_total); enum_i32(stats.dequeue_stats_fail.t_min); enum_i32(stats.dequeue_stats_fail.t_max);
+	@|v: ValueVisitor| {
+		v.enum_i64(stats.enqueue_stats_succ.num_operations); v.enum_i64(stats.enqueue_stats_succ.t_total); v.enum_i32(stats.enqueue_stats_succ.t_min); v.enum_i32(stats.enqueue_stats_succ.t_max);
+		v.enum_i64(stats.enqueue_stats_fail.num_operations); v.enum_i64(stats.enqueue_stats_fail.t_total); v.enum_i32(stats.enqueue_stats_fail.t_min); v.enum_i32(stats.enqueue_stats_fail.t_max);
+		v.enum_i64(stats.dequeue_stats_succ.num_operations); v.enum_i64(stats.dequeue_stats_succ.t_total); v.enum_i32(stats.dequeue_stats_succ.t_min); v.enum_i32(stats.dequeue_stats_succ.t_max);
+		v.enum_i64(stats.dequeue_stats_fail.num_operations); v.enum_i64(stats.dequeue_stats_fail.t_total); v.enum_i32(stats.dequeue_stats_fail.t_min); v.enum_i32(stats.dequeue_stats_fail.t_max);
 	}
 }
 
@@ -187,7 +187,7 @@ fn @create_queue_instrumentation_none(_device: AccDevice) {
 		},
 		results = @|| {
 			QueueInstrumentationResults {
-				enum_values = @|_, _| {}
+				enum_values = @|_| {}
 			}
 		}
 	}

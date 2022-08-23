@@ -6,8 +6,8 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 			enum_param("block_size"); enum_param("attempts_per_thread");
 		},
 
-		enum_param_values = @|enum_param_i32, _enum_param_f32| {
-			enum_param_i32(block_size); enum_param_i32(attempts_per_thread);
+		enum_param_values = @|v| {
+			v.enum_i32(block_size); v.enum_i32(attempts_per_thread);
 		},
 
 		reset = @|_| {},
