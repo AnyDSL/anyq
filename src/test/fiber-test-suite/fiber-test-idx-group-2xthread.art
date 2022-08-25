@@ -4,7 +4,7 @@ fn @setup_input(_num_globals: i32, _num_locals: i32) -> (fn(i32)->i32, fn(i32)->
 	(global, local)
 }
 
-fn @test_body(grid: gpu_grid_context, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
+fn @test_body(grid: grid_context, read: ReadFn, write: WriteFn, global: GlobalFn) -> () {
 	for group in grid.groups() {
 		let boff = (group.idx(0) * group.num_threads(0)) as i32;
 

@@ -95,7 +95,7 @@ fn @createBrokerWorkDistributorQueueCUDAIndirect(device: AccDevice, queue_size: 
 	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
 
 	ProducerConsumerQueue[u32] {
-		push = @|source:fn()->u32| @|_thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->u32| @|_thread:thread_context| -> i32 {
 			if bq_ensure_enqueue(queue_device_memory) {
 				bq_put_data(queue_device_memory, source());
 				1
@@ -105,7 +105,7 @@ fn @createBrokerWorkDistributorQueueCUDAIndirect(device: AccDevice, queue_size: 
 			}
 		},
 
-		pop = @|sink:fn(u32)->()| @|_thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(u32)->()| @|_thread:thread_context| -> i32 {
 			if bq_ensure_dequeue(queue_device_memory) {
 				sink(bq_read_data(queue_device_memory));
 				1

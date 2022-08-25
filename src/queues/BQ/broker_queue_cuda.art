@@ -91,7 +91,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 	};
 
 	ProducerConsumerQueue[u32] {
-		push = @|source:fn()->u32| @|_thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->u32| @|_thread:thread_context| -> i32 {
 			if bq_ensure_enqueue() {
 				bq_put_data(source());
 				1
@@ -101,7 +101,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 			}
 		},
 
-		pop = @|sink:fn(u32)->()| @|_thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(u32)->()| @|_thread:thread_context| -> i32 {
 			if bq_ensure_dequeue() {
 				sink(bq_read_data());
 				1

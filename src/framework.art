@@ -108,7 +108,7 @@ fn @print_binary(value: u32) -> () {
 
 
 struct AccDevice {
-	launch_1d: fn(fn(gpu_grid_context) -> ()) -> fn(i32, i32) -> (),
+	launch_1d: fn(fn(grid_context) -> ()) -> fn(i32, i32) -> (),
 	synchronize: fn() -> (),
 	alloc: fn(i64) -> Buffer,
 	platform_device: i32,

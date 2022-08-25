@@ -27,11 +27,11 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 		print_string("concurrent push and pop ...\n");
 
-		fn @fail(i: i32, thread: gpu_thread_context) {
+		fn @fail(i: i32, thread: thread_context) {
 			thread.atomic_or_global_u32(device_failed_flag, 1 << i as u32, memory_order::relaxed);
 		}
 
-		let push = @|thread: gpu_thread_context, ref_value: i32| {
+		let push = @|thread: thread_context, ref_value: i32| {
 			if for queue.push(thread) {
 				thread.atomic_add_global_i32(push_buffer(ref_value), 1, memory_order::relaxed);
 
@@ -48,7 +48,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 			}
 		};
 
-		let pop = @|thread: gpu_thread_context| {
+		let pop = @|thread: thread_context| {
 			if for el in queue.pop(thread) {
 				let ref_value = test_element.unpackRefValue(el);
 

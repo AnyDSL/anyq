@@ -21,7 +21,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 	let alloc_ptr = &mut alloc_next as &mut addrspace(1) u32;
 
 	let nil:u32 = -1;
-	let alloc_slot = @|thread:gpu_thread_context| -> u32 {
+	let alloc_slot = @|thread:thread_context| -> u32 {
 		let new_slot = thread.atomic_add_global_u32(alloc_ptr, 1, memory_order::relaxed);
 
 		if new_slot < pool_size as u32 {
@@ -39,7 +39,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 	assert(success > 0, "moodycamel_cq_create() failed");
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:thread_context| -> i32 {
 			let slot = alloc_slot(thread);
 			if (slot != nil) {
 				memory(slot) = source();
@@ -50,7 +50,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> Produc
 			}
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:thread_context| -> i32 {
 			let mut slot:i64 = thread.idx(0) as i64;
 			let success = moodycamel_cq_try_dequeue(queue, &mut slot);
 			if success > 0 {
@@ -115,7 +115,7 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 	//let alloc_ptr = &mut alloc_next as &mut addrspace(1) u32;
 
 	let nil:u32 = -1;
-	let alloc_slot = @|_thread:gpu_thread_context| -> u32 {
+	let alloc_slot = @|_thread:thread_context| -> u32 {
 		/* let new_slot = thread.atomic_add_global_u32(alloc_ptr, 1, memory_order::relaxed);
 
 		if new_slot < pool_size as u32 {
@@ -134,7 +134,7 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 	assert(success > 0, "moodycamel_cq_create_u32() failed");
 
 	ProducerConsumerQueue[u32] {
-		push = @|source:fn()->u32| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->u32| @|thread:thread_context| -> i32 {
 			let slot = alloc_slot(thread);
 			if (slot != nil) {
 				let value = source();
@@ -145,7 +145,7 @@ fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> Producer
 			}
 		},
 
-		pop = @|sink:fn(u32)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(u32)->()| @|thread:thread_context| -> i32 {
 			let mut value:u32 = thread.idx(0);
 			let success = moodycamel_cq_try_dequeue_u32(queue, &mut value);
 			if success > 0 {

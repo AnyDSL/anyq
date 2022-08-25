@@ -14,12 +14,12 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 		let num_left_in_push_buffer = &mut pushed_buffer(pushed_buffer_size + 4) as &mut addrspace(1) i32;
 
 		fn pushed_buffer_addr(idx: u32) -> &mut addrspace(1) i32 { &mut pushed_buffer(idx) };
-		fn set_pushed_buffer(thread: gpu_thread_context, idx: u32, value: i32) -> () {
+		fn set_pushed_buffer(thread: thread_context, idx: u32, value: i32) -> () {
 			//device.print_2xi32("pushed_buffer(%d) = %d\n", idx as i32, value);
 			thread.atomic_store_global_i32(pushed_buffer_addr(idx), value, memory_order::relaxed);
 			//*(pushed_buffer_addr(idx)) = value;
 		}
-		fn get_pushed_buffer(thread: gpu_thread_context, idx: u32) -> i32 {
+		fn get_pushed_buffer(thread: thread_context, idx: u32) -> i32 {
 			thread.atomic_load_global_i32(pushed_buffer_addr(idx), memory_order::relaxed)
 			//*(pushed_buffer_addr(idx))
 		}
@@ -43,7 +43,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 
 		print_string("concurrent push and pop, verify that each element is within bounds and does not get corrupted ...\n");
 
-		let push = @|thread: gpu_thread_context, ref_value_slot: i32| {
+		let push = @|thread: thread_context, ref_value_slot: i32| {
 			if for i in queue.push(thread) {
 				if i >= queue_size as u32 {
 					device.print_2xi32("%d | ERROR: got queue element %d out of bounds to push to!\n", thread.gid() as i32, i as i32);
@@ -66,7 +66,7 @@ fn concurrent_push_pop_queue_test[T](num_threads: i32, block_dim: i32, attempts_
 			}
 		};
 
-		let pop = @|thread: gpu_thread_context| {
+		let pop = @|thread: thread_context| {
 			if for el, i in queue.pop(thread) {
 
 				if i >= queue_size as u32 {

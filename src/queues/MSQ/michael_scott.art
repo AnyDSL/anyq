@@ -30,7 +30,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 
 	let nil:u32 = -1;
 
-	let alloc_node = @|thread:gpu_thread_context| {
+	let alloc_node = @|thread:thread_context| {
 		let new_node = thread.atomic_add_global_u32(queue.alloc_next, 1, memory_order::relaxed);
 
 		if new_node < pool_size as u32 {
@@ -42,12 +42,12 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 		}
 	};
 
-	let free_node = @|_:u32, _thread:gpu_thread_context| {
+	let free_node = @|_:u32, _thread:thread_context| {
 		// TODO: stack-based recycling of nodes, don't forget about ABA problem
 	};
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source|@|thread| {
 			let new_node = alloc_node(thread);
 
 			if (new_node != nil) {
@@ -80,7 +80,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 			}
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink|@|thread| {
 			while true {
 				let head = thread.atomic_load_global_u32(queue.head, memory_order::acquire);
 				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
@@ -129,7 +129,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 			}
 		},
 
-		validate = @|corrupted: &mut addrspace(1) u32, grid| {
+		validate = @|corrupted, grid| {
 			for thread in grid.threads() {
 				if thread.idx(0) == 0 {
 					let mut size = 0;

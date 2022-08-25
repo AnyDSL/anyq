@@ -94,7 +94,7 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 // 	}
 // }
 
-fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_thread_context) -> ()) -> () {
+fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
@@ -102,7 +102,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 	let atomic_add = cpu_atomic_rmw[u32](1);
 	let atomic_sub = cpu_atomic_rmw[u32](2);
 
-	@body(gpu_thread_context {
+	@body(thread_context {
 		idx = tid,
 
 		gid = @|| gid_offset + self,
@@ -193,7 +193,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 	});
 }
 
-fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_wave_context) -> ()) -> () {
+fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(wave_context) -> ()) -> () {
 
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
@@ -221,7 +221,7 @@ fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32
 		}
 	}
 
-	@body(gpu_wave_context{
+	@body(wave_context{
 		idx = @|| idx.warp_id,
 
 		membermask = @|| membermask,
@@ -265,9 +265,9 @@ fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32
 	});
 }
 
-fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(gpu_group_context) -> ()) -> () {
+fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(group_context) -> ()) -> () {
 
-	@body(gpu_group_context {
+	@body(group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
 		waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
@@ -288,7 +288,7 @@ struct Index {
 	local_id: u32
 }
 
-fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context) -> ()) -> () {
+fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -> () {
 
 	let num_threads_per_block = block_dim as u32;
 	let num_warps_per_block = (num_threads_per_block + warp_size - 1) / warp_size;
@@ -311,7 +311,7 @@ fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(gpu_grid_context
 				local_id = local_id as u32,
 			};
 
-			let context = gpu_grid_context {
+			let context = grid_context {
 				device = 0,
 				groups = @|body| @|| fiberless_block(logical_block_id, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, body),
 				waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id, warp_id = warp_id as u32, local_id = idx.local_id }, body),

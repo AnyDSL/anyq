@@ -36,7 +36,7 @@ fn main() -> i32 {
 				for wave in grid.waves() {
 						// let mut rand_state = xorshift32(((wave.idx() + 23) * 42) as u32);
 
-						fn producer(sink: Sink[u32, gpu_thread_context], thread: gpu_thread_context) -> bool {
+						fn producer(sink: Sink[u32, thread_context], thread: thread_context) -> bool {
 							let el = thread.atomic_add_global_u32(next_input, 1);
 
 							if el < num_elements {
@@ -50,13 +50,13 @@ fn main() -> i32 {
 							}
 						}
 
-						fn consumer(el: u32, thread: gpu_thread_context) -> () {
+						fn consumer(el: u32, thread: thread_context) -> () {
 							let i = thread.atomic_add_global_u32(next_output, 1);
 							output(i) = el;
 						}
 
 
-						fn should_flush(thread: gpu_thread_context) -> bool {
+						fn should_flush(thread: thread_context) -> bool {
 							// let should_push = if rand_state as i32 < 0 { 1 } else { 0 };
 							// if drain || wave.shfl_i32(should_push, 0, wave.num_threads()) == 0 {  // note: cannot use barrier_any(), would mess up the probabilities
 							queue.size(thread) >= wave.num_threads() as i32

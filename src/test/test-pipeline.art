@@ -23,7 +23,7 @@ fn main() -> i32 {
 		y:f32
 	};
 
-	let stage1 = Stage[B, gpu_thread_context] {
+	let stage1 = Stage[B, thread_context] {
 		produce = |_sink| {
 			// let rand_state = xorshift32(i);
 			// let elements = (rand_state % 8) as i32;
@@ -34,14 +34,14 @@ fn main() -> i32 {
 		}
 	}
 
-	let stage2 = Stage[C, gpu_thread_context] {
+	let stage2 = Stage[C, thread_context] {
 			produce = |_sink| {
 				
 			}
 		}
 	}
 
-	let output_storage = |element: C, ctx:gpu_thread_context| {
+	let output_storage = |element: C, ctx:thread_context| {
 		// …
 	}
 

@@ -1,9 +1,9 @@
 struct QueueElement[T] {
-	// [THREAD-SAFETY]: only functions that receive a gpu_thread_context (i.e. load/store) are thread-safe
+	// [THREAD-SAFETY]: only functions that receive a thread_context (i.e. load/store) are thread-safe
 	clear: fn() -> (),
 	is_free: fn() -> bool,
-	store: fn(fn() -> T, gpu_thread_context) -> (),
-	load: fn(fn(T) -> (), gpu_thread_context) -> (),
+	store: fn(fn() -> T, thread_context) -> (),
+	load: fn(fn(T) -> (), thread_context) -> (),
 	debug_print: fn(AccDevice) -> ()
 }
 
@@ -33,7 +33,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let buffer_element = @|i:u32| -> QueueElement[T] { element_type.buffer_element(buffer, i) };
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:thread_context| -> i32 {
 			let current_size1 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size1 >= num_elements {
 				0
@@ -64,7 +64,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 			}
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:thread_context| -> i32 {
 			let current_size2 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size2 <= 0 {
 				0

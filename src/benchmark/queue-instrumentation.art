@@ -33,14 +33,14 @@ fn @init_benchmark_stats() = QueueBenchmarkStatistics {
 	dequeue_stats_fail = init_queue_operation_stats(),
 };
 
-fn @accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: gpu_thread_context) {
+fn @accumulate_queue_operation_stats(dest: &mut addrspace(1) QueueOperationStatistics, stats: QueueOperationStatistics, thread: thread_context) {
 	thread.atomic_add_global_i64(dest.num_operations, stats.num_operations, memory_order::relaxed);
 	thread.atomic_add_global_i64(dest.t_total, stats.t_total, memory_order::relaxed);
 	thread.atomic_min_global_i32(dest.t_min, stats.t_min, memory_order::relaxed);
 	thread.atomic_max_global_i32(dest.t_max, stats.t_max, memory_order::relaxed);
 }
 
-fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: gpu_thread_context) {
+fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics, stats: QueueBenchmarkStatistics, thread: thread_context) {
 	accumulate_queue_operation_stats(&mut dest.enqueue_stats_succ, stats.enqueue_stats_succ, thread);
 	accumulate_queue_operation_stats(&mut dest.enqueue_stats_fail, stats.enqueue_stats_fail, thread);
 	accumulate_queue_operation_stats(&mut dest.dequeue_stats_succ, stats.dequeue_stats_succ, thread);
@@ -50,7 +50,7 @@ fn @accumulate_benchmark_stats(dest: &mut addrspace(1) QueueBenchmarkStatistics,
 
 fn @wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut QueueBenchmarkStatistics) -> ProducerConsumerQueue[T] {
 	let wrapped_queue = ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:thread_context| -> i32 {
 
 			let t_begin = thread.timestamp32();
 
@@ -72,7 +72,7 @@ fn @wrap_queue_instrumentation[T](queue: ProducerConsumerQueue[T], stats: &mut Q
 			num_pushed
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:thread_context| -> i32 {
 
 			let t_begin = thread.timestamp32();
 
@@ -109,12 +109,12 @@ struct QueueInstrumentationResults {
 }
 
 struct QueueInstrumentationScope {
-	record: fn(fn(ProducerConsumerQueue[u32]) -> ()) -> fn(gpu_thread_context) -> ()
+	record: fn(fn(ProducerConsumerQueue[u32]) -> ()) -> fn(thread_context) -> ()
 }
 
 struct QueueInstrumentation {
 	enum_result_names: fn(fn(&[u8]) -> ()) -> (),
-	reset: fn(gpu_grid_context) -> (),
+	reset: fn(grid_context) -> (),
 	record: fn(fn(QueueInstrumentationScope) -> ()) -> fn(ProducerConsumerQueue[u32]) -> (),
 	results: fn() -> QueueInstrumentationResults,
 }

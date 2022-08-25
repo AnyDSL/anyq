@@ -28,7 +28,7 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 
 		print_string("concurrent push until full ...\n");
 
-		fn @fail(i: i32, thread: gpu_thread_context) {
+		fn @fail(i: i32, thread: thread_context) {
 			thread.atomic_or_global_u32(device_failed_flag, 1 << i as u32, memory_order::relaxed);
 		}
 

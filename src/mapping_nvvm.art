@@ -93,10 +93,10 @@ fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: 
 // 	}
 // }
 
-fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(gpu_thread_context) -> ()) -> () {
+fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(thread_context) -> ()) -> () {
 	let yield = if its { @|| nvvm_nanosleep(0) } else { nvvm_threadfence };
 
-	@body(gpu_thread_context {
+	@body(thread_context {
 		idx = idx,
 
 		gid = gid,
@@ -174,7 +174,7 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(gpu_t
 	});
 }
 
-fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, its: bool, body: fn(gpu_wave_context) -> ()) -> () {
+fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, its: bool, body: fn(wave_context) -> ()) -> () {
 	let thread_idx = @|i: i32| match i { 0 => nvvm_laneid(), _ => 0 };
 
 	//  1 00000001 -> 00011111
@@ -196,7 +196,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 		(shuffle_group_mask(width) << 8) as i32
 	}
 
-	@body(gpu_wave_context{
+	@body(wave_context{
 		idx = idx,
 
 		membermask = @|| membermask as u64,
@@ -263,7 +263,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 	});
 }
 
-fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, its: bool, body: fn(gpu_group_context) -> ()) -> () {
+fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, its: bool, body: fn(group_context) -> ()) -> () {
 	let linear_thread_idx = @|| {
 		(thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0)
 	};
@@ -275,7 +275,7 @@ fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 	let num_threads = @|| block_size(0) * block_size(1) * block_size(2);
 	let num_warps = @|| (num_threads() + warp_size - 1) / warp_size;
 
-	@body(gpu_group_context {
+	@body(group_context {
 		idx = idx,
 		waves = @|body|@|| nvvm_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, its, body),
 		threads = @|body|@|| nvvm_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), its, body),
@@ -288,7 +288,7 @@ fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 	});
 }
 
-fn @nvvm_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(gpu_grid_context) -> ()) -> () {
+fn @nvvm_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
@@ -336,7 +336,7 @@ fn @nvvm_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_
 
 	let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / warp_size;
 
-	nvvm(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(gpu_grid_context {
+	nvvm(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(grid_context {
 		device = device,
 		groups = @|body|@|| nvvm_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, its, body),
 		waves = @|body|@|| nvvm_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, its, body),

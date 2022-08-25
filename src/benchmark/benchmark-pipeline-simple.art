@@ -46,7 +46,7 @@ fn @simple_pipeline_benchmark(device: AccDevice, block_size: i32, num_input_elem
 								};
 
 								while (thread.atomic_load_global_i32(completed_elements, memory_order::relaxed) < num_input_elements) {
-									let should_drain = @|thread: gpu_thread_context| q.size(thread) >= wave.num_threads() as i32 || thread.atomic_load_global_i32(input_elements, memory_order::relaxed) <= 0;
+									let should_drain = @|thread: thread_context| q.size(thread) >= wave.num_threads() as i32 || thread.atomic_load_global_i32(input_elements, memory_order::relaxed) <= 0;
 
 									if wave.barrier_any(if thread.idx(0) == 0 { should_drain(thread) } else { false }) {
 										if for value in q.pop(thread) {

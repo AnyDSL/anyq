@@ -24,7 +24,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 	let queue = &mut queue_device_memory(queue_offset) as &mut addrspace(1) BrokerWorkDistributorQueue;
 
 
-	fn @wait_for_ticket(i: u32, number: u32, thread: gpu_thread_context) -> () {
+	fn @wait_for_ticket(i: u32, number: u32, thread: thread_context) -> () {
 		let load_ticket = if reference_impl {
 			@|| thread.atomic_load_global_u32_coalesced(tickets(i), memory_order::relaxed)
 		}
@@ -35,7 +35,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		thread.wait(@|| load_ticket() == number, "BWD waiting for ticket");
 	}
 
-	fn @ensure_dequeue(thread: gpu_thread_context) -> bool {
+	fn @ensure_dequeue(thread: thread_context) -> bool {
 		let load_size = if reference_impl {
 			@|| queue.size
 		}
@@ -59,7 +59,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		ensurance
 	}
 
-	fn @ensure_enqueue(thread: gpu_thread_context) -> bool {
+	fn @ensure_enqueue(thread: thread_context) -> bool {
 		let load_size = if reference_impl {
 			@|| queue.size
 		}
@@ -83,7 +83,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		ensurance
 	}
 
-	fn @read_data(sink: fn(T) -> (), thread: gpu_thread_context) -> () {
+	fn @read_data(sink: fn(T) -> (), thread: thread_context) -> () {
 		let store_ticket = if reference_impl {
 			@|p:u32, value:u32| { thread.atomic_store_global_u32_coalesced(tickets(p), value, memory_order::relaxed); }
 		}
@@ -102,7 +102,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		sink(val);
 	}
 
-	fn @put_data(source: fn() -> T, thread: gpu_thread_context) -> () {
+	fn @put_data(source: fn() -> T, thread: thread_context) -> () {
 		let store_ticket = if reference_impl {
 			@|p:u32, value:u32| { thread.atomic_store_global_u32_coalesced(tickets(p), value, memory_order::relaxed); }
 		}
@@ -123,7 +123,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 	}
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:gpu_thread_context| -> i32 {
+		push = @|source:fn()->T| @|thread:thread_context| -> i32 {
 			if ensure_enqueue(thread) {
 				put_data(source, thread);
 				1
@@ -133,7 +133,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 			}
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:gpu_thread_context| -> i32 {
+		pop = @|sink:fn(T)->()| @|thread:thread_context| -> i32 {
 			if ensure_dequeue(thread) {
 				read_data(sink, thread);
 				1

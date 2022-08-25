@@ -26,7 +26,7 @@ fn main() -> i32 {
 			device.synchronize();
 		};
 
-		let check_gid = @|thread: gpu_thread_context, fail_flag: u32| {
+		let check_gid = @|thread: thread_context, fail_flag: u32| {
 			let gid = thread.gid();
 
 			let slot = gid / 32;

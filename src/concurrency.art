@@ -1,21 +1,48 @@
 
-struct gpu_grid_context {
+enum memory_order {
+	relaxed,
+	acquire,
+	release,
+	acq_rel,
+	seq_cst
+}
+
+fn @is_weaker_memory_order(a: memory_order, b: memory_order) -> bool {
+	builtin_memory_order(a) < builtin_memory_order(b)
+}
+
+fn @stronger_memory_order(a: memory_order, b: memory_order) -> memory_order {
+	if is_weaker_memory_order(a, b) { b } else { a }
+}
+
+fn @builtin_memory_order(order: memory_order) -> u32 {
+	match order {
+		memory_order::relaxed => 2,
+		memory_order::acquire => 4,
+		memory_order::release => 5,
+		memory_order::acq_rel => 6,
+		memory_order::seq_cst => 7,
+	}
+}
+
+
+struct grid_context {
 	device: i32,
 
-	groups: fn(fn(gpu_group_context) -> ()) -> fn() -> (),
-	waves: fn(fn(gpu_wave_context) -> ()) -> fn() -> (),
-	threads: fn(fn(gpu_thread_context) -> ()) -> fn() -> (),
+	groups: fn(fn(group_context) -> ()) -> fn() -> (),
+	waves: fn(fn(wave_context) -> ()) -> fn() -> (),
+	threads: fn(fn(thread_context) -> ()) -> fn() -> (),
 
 	num_groups: fn(i32) -> u32,
 	num_waves: fn() -> u32,
 	num_threads: fn(i32) -> u32,
 }
 
-struct gpu_group_context {
+struct group_context {
 	idx: fn(i32) -> u32,
 
-	waves: fn(fn(gpu_wave_context) -> ()) -> fn() -> (),
-	threads: fn(fn(gpu_thread_context) -> ()) -> fn() -> (),
+	waves: fn(fn(wave_context) -> ()) -> fn() -> (),
+	threads: fn(fn(thread_context) -> ()) -> fn() -> (),
 
 	num_waves: fn() -> u32,
 	num_threads: fn(i32) -> u32,
@@ -26,12 +53,12 @@ struct gpu_group_context {
 	barrier_count: fn(bool) -> i32,
 }
 
-struct gpu_wave_context {
+struct wave_context {
 	idx: fn() -> u32,
 
 	membermask: fn() -> u64,
 
-	threads: fn(fn(gpu_thread_context) -> ()) -> fn() -> (),
+	threads: fn(fn(thread_context) -> ()) -> fn() -> (),
 
 	num_threads: fn() -> u32,
 
@@ -92,7 +119,7 @@ struct gpu_wave_context {
 	lanemask_gt: fn() -> u64
 }
 
-struct gpu_thread_context {
+struct thread_context {
 	idx: fn(i32) -> u32,
 
 	gid: fn() -> u32,

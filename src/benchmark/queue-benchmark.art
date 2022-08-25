@@ -20,7 +20,7 @@ struct ValueVisitor {
 struct QueueBenchmark {
 	enum_param_names: fn(fn(&[u8]) -> ()) -> (),
 	enum_param_values: fn(ValueVisitor) -> (),
-	reset: fn(gpu_grid_context) -> (),
+	reset: fn(grid_context) -> (),
 	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
 
