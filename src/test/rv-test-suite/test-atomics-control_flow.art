@@ -1,7 +1,14 @@
 
 // cascade of atomic operations
 
-// inst_stats[x86_64]: extractelement(8), atomicrmw(8), insertelement(8)
+// inst_stats[x86_64]: extractelement(7), atomicrmw(1), insertelement(8), llvm.x86.avx.blendv.ps.256(2), llvm.vector.reduce.add.v8i32(1)
+
+// optimal code:
+//  - blend inactive lanes with neutral element / 1x llvm.x86.avx.blendv.ps.256
+//  - reduction over all lanes / 1x llvm.vector.reduce.add.v8i32
+//  - perform aggregated atomic / 1x atomicrmw
+//  - reconstruct intermediate results per lane / 8x insert into result, 7x extract from input, last lane's value doesn't matter
+//  - blend result according to if-branch before storing / 1x llvm.x86.avx.blendv.ps.256
 
 
 fn @loop_body(lane: i32, vec_width: i32, read: fn(i32)->i32, write: fn(i32, i32)->(), global: fn(i32)->&mut i32) -> () {
