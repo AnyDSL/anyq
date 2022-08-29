@@ -136,7 +136,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art)
 
-	if (${_platform} STREQUAL "cuda")
+	if (${_platform} STREQUAL "cuda" AND ${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
 		add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
