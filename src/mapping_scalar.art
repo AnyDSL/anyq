@@ -1,0 +1,454 @@
+static cpu_threads = 0;
+//static vec_width = 1u;
+static warp_size:u32 = 1;
+static num_blocks_in_flight:i32 = 32;
+
+fn @createAccDevice(device: i32) = AccDevice {
+	launch_1d = @|body|@|num_groups, group_size| {
+		scalar_launch_1d(num_groups, group_size, body)
+	},
+	synchronize = @|| { },
+	alloc = @|size| alloc_cpu(size),
+	platform_device = runtime_device(0, device),
+
+	platform_name = "cpu",
+
+	print_i32 = @|msg: &[u8], i: i32| {
+		anyq_print_3xi32(msg, i, 0, 0);
+	},
+
+	print_2xi32 = @|format: &[u8], a1: i32, a2: i32| {
+		anyq_print_3xi32(format, a1, a2, 0);
+	},
+
+	print_3xi32 = @|format: &[u8], a1: i32, a2: i32, a3: i32| {
+		anyq_print_3xi32(format, a1, a2, a3);
+	}
+};
+
+fn @createDefaultAccDevice() = createAccDevice(0);
+
+
+#[import(cc = "thorin", name = "fibers")] fn thorin_fibers(_num_threads: i32, _num_blocks: i32, _num_warps: i32, _body: fn(i32, i32) -> ()) -> ();
+fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_warps: i32| thorin_fibers(num_threads, num_blocks, num_warps, body);
+
+#[import(cc = "C", name = "anydsl_fibers_sync_block"              )] fn fibers_sync_block(i32) -> ();
+#[import(cc = "C", name = "anydsl_fibers_sync_block_with_result"  )] fn fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
+#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield(&[u8]) -> ();
+#[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
+
+
+//#[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;
+//#[import(cc = "C", name = "rv_extract")] fn rv_extract_u32(u32, i32) -> u32;
+//#[import(cc = "C", name = "rv_insert")] fn rv_insert_i32(i32, i32, i32) -> i32;
+//#[import(cc = "C", name = "rv_insert")] fn rv_insert_u32(u32, i32, u32) -> u32;
+//#[import(cc = "C", name = "rv_ballot")] fn rv_ballot_u32(bool) -> u32;
+//
+//#[import(cc = "device", name = "llvm.ctpop.i32")] fn cpu_popcount_u32(u32) -> i32;
+
+/*
+fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
+	@|value: i32, src_lane: i32| -> i32 {
+		let mut result:i32 = self as i32; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_i32(value, lane_src_lane);
+			result = rv_insert_i32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
+	@|value: u32, src_lane: i32| -> u32 {
+		let mut result:u32 = self; // self is needed to make result marked as varying
+		for l in unroll(0, vec_width) {
+			let lane_src_lane = rv_extract_i32(src_lane, l);
+			let lane_value = rv_extract_u32(value, lane_src_lane);
+			result = rv_insert_u32(result, l, lane_value);
+		}
+		result
+	}
+}
+
+fn @unroll_reduction_step(body: fn(i32) -> ()) {
+	fn @(?width) loop(mask: i32, width: i32) -> () {
+		if width > 0 {
+			@body(mask);
+			loop(mask << 1, width >> 1)
+		}
+	}
+	loop
+}
+*/
+
+fn @do_once_op(_self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
+	@|body:fn(u32, u32)->()| {
+		//let mask = rv_ballot(true) as u32;
+		//let lsb = mask & -mask;
+		//if 1 << self == lsb {
+		//	body(self, mask)
+		//}
+		body(0, 1)
+	}
+}
+
+fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
+	= atomic_load[T](location as &T, builtin_memory_order(order), "");
+
+fn @cpu_atomic_store[T](location: &mut addrspace(1) T, value: T, order: memory_order)
+	= atomic_store[T](location as &mut T, value, builtin_memory_order(order), "");
+
+fn @cpu_atomic_rmw[T](op: u32) {
+	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> T {
+		atomic[T](op, location as &mut T, value, builtin_memory_order(order), "")
+	}
+}
+
+fn @cpu_atomic_cas[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
+	= cmpxchg[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+
+fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
+	= cmpxchg_weak[T](location as &mut T, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
+
+// fn @cpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
+// 	while !cpu_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
+// 		// fibers_yield(debug_msg);
+// 	}
+// }
+
+fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
+	let self = idx.local_id;
+	let vec_width = num_threads() as i32;
+
+	let do_once = do_once_op(self, vec_width);
+
+	@body(thread_context {
+		idx = tid,
+
+		gid = @|| gid_offset + self,
+
+		atomic_load_global_i32 = cpu_atomic_load[i32],
+		atomic_load_global_u32 = cpu_atomic_load[u32],
+		atomic_load_global_u64 = cpu_atomic_load[u64],
+
+		atomic_load_global_i32_coalesced = cpu_atomic_load[i32],
+		atomic_load_global_u32_coalesced = cpu_atomic_load[u32],
+		atomic_load_global_u64_coalesced = cpu_atomic_load[u64],
+
+		atomic_store_global_i32 = cpu_atomic_store[i32],
+		atomic_store_global_u32 = cpu_atomic_store[u32],
+		atomic_store_global_u64 = cpu_atomic_store[u64],
+
+		atomic_store_global_i32_coalesced = cpu_atomic_store[i32],
+		atomic_store_global_u32_coalesced = cpu_atomic_store[u32],
+		atomic_store_global_u64_coalesced = cpu_atomic_store[u64],
+
+		atomic_add_global_i32 = cpu_atomic_rmw[i32](1),
+		atomic_add_global_u32 = cpu_atomic_rmw[u32](1),
+		atomic_add_global_i64 = cpu_atomic_rmw[i64](1),
+		atomic_add_global_u64 = cpu_atomic_rmw[u64](1),
+
+		atomic_sub_global_i32 = cpu_atomic_rmw[i32](2),
+		atomic_sub_global_u32 = cpu_atomic_rmw[u32](2),
+		atomic_sub_global_u64 = cpu_atomic_rmw[u64](2),
+
+		atomic_and_global_i32 = cpu_atomic_rmw[i32](3),
+		atomic_and_global_u32 = cpu_atomic_rmw[u32](3),
+		atomic_and_global_u64 = cpu_atomic_rmw[u64](3),
+
+		atomic_or_global_i32 = cpu_atomic_rmw[i32](5),
+		atomic_or_global_u32 = cpu_atomic_rmw[u32](5),
+		atomic_or_global_u64 = cpu_atomic_rmw[u64](5),
+
+		atomic_xor_global_i32 = cpu_atomic_rmw[i32](6),
+		atomic_xor_global_u32 = cpu_atomic_rmw[u32](6),
+		atomic_xor_global_u64 = cpu_atomic_rmw[u64](6),
+
+		atomic_exch_global_i32 = cpu_atomic_rmw[i32](0),
+		atomic_exch_global_u32 = cpu_atomic_rmw[u32](0),
+		atomic_exch_global_u64 = cpu_atomic_rmw[u64](0),
+
+		atomic_min_global_i32 = cpu_atomic_rmw[i32]( 8),
+		atomic_min_global_u32 = cpu_atomic_rmw[u32](10),
+		atomic_min_global_u64 = cpu_atomic_rmw[u64](10),
+
+		atomic_max_global_i32 = cpu_atomic_rmw[i32](7),
+		atomic_max_global_u32 = cpu_atomic_rmw[u32](9),
+		atomic_max_global_u64 = cpu_atomic_rmw[u64](9),
+
+		atomic_cas_global_i32 = cpu_atomic_cas[i32],
+		atomic_cas_global_u32 = cpu_atomic_cas[u32],
+		atomic_cas_global_u64 = cpu_atomic_cas[u64],
+		atomic_cas_global_i32_weak = cpu_atomic_cas_weak[i32],
+		atomic_cas_global_u32_weak = cpu_atomic_cas_weak[u32],
+		atomic_cas_global_u64_weak = cpu_atomic_cas_weak[u64],
+
+		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			/*
+			let ptr = addr as &mut u32;
+
+			// this is the generic version
+			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
+			let mut cmp:bool = false;
+
+			while(!cmp) {
+				let new = if old >= val { 0 } else { old + 1 };
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), builtin_memory_order(memory_order::relaxed), "");
+				old = res_old;
+				cmp = res_cmp;
+			}
+
+			old
+			*/
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+
+			(old % (val + 1))
+
+			// val == 2^n - 1
+			/*
+			assert(cpu_popcount_u32(val) == 1, "atomic_inc_global_u32() only supports power of two");
+
+			let atomic_add = cpu_atomic_rmw[u32](1);
+			let atomic_and = cpu_atomic_rmw[u32](3);
+
+			let old = atomic_add(addr, 1, memory_order::relaxed);
+			if old > val {
+				atomic_and(addr, val, memory_order::relaxed);
+			}
+
+			(old & val)
+			*/
+		},
+		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
+			let ptr = addr as &mut u32;
+
+			// this is the generic version
+			let mut old:u32 = atomic_load[u32](ptr, builtin_memory_order(memory_order::relaxed), "");
+			let mut cmp:bool = false;
+			while(!cmp) {
+				let new = if (old == 0) || (old > val) { val } else { old - 1 };
+				let (res_old, res_cmp) = cmpxchg[u32](ptr, old, new, builtin_memory_order(memory_order::relaxed), builtin_memory_order(memory_order::relaxed), "");
+				old = res_old;
+				cmp = res_cmp;
+			}
+
+			// this is optimized for val being 2**n-1
+			/*
+			// atomic sub
+			let old:u32 = atomic[u32](2, ptr, 1, 2, "");
+			if old == 0 {
+				// atomic and to mask overflow bits
+				// however, we must ensure that addr will not be read outside of this function
+				atomic[u32](3, ptr, val, 2, "");
+			}
+			*/
+
+			old
+		},
+
+		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
+
+		timestamp = get_nano_time,
+		timestamp32 = @|| get_nano_time() as i32,
+
+		// yield = @|msg| { do_once(@|_, _| { fibers_yield(msg); }); }
+		// atomic_wait_and_transition_global_u32 = cpu_atomic_wait_and_transition[u32]
+		wait = @|f:fn() -> bool, debug_msg:&[u8]| -> () {
+			let mut retry = 50;
+			while !f() {
+				// fibers_yield(debug_msg);
+				retry =- 1;
+				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
+			}
+		}
+	});
+}
+
+fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(wave_context) -> ()) -> () {
+
+	let self = idx.local_id;
+	let _vec_width = num_threads() as i32;
+
+	//let warp_shuffle_i32 = shuffle_i32(self, vec_width);
+	//let warp_shuffle_u32 = shuffle_u32(self, vec_width);
+/*
+	fn @lanemask_eq() -> u64 {
+		1 << self as u64
+	}
+
+	fn @lanemask_lt() -> u64 {
+		let ballot = rv_ballot_u32(true) as u64;
+		let mask = (1 << self as u64) - 1;
+		mask & ballot
+	}
+
+	fn @lanemask_gt() -> u64 {
+		if (vec_width == 64 && self == 63) || (vec_width == 32 && self == 31) {
+			0
+		} else {
+			let ballot = rv_ballot_u32(true) as u64;
+			let mask = (!0:u64) << (self as u64 + 1);
+			mask & ballot
+		}
+	}
+*/
+	@body(wave_context{
+		idx = @|| idx.warp_id,
+
+		membermask = @|| membermask,
+
+		// TODO: return simd_lane
+		threads = @|body| @|| cpu_thread(@|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
+
+		num_threads = num_threads,
+
+		barrier = @|| { },
+		barrier_all = @|predicate:bool| -> bool { predicate },
+		barrier_any = @|predicate:bool| -> bool { predicate },
+		barrier_count = @|predicate:bool| -> i32 { if predicate { 1 } else { 0 } },
+		barrier_vote = @|predicate:bool| -> u64 { if predicate { 1 } else { 0 } },
+
+		/* TODO: assert width <= num_threads == warp_size */
+		/* TODO: assert width 2^n */
+		shfl_i32 = @|_x:i32, _src_lane:i32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_u32 = @|_x:u32, _src_lane:i32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
+		//shfl_f32 = @|x:f32, src_lane:i32, width:u32| undef[f32](),
+
+		//shfl_up_i32 = @|x:i32, delta:u32, width:u32| rv_shuffle_i32(x, -(delta as i32)),
+		//shfl_up_u32 = @|x:u32, delta:u32, width:u32| rv_shuffle_u32(x, -(delta as i32)),
+		shfl_up_i32 = @|_x:i32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_up_u32 = @|_x:u32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
+		//shfl_up_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
+
+		shfl_down_i32 = @|_x:i32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_down_u32 = @|_x:u32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
+		//shfl_down_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
+
+		shfl_bfly_i32 = @|_x:i32, _lane_mask:i32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_bfly_u32 = @|_x:u32, _lane_mask:i32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
+		//shfl_bfly_f32 = @|x:f32, lane_mask:i32, width:u32| undef[f32](),
+
+		lanemask =    @|| 1,
+		lanemask_le = @|| 1,
+		lanemask_lt = @|| 0,
+		lanemask_ge = @|| 1,
+		lanemask_gt = @|| 0
+	});
+}
+
+fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
+
+	let vec_width = warp_size as i32;
+	let do_once = do_once_op(idx.local_id, vec_width);
+
+	@body(group_context {
+		// TODO: dispatch ndim-block_id
+		idx = @|_i:i32| logical_block_id,
+		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
+		threads = @|body| @|| cpu_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
+		num_waves = num_warps,
+		// TODO: dispatch ndim-thread_id
+		num_threads = @|_i:i32| num_threads(),
+		barrier = @|| -> () { do_once(@|_, _| { fibers_sync_block(idx.block_id as i32); }); },
+		barrier_all = @|predicate:bool| -> bool {
+			let warp_pred = if predicate { 1 } else { 0 };
+			do_once(@|_, _| {
+				// atomic_and_global_i32
+				atomic[i32](3, addr(1), warp_pred, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
+			});
+			let result = *(addr(0));
+			result != 0
+		},
+		barrier_any = @|predicate:bool| -> bool {
+			let warp_pred = if predicate { 1 } else { 0 };
+			do_once(@|_, _| {
+				// atomic_or_global_i32
+				atomic[i32](5, addr(2), warp_pred, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
+			});
+			let result = *(addr(0));
+			result != 0
+		},
+		barrier_count = @|predicate:bool| -> i32 {
+			let warp_count = if predicate { 1 } else { 0 }; //cpu_popcount_u32(rv_ballot_u32(predicate));
+			do_once(@|_, _| {
+				// atomic_add_global_i32
+				atomic[i32](1, addr(3), warp_count, 7, "");
+				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
+			});
+			let result = *(addr(0));
+			result
+		},
+	});
+}
+
+struct Index {
+	block_id: u32,
+	warp_id:  u32,
+	local_id: u32
+}
+
+fn @scalar_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -> () {
+	// TODO: assert(warp_size == 32)
+
+	let num_threads_per_block = block_dim as u32;
+	let num_warps_per_block = (num_threads_per_block + warp_size - 1) / warp_size;
+	let num_blocks = grid_dim as u32;
+	let num_warps = num_blocks * num_warps_per_block;
+	let num_threads = num_blocks * num_threads_per_block;
+	let num_blocks_in_flight = min(grid_dim, num_blocks_in_flight);
+
+	// TODO: assert(warp_size/l == vec_width)
+	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
+	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| range(body)(0, l as i32);
+	fn @warp_loop(body: fn(i32)->()) = @|_:u32| body(0);
+
+	// we need a buffer to accumulate block level results of barriers
+	let num_block_variables = 4; // output, all, any, count
+	let block_pred_buffer = alloc(0, num_block_variables as i64 * num_blocks_in_flight as i64 * sizeof[i32]());
+	let addr = block_pred_buffer.data as &mut[i32];
+
+	// reset all variables
+	for i in range(0, num_blocks_in_flight) {
+		addr(num_block_variables*i + 1) = 1;
+		addr(num_block_variables*i + 2) = 0;
+		addr(num_block_variables*i + 3) = 0;
+	}
+
+	for block_id, warp_id in fibers(cpu_threads, num_blocks_in_flight, num_warps_per_block as i32) {
+		for logical_block_id in range_step(block_id, num_blocks as i32, num_blocks_in_flight) {
+
+			for local_id in warp_loop(warp_size) {
+				let idx = Index {
+					block_id = block_id as u32,
+					 warp_id =  warp_id as u32,
+					local_id = local_id as u32,
+				};
+
+				let context = grid_context {
+					device = 0,
+					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
+					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size, idx, body),
+					num_groups = @|_i:i32| num_blocks,
+					num_waves = @|| num_warps,
+					num_threads = @|_i:i32| num_threads
+				};
+				@body(context)
+			}
+
+			// TODO: do we need a sync or yield here to ensure proper finalization of one block?
+			//       otherwise fibers may work on different blocks - does this cause issues?
+			//fibers_yield();
+			//fibers_sync_block(block_id);
+
+		}
+	}
+
+	release(block_pred_buffer);
+}

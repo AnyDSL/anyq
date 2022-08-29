@@ -42,6 +42,7 @@ set(COMMON_ARTIC_FILES
 
 set(mapping_source_files_amdgpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_amdgpu.art")
 set(mapping_source_files_cpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cpu.art")
+set(mapping_source_files_scalar "${CMAKE_CURRENT_SOURCE_DIR}/mapping_scalar.art")
 set(mapping_source_files_fiberless "${CMAKE_CURRENT_SOURCE_DIR}/mapping_fiberless.art")
 set(mapping_source_files_cuda "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art")
 set(mapping_source_files_nvvm "${CMAKE_CURRENT_SOURCE_DIR}/mapping_nvvm.art")
@@ -73,6 +74,7 @@ if (Boost_FOUND)
 
 	set(AnyQ_FIBER_SUPPORT TRUE)
 	set(ADDITIONAL_LINK_DEPENDENCY_cpu fiber-support)
+	set(ADDITIONAL_LINK_DEPENDENCY_scalar fiber-support)
 else()
 	message(STATUS "Boost is required for fiber-support used in the CPU mapping.")
 endif()
@@ -109,6 +111,9 @@ if (Thorin_HAS_RV_SUPPORT)
 	endif()
 endif()
 
+if (AnyQ_FIBER_SUPPORT)
+	list(APPEND AnyQ_PLATFORMS scalar)
+endif()
 
 
 include(queues/queues.cmake)
@@ -118,3 +123,5 @@ if (BUILD_TESTING)
 endif()
 
 add_subdirectory(benchmark)
+
+add_subdirectory(threading)
