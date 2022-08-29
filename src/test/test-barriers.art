@@ -15,7 +15,7 @@ fn main() -> i32 {
 				for thread in wave.threads() {
 					for i in range(0, wave.num_threads() as i32) {
 
-						if wave.barrier_all(thread.idx(0) == i as u32) != false {
+						if wave.barrier_all(thread.idx(0) == i as u32) != (wave.num_threads() == 1) {
 							thread.atomic_or_global_u32(device_failed_flag, 1 << 0, memory_order::relaxed);
 						}
 					}
