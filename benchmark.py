@@ -202,6 +202,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 							raise Exception(f"benchmark reported inconsistent device name")
 
 						if params_reported.platform != bm.binary.platform:
+							print('platform:', params_reported.platform, 'vs', bm.binary.platform)
 							raise Exception("benchmark reported inconsistent platform")
 
 						if params_reported.properties['queue_type'] != bm.binary.queue_type:
@@ -548,6 +549,7 @@ def main(args):
 		devices = {
 			"cpu": [0],
 			"fiberless": [0],
+			"scalar": [0],
 			"cuda": device_list(args.cuda_device),
 			"nvvm": device_list(args.cuda_device),
 			"amdgpu": device_list(args.amdgpu_device)
