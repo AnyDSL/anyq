@@ -175,9 +175,11 @@ struct thread_context {
 
 	atomic_cas_global_i32: fn(&mut addrspace(1) i32, i32, i32, memory_order, memory_order) -> (i32, bool),
 	atomic_cas_global_u32: fn(&mut addrspace(1) u32, u32, u32, memory_order, memory_order) -> (u32, bool),
+	atomic_cas_global_i64: fn(&mut addrspace(1) i64, i64, i64, memory_order, memory_order) -> (i64, bool),
 	atomic_cas_global_u64: fn(&mut addrspace(1) u64, u64, u64, memory_order, memory_order) -> (u64, bool),
 	atomic_cas_global_i32_weak: fn(&mut addrspace(1) i32, i32, i32, memory_order, memory_order) -> (i32, bool),
 	atomic_cas_global_u32_weak: fn(&mut addrspace(1) u32, u32, u32, memory_order, memory_order) -> (u32, bool),
+	atomic_cas_global_i64_weak: fn(&mut addrspace(1) i64, i64, i64, memory_order, memory_order) -> (i64, bool),
 	atomic_cas_global_u64_weak: fn(&mut addrspace(1) u64, u64, u64, memory_order, memory_order) -> (u64, bool),
 
 	atomic_inc_global_u32: fn(&mut addrspace(1) u32, u32) -> u32,

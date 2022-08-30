@@ -152,9 +152,11 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 
 		atomic_cas_global_i32 = nvvm_atomic_cas[i32],
 		atomic_cas_global_u32 = nvvm_atomic_cas[u32],
+		atomic_cas_global_i64 = nvvm_atomic_cas[i64],
 		atomic_cas_global_u64 = nvvm_atomic_cas[u64],
 		atomic_cas_global_i32_weak = nvvm_atomic_cas_weak[i32],
 		atomic_cas_global_u32_weak = nvvm_atomic_cas_weak[u32],
+		atomic_cas_global_i64_weak = nvvm_atomic_cas_weak[i64],
 		atomic_cas_global_u64_weak = nvvm_atomic_cas_weak[u64],
 
 		atomic_inc_global_u32 = nvvm_atomic_inc_global_u32,

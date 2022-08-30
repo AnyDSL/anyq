@@ -177,9 +177,11 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 
 		atomic_cas_global_i32 = cpu_atomic_cas[i32],
 		atomic_cas_global_u32 = cpu_atomic_cas[u32],
+		atomic_cas_global_i64 = cpu_atomic_cas[i64],
 		atomic_cas_global_u64 = cpu_atomic_cas[u64],
 		atomic_cas_global_i32_weak = cpu_atomic_cas_weak[i32],
 		atomic_cas_global_u32_weak = cpu_atomic_cas_weak[u32],
+		atomic_cas_global_i64_weak = cpu_atomic_cas_weak[i64],
 		atomic_cas_global_u64_weak = cpu_atomic_cas_weak[u64],
 
 		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {

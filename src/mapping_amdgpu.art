@@ -97,9 +97,11 @@ fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(thread_context)-
 
         atomic_cas_global_i32 = amdgpu_atomic_cas[i32],
         atomic_cas_global_u32 = amdgpu_atomic_cas[u32],
+        atomic_cas_global_i64 = amdgpu_atomic_cas[i64],
         atomic_cas_global_u64 = amdgpu_atomic_cas[u64],
         atomic_cas_global_i32_weak = amdgpu_atomic_cas_weak[i32],
         atomic_cas_global_u32_weak = amdgpu_atomic_cas_weak[u32],
+        atomic_cas_global_i64_weak = amdgpu_atomic_cas_weak[i64],
         atomic_cas_global_u64_weak = amdgpu_atomic_cas_weak[u64],
 
         atomic_inc_global_u32 = @|addr, val| amdgcn_atomic_inc_global_u32(addr, val, 0, 0, false),

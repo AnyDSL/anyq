@@ -122,25 +122,25 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 
 		gid = gid,
 
-		atomic_load_global_i32 = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location:&addrspace(1) i32| { let mut res:i32; asm("atom.global.add.s32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u32 = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location:&addrspace(1) u32| { let mut res:u32; asm("atom.global.add.u32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u64 = cuda_legacy_atomic_memory_order_wrap_load[u64](@|location:&addrspace(1) u64| { let mut res:u64; asm("atom.global.add.u64 %0, [%1], 0;" : "=l"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_i32 = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location| { let mut res:i32; asm("atom.global.add.s32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u32 = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location| { let mut res:u32; asm("atom.global.add.u32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u64 = cuda_legacy_atomic_memory_order_wrap_load[u64](@|location| { let mut res:u64; asm("atom.global.add.u64 %0, [%1], 0;" : "=l"(res) : "l"(location) : "memory"); res }),
 
-		atomic_load_global_i32_coalesced = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location:&addrspace(1) i32| { let mut res:i32; asm("ld.volatile.global.s32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u32_coalesced = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location:&addrspace(1) u32| { let mut res:u32; asm("ld.volatile.global.u32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u64_coalesced = cuda_legacy_atomic_memory_order_wrap_load[u64](@|location:&addrspace(1) u64| { let mut res:u64; asm("ld.volatile.global.u64 %0, [%1];" : "=l"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_i32_coalesced = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location| { let mut res:i32; asm("ld.volatile.global.s32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u32_coalesced = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location| { let mut res:u32; asm("ld.volatile.global.u32 %0, [%1];" : "=r"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_u64_coalesced = cuda_legacy_atomic_memory_order_wrap_load[u64](@|location| { let mut res:u64; asm("ld.volatile.global.u64 %0, [%1];" : "=l"(res) : "l"(location) : "memory"); res }),
 
-		atomic_store_global_i32 = cuda_legacy_atomic_memory_order_wrap_store[i32](@|location:&mut addrspace(1) i32, value:i32| { let mut res:i32; asm("atom.global.exch.b32 %0, [%1], %2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
-		atomic_store_global_u32 = cuda_legacy_atomic_memory_order_wrap_store[u32](@|location:&mut addrspace(1) u32, value:u32| { let mut res:u32; asm("atom.global.exch.b32 %0, [%1], %2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
-		atomic_store_global_u64 = cuda_legacy_atomic_memory_order_wrap_store[u64](@|location:&mut addrspace(1) u64, value:u64| { let mut res:u64; asm("atom.global.exch.b64 %0, [%1], %2;" : "=r"(res) : "l"(location), "l"(value) : "memory"); }),
+		atomic_store_global_i32 = cuda_legacy_atomic_memory_order_wrap_store[i32](@|location, value| { let mut res:i32; asm("atom.global.exch.b32 %0, [%1], %2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
+		atomic_store_global_u32 = cuda_legacy_atomic_memory_order_wrap_store[u32](@|location, value| { let mut res:u32; asm("atom.global.exch.b32 %0, [%1], %2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
+		atomic_store_global_u64 = cuda_legacy_atomic_memory_order_wrap_store[u64](@|location, value| { let mut res:u64; asm("atom.global.exch.b64 %0, [%1], %2;" : "=r"(res) : "l"(location), "l"(value) : "memory"); }),
 
-		atomic_store_global_i32_coalesced = cuda_legacy_atomic_memory_order_wrap_store[i32](@|location:&mut addrspace(1) i32, value:i32| asm("st.volatile.global.s32 [%0], %1;" : : "l"(location), "r"(value) : "memory")),
-		atomic_store_global_u32_coalesced = cuda_legacy_atomic_memory_order_wrap_store[u32](@|location:&mut addrspace(1) u32, value:u32| asm("st.volatile.global.u32 [%0], %1;" : : "l"(location), "r"(value) : "memory")),
-		atomic_store_global_u64_coalesced = cuda_legacy_atomic_memory_order_wrap_store[u64](@|location:&mut addrspace(1) u64, value:u64| asm("st.volatile.global.u64 [%0], %1;" : : "l"(location), "l"(value) : "memory")),
+		atomic_store_global_i32_coalesced = cuda_legacy_atomic_memory_order_wrap_store[i32](@|location, value| asm("st.volatile.global.s32 [%0], %1;" : : "l"(location), "r"(value) : "memory")),
+		atomic_store_global_u32_coalesced = cuda_legacy_atomic_memory_order_wrap_store[u32](@|location, value| asm("st.volatile.global.u32 [%0], %1;" : : "l"(location), "r"(value) : "memory")),
+		atomic_store_global_u64_coalesced = cuda_legacy_atomic_memory_order_wrap_store[u64](@|location, value| asm("st.volatile.global.u64 [%0], %1;" : : "l"(location), "l"(value) : "memory")),
 
 		atomic_add_global_i32 = cuda_legacy_atomic_memory_order_wrap_rmw[i32](cuda_atomic_add_global_i32),
 		atomic_add_global_u32 = cuda_legacy_atomic_memory_order_wrap_rmw[u32](cuda_atomic_add_global_u32),
-		atomic_add_global_i64 = cuda_legacy_atomic_memory_order_wrap_rmw[i64](@|location:&mut addrspace(1) i64, value:i64| cuda_atomic_add_global_u64(location as &mut addrspace(1) u64, value as u64) as i64),
+		atomic_add_global_i64 = cuda_legacy_atomic_memory_order_wrap_rmw[i64](@|location, value| cuda_atomic_add_global_u64(location as &mut addrspace(1) u64, value as u64) as i64),
 		atomic_add_global_u64 = cuda_legacy_atomic_memory_order_wrap_rmw[u64](cuda_atomic_add_global_u64),
 
 		atomic_sub_global_i32 = cuda_legacy_atomic_memory_order_wrap_rmw[i32](cuda_atomic_sub_global_i32),
@@ -173,9 +173,11 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 
 		atomic_cas_global_i32 = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32, @|a, b| a == b),
 		atomic_cas_global_u32 = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32, @|a, b| a == b),
+		atomic_cas_global_i64 = cuda_legacy_atomic_memory_order_wrap_cas[i64](@|location, expected, desired| cuda_atomic_cas_global_u64(location as &mut addrspace(1) u64, expected as u64, desired as u64) as i64, @|a, b| a == b),
 		atomic_cas_global_u64 = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64, @|a, b| a == b),
 		atomic_cas_global_i32_weak = cuda_legacy_atomic_memory_order_wrap_cas[i32](cuda_atomic_cas_global_i32, @|a, b| a == b),
 		atomic_cas_global_u32_weak = cuda_legacy_atomic_memory_order_wrap_cas[u32](cuda_atomic_cas_global_u32, @|a, b| a == b),
+		atomic_cas_global_i64_weak = cuda_legacy_atomic_memory_order_wrap_cas[i64](@|location, expected, desired| cuda_atomic_cas_global_u64(location as &mut addrspace(1) u64, expected as u64, desired as u64) as i64, @|a, b| a == b),
 		atomic_cas_global_u64_weak = cuda_legacy_atomic_memory_order_wrap_cas[u64](cuda_atomic_cas_global_u64, @|a, b| a == b),
 
 		atomic_inc_global_u32 = cuda_atomic_inc_global_u32,
