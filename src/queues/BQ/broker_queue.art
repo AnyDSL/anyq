@@ -1,6 +1,6 @@
 // implementation of queue algorithm described in
 // Bernhard Kerbl, Michael Kenzel, Joerg H. Mueller, Dieter Schmalstieg and Markus Steinberger. 2018. The Broker Queue: A Fast, Linearizable FIFO Queue for Fine-Granular Work Distribution on the GPU.
-// ICS '18: Proceedings of the 2018 International Conference on Supercomputing, pages 76–85
+// In Proceedings of the 2018 International Conference on Supercomputing (ICS '18), pages 76–85
 // https://doi.org/10.1145/3205289.3205291
 
 struct BrokerWorkDistributorQueue {

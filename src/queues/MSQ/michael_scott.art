@@ -1,32 +1,34 @@
 // implementation of queue algorithm described in
 // Maged M. Michael and Michael L. Scott. 1996. Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms.
-// PODC '96: Proceedings of the fifteenth annual ACM symposium on Principles of distributed computing, pages 267–275
+// In Proceedings of the fifteenth annual ACM symposium on Principles of distributed computing (PODC '96), pages 267–275
 // https://doi.org/10.1145/248052.248106
 
-struct MichaelScottQueue {
-	size: i32,
-	head: u32,
-	tail: u32,
-	alloc_next: u32
-}
+mod MichaelScott {
+	struct Queue {
+		size: i32,
+		head: u32,
+		tail: u32,
+		alloc_next: u32
+	}
 
-struct MichaelScottQueueNode[T] {
-	payload: T,
-	next: u32
+	struct QueueNode[T] {
+		payload: T,
+		next: u32
+	}
 }
 
 fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[T] {
 	let pool_size = (1 << 21) * 20 * 2;
-	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScottQueueNode[T]]();
-	let buffer_alignment = alignof[MichaelScottQueueNode[T]]();
+	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScott::QueueNode[T]]();
+	let buffer_alignment = alignof[MichaelScott::QueueNode[T]]();
 
-	let buffer_data_offset = round_up_i64(sizeof[MichaelScottQueue](), buffer_alignment);
+	let buffer_data_offset = round_up_i64(sizeof[MichaelScott::Queue](), buffer_alignment);
 
 	let queue_device_state_alloc = device.alloc(buffer_data_offset + buffer_size);
 	let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
 
-	let queue = &mut queue_device_memory(0) as &mut addrspace(1) MichaelScottQueue;
-	let node = &mut queue_device_memory(buffer_data_offset) as &mut addrspace(1) [MichaelScottQueueNode[T]];
+	let queue = &mut queue_device_memory(0) as &mut addrspace(1) MichaelScott::Queue;
+	let node = &mut queue_device_memory(buffer_data_offset) as &mut addrspace(1) [MichaelScott::QueueNode[T]];
 
 	let nil:u32 = -1;
 
