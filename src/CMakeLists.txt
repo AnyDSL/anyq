@@ -123,5 +123,3 @@ if (BUILD_TESTING)
 endif()
 
 add_subdirectory(benchmark)
-
-add_subdirectory(threading)
