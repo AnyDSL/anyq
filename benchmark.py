@@ -98,9 +98,12 @@ class QueueBenchmarkBinary:
 
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
-		if f.name.startswith("benchmark-") and f.suffix in ['', '.exe'] and include.match(f.name):
-			test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
-			yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
+		if f.name.startswith("benchmark-") and f.suffix in ['', '.exe']:
+			for pattern in include:
+				if pattern.match(f.name):
+					test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
+					yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
+					break
 
 class QueueBenchmarkRun:
 	def __init__(self, output_path, device_name, binary, **args):
@@ -141,6 +144,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 	# avoid scanning the benchmark binaries dir over and over again
 	# we want to keep a persistent list of binaries since we amend it with info, such as fingerprint
 	selected_binaries = list(benchmark_binaries(bin_dir, include))
+	# print(selected_binaries)
 
 	for binary in selected_binaries:
 		for device in devices.get(binary.platform):
@@ -265,9 +269,16 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 def collect_datasets(results_dir, include):
 	for f in results_dir.iterdir():
-		if f.suffix == ".csv" and include.match(f.name):
-			with open(f, "rb") as file:
-				yield Dataset(parse_benchmark_output_header(file), f, file.tell())
+		if f.suffix == ".csv":
+			for pattern in include:
+				m = pattern.match(f.name)
+				if m is not None:
+					with open(f, "rb") as file:
+						params = parse_benchmark_output_header(file)
+						if len(m.groups()) > 0:
+							params.properties['result_group'] = m.group(1)
+						yield Dataset(params, f, file.tell())
+					break
 
 
 def plot(results_dir, include):
@@ -536,7 +547,7 @@ def fixup(results_dir, include):
 def main(args):
 	results_dir = default_results_dir
 
-	include = re.compile(args.include)
+	include = [re.compile(pattern) for pattern in args.include]
 
 	if args.command == run:
 		bin_dir = args.bin_dir
@@ -576,7 +587,7 @@ if __name__ == "__main__":
 
 	def add_command(name, function, **kwargs):
 		args = sub_args.add_parser(name, **kwargs)
-		args.add_argument("include", nargs="?", type=str, default=".*")
+		args.add_argument("include", nargs="*", type=str, default=['.*'])
 		args.set_defaults(command=function)
 		return args
 
