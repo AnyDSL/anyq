@@ -590,7 +590,7 @@ function createPlot(plotElem, menuElem, line_style_map)
 
 		plot = createRatioPlot(svg, f1, f2);
 	}
-	if (!plot) return;
+	if (!plot) Promise.reject(new Error('could not create proper plot type'));
 
 	// let data = window[plotElem.attr('data-src')];
 	//console.log(plotElem, "data:", data);
@@ -610,13 +610,13 @@ function createPlot(plotElem, menuElem, line_style_map)
 		return resources[url].then(resolve);
 	});
 
-	loadDataSource(plot_url)
+	return loadDataSource(plot_url)
 		.catch(() => { console.log("could not load", plot_url); })
 		.then((data) => {
 
 		//console.log(plotElem, "data:", data);
 		//return;
-		if (!data) return;
+		if (!data) return Promise.reject(new Error('could not receive plot data'));
 
 		const line_map = plot.add_lines(data);
 
@@ -741,7 +741,5 @@ function createPlot(plotElem, menuElem, line_style_map)
 				a.attr('href', window.URL.createObjectURL(blob));
 				a.attr('download', 'plot.csv');
 			});
-	});
-
-	return plot;
+	}).then(() => { return plot; });
 }

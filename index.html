@@ -185,24 +185,32 @@
 
 				let line_style_map = new Map();
 
-				$('.nav .nav-link').on('shown.bs.tab', function(event){
-					console.log('set margin-top to', menu.height());
-					body.css('margin-top', menu.height() + 40 + 'px');
-				});
-
 				plots.each(function (idx, elem) { elem.plot = createPlot($(elem), menu, line_style_map); });
 
 				let url = new window.URL(document.location);
 				let params = url.searchParams;
 
-				/*
-				for (key of new Set(params.keys())) {
-					let boxes = $("div[data-category=" + key + "]").find("label.checkbox").click();
-					$.each(params.getAll(key), function(i, val) {
-						boxes.filter("[data-value=" + val + "]").click();
+				Promise.allSettled(
+					plots.map(function() { return this.plot }).toArray()
+				).then(function(values) {
+					console.log('all plot promises settled', values);
+
+					$('.nav .nav-link').on('shown.bs.tab', function(event){
+						// console.log('set margin-top to', menu.height());
+						body.css('margin-top', menu.height() + 40 + 'px');
 					});
-				}
-				*/
+				}).then(function() {
+					console.log('update values based on shared link');
+
+					for (key of new Set(params.keys())) {
+						let boxes = $("div[data-category=" + key + "]").find("label.checkbox").click();
+						$.each(params.getAll(key), function(i, val) {
+							boxes.filter("[data-value=" + val + "]").click();
+						});
+					}
+				}).then(function() {
+					console.log('nav bar updated');
+				});
 
 				$("#share-btn").click(function() {
 
