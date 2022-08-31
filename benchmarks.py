@@ -1,9 +1,9 @@
 
+num_threads_min = 1
+num_threads_max = 1 << 21
+
 
 def generate_benchmark_variants(test_name):
-	num_threads_min = 1
-	num_threads_max = 1 << 21
-
 	if test_name.startswith("benchmark-queue-concurrent"):
 		for workload_size in [1, 512]:
 			for p_enq in [0.25, 0.5, 1.0]:

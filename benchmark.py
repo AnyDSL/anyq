@@ -225,7 +225,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 				except asyncio.TimeoutError as e:
 					threads, total_time = e.last_success
-					eta = num_threads_max * total_time / threads / 1000
+					eta = benchmarks.num_threads_max * total_time / threads / 1000
 					print("TIMEOUT (eta %.2fs)" % eta)
 					bm.eta = eta
 					if bm not in timeouted:
