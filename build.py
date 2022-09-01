@@ -108,8 +108,8 @@ class LLVM(Build):
 		self.rv_source_dir = self.source_dir/"rv"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-12.0.1")
-		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/12.x")
+		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-14.0.0")
+		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/14.x")
 
 	def configure(self, configs, anydsl):
 		for patch in [
