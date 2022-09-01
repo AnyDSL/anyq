@@ -1,0 +1,60 @@
+// AnyQ wrapper for reference implementation published with
+// Chaoran Yang and John Mellor-Crummey. 2016. A wait-free queue as fast as fetch-and-add.
+// In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming (PPoPP '16), pages 1–13.
+// https://doi.org/10.1145/2851141.2851168
+
+
+#[import(cc = "C")] fn wfqueue_create(nprocs: i32) -> &mut [u8];
+#[import(cc = "C")] fn wfqueue_init(queue: &mut [u8], id: i32) -> ();
+#[import(cc = "C")] fn wfqueue_enqueue(queue: &mut [u8], id: i32, v: u64) -> ();
+#[import(cc = "C")] fn wfqueue_dequeue(queue: &mut [u8], id: i32) -> u64;
+#[import(cc = "C")] fn wfqueue_destroy(queue: &mut [u8]) -> ();
+
+fn @createYangMellorCrummeyRefQueue(device: AccDevice, queue_size: i32) -> ProducerConsumerQueue[u32] {
+	// let queue_state_size = 80 as i64;
+
+	let num_handles = (1 << 24);
+	// let handle_buffer_size = num_handles * sizeof[YangMellorCrummey::Handle]();
+	// let handle_buffer_alignment = alignof[YangMellorCrummey::Handle]();
+
+	// let handle_data_offset = round_up_i64(queue_state_size, handle_buffer_alignment);
+
+	// let queue_device_state_alloc = device.alloc(handle_data_offset + handle_buffer_size);
+	// let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
+
+	// let queue = &mut queue_device_memory(0) as &mut addrspace(1) [u8];
+	// let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [u8];
+
+	let queue = wfqueue_create(num_handles);
+
+	ProducerConsumerQueue[u32] {
+		push = @|source| @|thread| {
+			wfqueue_enqueue(queue, thread.gid() as i32, source() as u64);
+			1
+		},
+
+		pop = @|sink| @|thread| {
+			sink(wfqueue_dequeue(queue, thread.gid() as i32) as u32);
+			1
+		},
+
+		size = @|_thread| {
+			0
+		},
+
+		reset = @|grid| {
+			for thread in grid.threads() {
+				for i in range_step(thread.idx(0) as i32, num_handles, grid.num_threads(0) as i32) {
+					wfqueue_init(queue, i);
+				}
+			}
+		},
+
+		validate = @|_corrupted, _grid| {
+		},
+
+		release = @|| {
+			wfqueue_destroy(queue);
+		}
+	}
+}
