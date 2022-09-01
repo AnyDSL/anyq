@@ -49,7 +49,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 	};
 
 	ProducerConsumerQueue[T] {
-		push = @|source|@|thread| {
+		push = @|source| @|thread| {
 			let new_node = alloc_node(thread);
 
 			if (new_node != nil) {
@@ -82,7 +82,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 			}
 		},
 
-		pop = @|sink|@|thread| {
+		pop = @|sink| @|thread| {
 			while true {
 				let head = thread.atomic_load_global_u32(queue.head, memory_order::acquire);
 				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);

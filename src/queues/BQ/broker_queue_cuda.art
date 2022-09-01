@@ -1,6 +1,6 @@
 // AnyQ wrapper for reference implementation published with
-// Bernhard Kerbl, Michael Kenzel, Joerg H. Mueller, Dieter Schmalstieg, Markus Steinberger, 2018, The Broker Queue: A Fast, Linearizable FIFO Queue for Fine-Granular Work Distribution on the GPU
-// ICS '18: Proceedings of the 2018 International Conference on Supercomputing, pages 76–85
+// Bernhard Kerbl, Michael Kenzel, Joerg H. Mueller, Dieter Schmalstieg and Markus Steinberger. 2018. The Broker Queue: A Fast, Linearizable FIFO Queue for Fine-Granular Work Distribution on the GPU.
+// In Proceedings of the 2018 International Conference on Supercomputing (ICS '18), pages 76–85
 // https://doi.org/10.1145/3205289.3205291
 
 
@@ -91,7 +91,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 	};
 
 	ProducerConsumerQueue[u32] {
-		push = @|source:fn()->u32| @|_thread:thread_context| -> i32 {
+		push = @|source| @|_thread| {
 			if bq_ensure_enqueue() {
 				bq_put_data(source());
 				1
@@ -101,7 +101,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 			}
 		},
 
-		pop = @|sink:fn(u32)->()| @|_thread:thread_context| -> i32 {
+		pop = @|sink| @|_thread| {
 			if bq_ensure_dequeue() {
 				sink(bq_read_data());
 				1
@@ -119,7 +119,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 			}
 		},
 
-		validate = @|_corrupted: &mut addrspace(1) u32, _grid| {
+		validate = @|_corrupted, _grid| {
 		},
 
 		release = @|| {

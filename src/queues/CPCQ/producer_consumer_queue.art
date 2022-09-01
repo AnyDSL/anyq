@@ -33,7 +33,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 	let buffer_element = @|i:u32| -> QueueElement[T] { element_type.buffer_element(buffer, i) };
 
 	ProducerConsumerQueue[T] {
-		push = @|source:fn()->T| @|thread:thread_context| -> i32 {
+		push = @|source| @|thread| {
 			let current_size1 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size1 >= num_elements {
 				0
@@ -64,7 +64,7 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 			}
 		},
 
-		pop = @|sink:fn(T)->()| @|thread:thread_context| -> i32 {
+		pop = @|sink| @|thread| {
 			let current_size2 = thread.atomic_load_global_i32(size, memory_order::relaxed);
 			if current_size2 <= 0 {
 				0
@@ -101,21 +101,19 @@ fn @createConcurrentProducerConsumerQueue[T](device: AccDevice, element_type: Qu
 
 		reset = @|grid| {
 			for thread in grid.threads() {
-				let idx = thread.idx(0) as i32;
-
-				if idx == 0 {
+				if thread.idx(0) == 0 {
 					thread.atomic_store_global_i32(size, 0, memory_order::relaxed);
 					thread.atomic_store_global_u32(head, 0, memory_order::relaxed);
 					thread.atomic_store_global_u32(tail, 0, memory_order::relaxed);
 				}
 
-				for i in range_step(idx, num_elements, grid.num_threads(0) as i32) {
+				for i in range_step(thread.idx(0) as i32, num_elements, grid.num_threads(0) as i32) {
 					buffer_element(i as u32).clear();
 				}
 			}
 		},
 
-		validate = @|corrupted: &mut addrspace(1) u32, grid| {
+		validate = @|corrupted, grid| {
 			for thread in grid.threads() {
 				let idx = thread.idx(0);
 
