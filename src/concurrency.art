@@ -126,18 +126,22 @@ struct thread_context {
 
 	atomic_load_global_i32: fn(&addrspace(1) i32, memory_order) -> i32,
 	atomic_load_global_u32: fn(&addrspace(1) u32, memory_order) -> u32,
+	atomic_load_global_i64: fn(&addrspace(1) i64, memory_order) -> i64,
 	atomic_load_global_u64: fn(&addrspace(1) u64, memory_order) -> u64,
 
 	atomic_load_global_i32_coalesced: fn(&addrspace(1) i32, memory_order) -> i32,
 	atomic_load_global_u32_coalesced: fn(&addrspace(1) u32, memory_order) -> u32,
+	atomic_load_global_i64_coalesced: fn(&addrspace(1) i64, memory_order) -> i64,
 	atomic_load_global_u64_coalesced: fn(&addrspace(1) u64, memory_order) -> u64,
 
 	atomic_store_global_i32: fn(&mut addrspace(1) i32, i32, memory_order) -> (),
 	atomic_store_global_u32: fn(&mut addrspace(1) u32, u32, memory_order) -> (),
+	atomic_store_global_i64: fn(&mut addrspace(1) i64, i64, memory_order) -> (),
 	atomic_store_global_u64: fn(&mut addrspace(1) u64, u64, memory_order) -> (),
 
 	atomic_store_global_i32_coalesced: fn(&mut addrspace(1) i32, i32, memory_order) -> (),
 	atomic_store_global_u32_coalesced: fn(&mut addrspace(1) u32, u32, memory_order) -> (),
+	atomic_store_global_i64_coalesced: fn(&mut addrspace(1) i64, i64, memory_order) -> (),
 	atomic_store_global_u64_coalesced: fn(&mut addrspace(1) u64, u64, memory_order) -> (),
 
 	atomic_add_global_i32: fn(&mut addrspace(1) i32, i32, memory_order) -> i32,
