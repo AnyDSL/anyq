@@ -96,11 +96,13 @@ class Line {
 		return true;
 	}
 
-	update(x, y, line_style_map) {
+	update(x, y) {
 		const line = d3.line().defined(this.defined).x(d => x(this.map_x_data(d))).y(d => y(this.map_y_data(d)));
 
 		this.path.attr("d", line(this.data));
+	}
 
+	style(line_style_map) {
 		if (line_style_map) {
 			for (const [param, style] of line_style_map) {
 				let stylist = style.get(this.params[param]);
@@ -134,11 +136,13 @@ class Line {
 	}
 
 	highlight() {
-		this.path.style("stroke-width", 5.0);
+		//if (this.vis < 0) return;
+		this.path.attr("stroke-width", 5.0);
 	}
 
 	unhighlight() {
-		this.path.style("stroke-width", this.stroke_width);
+		//if (this.vis < 0) return;
+		this.path.attr("stroke-width", this.stroke_width);
 	}
 };
 
@@ -261,11 +265,14 @@ class Plot {
 		this.label.x.attr("transform", `translate(${(this.x(this.x_min) + this.x(this.x_max)) / 2}, ${this.y(this.y_min) + 38})`);
 		this.label.y.attr("transform", `translate(${this.x(this.x_min) - 34}, ${(this.y(this.y_min) + this.y(this.y_max)) / 2})rotate(-90)`);
 
-		for (let l of this.lines) {
-			l.update(this.x, this.y, this.line_style_map);
-		}
+		this.lines.forEach(line => line.update(this.x, this.y))
 
 		return true;
+	}
+
+	apply_styles(line_style_map) {
+		this.line_style_map = line_style_map;
+		this.lines.forEach(line => line.style(this.line_style_map));
 	}
 }
 
@@ -392,6 +399,7 @@ function findOrCreateLabel(name, entry, style, parentElem) {
 		} else {
 			label.trigger("deactivate");
 		}
+		label.trigger("mouseenter");
 	});
 
 	$("<span/>").text(entry).appendTo(label);
@@ -410,6 +418,7 @@ function fillButtonTable(menuElem, line_map, line_style_map, plot)
 			let label = findOrCreateLabel(col_name, entry, style, fieldElem);
 			//console.log(label);
 
+			let all_lines = Array.from(lines);
 
 			let checkbox = label.children('input');
 			let _checkbox = checkbox.get(0);
@@ -429,16 +438,18 @@ function fillButtonTable(menuElem, line_map, line_style_map, plot)
 				plot.update();
 			});
 
-			// label.mouseenter(e => {
-				// for (let line of lines) {
-					// line.highlight();
-				// }
-			// });
-			// label.mouseleave(e => {
-				// for (let line of lines) {
-					// line.unhighlight();
-				// }
-			// });
+			label.on("mouseenter", function(e) {
+				if (!_checkbox.checked) return;
+				let _lines = all_lines.filter(line => line.is_visible());
+				// console.log(e, _checkbox.checked, _lines);
+				_lines.forEach(line => line.highlight() );
+				label._lines = _lines;
+			});
+			label.on("mouseleave", function(e) {
+				// console.log(e);
+				if (!_checkbox.checked) return;
+				label._lines.forEach(line => line.unhighlight() );
+			});
 		}
 	}
 }
@@ -658,7 +669,7 @@ function createPlot(plotElem, menuElem, line_style_map)
 			}
 		}
 
-		plot.line_style_map = line_style_map;
+		plot.apply_styles(line_style_map);
 		//plot.update();
 
 		fillButtonTable(menuElem, line_map, line_style_map, plot);
