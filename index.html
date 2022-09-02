@@ -192,8 +192,8 @@
 
 				Promise.allSettled(
 					plots.map(function() { return this.plot }).toArray()
-				).then(function(values) {
-					console.log('all plot promises settled', values);
+				).then(function() {
+					console.log('all plot promises settled');
 
 					$('.nav .nav-link').on('shown.bs.tab', function(event){
 						// console.log('set margin-top to', menu.height());
@@ -203,13 +203,14 @@
 					console.log('update values based on shared link');
 
 					for (key of new Set(params.keys())) {
-						let boxes = $("div[data-category=" + key + "]").find("label.checkbox").click();
+						let boxes = $("div[data-category=" + key + "]").find("label.checkbox").trigger("deactivate");
 						$.each(params.getAll(key), function(i, val) {
-							boxes.filter("[data-value=" + val + "]").click();
+							boxes.filter("[data-value=" + val + "]").trigger("activate");
 						});
 					}
 				}).then(function() {
 					console.log('nav bar updated');
+					plots.each(function (idx, elem) { elem.plot.then(p => p.update() ); });
 				});
 
 				$("#share-btn").click(function() {

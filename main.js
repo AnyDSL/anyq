@@ -118,7 +118,7 @@ class Line {
 	}
 
 	is_visible() {
-		return this.path.style("visibility") == "visible";
+		return this.vis == 0;
 	}
 
 	hide() {
@@ -385,6 +385,15 @@ function findOrCreateLabel(name, entry, style, parentElem) {
 	});
 	checkbox.appendTo(label);
 
+	checkbox.on("change", function(e) {
+		// console.log(e, this.checked);
+		if (this.checked) {
+			label.trigger("activate");
+		} else {
+			label.trigger("deactivate");
+		}
+	});
+
 	$("<span/>").text(entry).appendTo(label);
 
 	return label;
@@ -401,20 +410,22 @@ function fillButtonTable(menuElem, line_map, line_style_map, plot)
 			let label = findOrCreateLabel(col_name, entry, style, fieldElem);
 			//console.log(label);
 
-			let checkbox = label.children('input')
 
-			checkbox.on("change", function() {
-				for (let line of lines) {
-					//console.log(this, lines);
-					if (this.checked) {
-						line.show();
-						//$.each(lines, function(i, line) { line.show(); });
-					} else {
-						line.hide();
-						//$.each(lines, function(i, line) { line.hide(); });
-					}
-				}
+			let checkbox = label.children('input');
+			let _checkbox = checkbox.get(0);
 
+			label.on("activate", function(e) {
+				// console.log(e, lines);
+				lines.forEach(line => line.show() );
+				_checkbox.checked = true;
+			});
+			label.on("deactivate", function(e) {
+				// console.log(e, lines);
+				lines.forEach(line => line.hide() );
+				_checkbox.checked = false;
+			});
+
+			checkbox.on("change", function(e) {
 				plot.update();
 			});
 
@@ -648,7 +659,7 @@ function createPlot(plotElem, menuElem, line_style_map)
 		}
 
 		plot.line_style_map = line_style_map;
-		plot.update();
+		//plot.update();
 
 		fillButtonTable(menuElem, line_map, line_style_map, plot);
 
@@ -741,5 +752,5 @@ function createPlot(plotElem, menuElem, line_style_map)
 				a.attr('href', window.URL.createObjectURL(blob));
 				a.attr('download', 'plot.csv');
 			});
-	}).then(() => { return plot; });
+	}).then(() => plot );
 }
