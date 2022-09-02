@@ -80,7 +80,7 @@ class Line {
 		// this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
 		this.x_max = d3.max(data, d => this.map_x_data(d));
 		this.y_max = d3.max(data, d => this.defined(d) ? this.map_y_data(d) : 0);
-		//this.y_min = d3.min(data, d => this.defined(d) ? this.map_y_data(d) : 0);
+		this.y_min = d3.min(data, d => this.defined(d) ? this.map_y_data(d) : this.y_max);
 	}
 
 	map_x_data(d) {
@@ -239,7 +239,6 @@ class Plot {
 
 	update(y_domain) {
 		this.x_max = d3.max(this.lines, l => l.is_visible() ? l.x_max : this.x_min);
-		this.y_max = d3.max(this.lines, l => l.is_visible() ? l.y_max : this.y_min);
 
 		this.x = d3.scaleLog().base(2)
 			.domain([this.x_min, this.x_max])
@@ -249,8 +248,19 @@ class Plot {
 			this.y_min = y_domain[0];
 			this.y_max = y_domain[1];
 		} else {
+			this.y_max = d3.max(this.lines, l => l.is_visible() ? l.y_max : this.y_min);
+			this.y_min = d3.min(this.lines, l => l.is_visible() ? l.y_min : this.y_max);
 			// add 10% padding to the top
 			this.y_max *= 1.1;
+
+			if (this.y_min > 0) {
+				let v = 1.0;
+				while (v > this.y_min) { v /= 10.0; }
+				//console.log(this.y_min, v);
+				this.y_min = v;
+			} else {
+				this.y_min = 0.01;
+			}
 		}
 
 		this.y = this.y_scale()
