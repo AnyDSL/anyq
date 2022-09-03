@@ -67,7 +67,11 @@ static void cleanup(queue_t * q, handle_t * th) {
 
   node_t * old = q->Hp;
   handle_t * ph = th;
-  handle_t * phs[q->nprocs];
+#ifdef __STDC_NO_VLA__
+  handle_t** phs = (handle_t**)malloc(q->nprocs * sizeof(handle_t*));
+#else
+  handle_t* phs[q->nprocs];
+#endif // __STDC_NO_VLA__
   int i = 0;
 
   do {
@@ -85,6 +89,10 @@ static void cleanup(queue_t * q, handle_t * th) {
     node_t * Hp = ACQUIRE(&phs[i]->Hp);
     if (Hp && Hp->id < new->id) new = Hp;
   }
+
+#ifdef __STDC_NO_VLA__
+  free(phs);
+#endif // __STDC_NO_VLA__
 
   long nid = new->id;
 
