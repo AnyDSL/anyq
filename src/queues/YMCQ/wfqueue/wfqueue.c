@@ -444,6 +444,7 @@ static void queue_register(queue_t * q, handle_t * th, int id)
 typedef struct
 {
   queue_t q;
+  volatile long size;
   handle_t h[];
 } wfqueue_t;
 
@@ -451,6 +452,7 @@ wfqueue_t* wfqueue_create(int32_t nprocs)
 {
   wfqueue_t* queue = align_malloc(_Alignof(wfqueue_t), sizeof(wfqueue_t) + nprocs * sizeof(handle_t));
   queue_init(&queue->q, nprocs);
+  queue->size = 0;
   return queue;
 }
 
@@ -462,11 +464,21 @@ void wfqueue_init(wfqueue_t* queue, int32_t id)
 void wfqueue_enqueue(wfqueue_t* queue, int32_t id, uintptr_t v)
 {
   enqueue(&queue->q, &queue->h[id], (void*)v);
+  FAA(&queue->size, 1);
 }
 
 uintptr_t wfqueue_dequeue(wfqueue_t* queue, int32_t id)
 {
-  (uintptr_t)dequeue(&queue->q, &queue->h[id]);
+  uintptr_t v = (uintptr_t)dequeue(&queue->q, &queue->h[id]);
+
+  if (v) FAA(&queue->size, -1);
+
+  return v;
+}
+
+int32_t wfqueue_size(wfqueue_t* queue)
+{
+  return queue->size;
 }
 
 void wfqueue_destroy(wfqueue_t* queue)
