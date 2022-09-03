@@ -108,6 +108,28 @@ _compare_and_swap(void ** ptr, void ** expected, void * desired) {
 #define FENCE() __sync_synchronize()
 
 #endif
+
+#ifdef _MSC_VER
+
+#include <intrin.h>
+
+#define FAA _InterlockedExchangeAdd
+#define FAAcs FAA
+
+#define CAS(ptr, cmp, val) (void*)_InterlockedCompareExchange64((volatile long long*)ptr, (long long)val, (long long)*cmp)
+#define CAScs CAS
+#define CASra CAS
+#define CASa  CAS
+
+#define SWAP(ptr, val) (void*)_InterlockedExchange((volatile long long*)ptr, (long long)val)
+#define SWAPra SWAP
+
+#define ACQUIRE(ptr) _InterlockedExchangeAdd64((volatile long long*)ptr, 0)
+#define RELEASE(ptr, val) _InterlockedExchange64((volatile long long*)ptr, (long long)val)
+#define FENCE() // noop
+
+#endif
+
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64_)
