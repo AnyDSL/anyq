@@ -28,26 +28,26 @@ struct _cell_t {
 };
 
 struct _node_t {
-  struct _node_t * volatile next CACHE_ALIGNED;
-  long id CACHE_ALIGNED;
-  struct _cell_t cells[WFQUEUE_NODE_SIZE] CACHE_ALIGNED;
+  CACHE_ALIGNED struct _node_t * volatile next;
+  CACHE_ALIGNED long id;
+  CACHE_ALIGNED struct _cell_t cells[WFQUEUE_NODE_SIZE];
 };
 
 typedef struct DOUBLE_CACHE_ALIGNED {
   /**
    * Index of the next position for enqueue.
    */
-  volatile long Ei DOUBLE_CACHE_ALIGNED;
+  DOUBLE_CACHE_ALIGNED volatile long Ei;
 
   /**
    * Index of the next position for dequeue.
    */
-  volatile long Di DOUBLE_CACHE_ALIGNED;
+  DOUBLE_CACHE_ALIGNED volatile long Di;
 
   /**
    * Index of the head of the queue.
    */
-  volatile long Hi DOUBLE_CACHE_ALIGNED;
+  DOUBLE_CACHE_ALIGNED volatile long Hi;
 
   /**
    * Pointer to the head node of the queue.
@@ -91,17 +91,17 @@ typedef struct _handle_t {
   /**
    * Enqueue request.
    */
-  struct _enq_t Er CACHE_ALIGNED;
+  CACHE_ALIGNED struct _enq_t Er;
 
   /**
    * Dequeue request.
    */
-  struct _deq_t Dr CACHE_ALIGNED;
+  CACHE_ALIGNED struct _deq_t Dr;
 
   /**
    * Handle of the next enqueuer to help.
    */
-  struct _handle_t * Eh CACHE_ALIGNED;
+  CACHE_ALIGNED struct _handle_t * Eh;
 
   long Ei;
 
@@ -113,7 +113,7 @@ typedef struct _handle_t {
   /**
    * Pointer to a spare node to use, to speedup adding a new node.
    */
-  struct _node_t * spare CACHE_ALIGNED;
+  CACHE_ALIGNED struct _node_t * spare;
 
   /**
    * Count the delay rounds of helping another dequeuer.
