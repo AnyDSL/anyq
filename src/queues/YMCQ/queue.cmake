@@ -9,7 +9,7 @@ add_library(wfqueue STATIC
 target_compile_definitions(wfqueue PRIVATE WFQUEUE)
 
 set_target_properties(wfqueue PROPERTIES
-	C_STANDARD 17
+	C_STANDARD 11
 	C_STANDARD_REQUIRED ON
 	C_EXTENSIONS OFF
 	FOLDER "wfqueue"
