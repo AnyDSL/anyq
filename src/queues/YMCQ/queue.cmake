@@ -16,14 +16,14 @@ set_target_properties(wfqueue PROPERTIES
 )
 
 
-# set(YangMellorCrummeyQueue_short_name YMCQ)
+set(YangMellorCrummeyQueue_short_name YMCQ)
 set(YangMellorCrummeyQueue_ref_short_name YMCQ_ref)
 
-# set(YangMellorCrummeyQueue_sources ${CMAKE_CURRENT_LIST_DIR}/wait_free_queue.art)
+set(YangMellorCrummeyQueue_sources ${CMAKE_CURRENT_LIST_DIR}/wait_free_queue.art)
 set(YangMellorCrummeyQueue_ref_sources ${CMAKE_CURRENT_LIST_DIR}/wfqueue.art)
 
-# set(YangMellorCrummeyQueue_constructor "")
-# set(YangMellorCrummeyQueue_constructor_u32 "createYangMellorCrummeyQueue")
+set(YangMellorCrummeyQueue_constructor "")
+set(YangMellorCrummeyQueue_constructor_u32 "createYangMellorCrummeyQueue")
 set(YangMellorCrummeyQueue_ref_constructor "")
 set(YangMellorCrummeyQueue_ref_constructor_u32 "createYangMellorCrummeyRefQueue")
 
