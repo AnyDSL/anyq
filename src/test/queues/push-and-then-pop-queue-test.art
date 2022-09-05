@@ -81,6 +81,11 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 						device.print_2xi32("ERROR: queue size (%d) is not consistent with number of source invocations recorded in push_buffer (%d)!\n", size, *push_buffer_sum);
 						fail(1, thread);
 					}
+
+					if size < queue_size {
+						device.print_2xi32("ERROR: actual queue size (%d) is less than requested capacity (%d)!\n", size, queue_size);
+						fail(2, thread);
+					}
 				}
 			}
 		}
@@ -92,11 +97,15 @@ fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size:
 		for grid in device.launch_1d(div_up(num_threads, block_dim), block_dim) {
 			for thread in grid.threads() {
 				if thread.idx(0) as i32 < num_threads {
-					while (thread.atomic_load_global_i32(num_popped, memory_order::relaxed) < queue_size) {
+					while (thread.atomic_load_global_i32(num_popped, memory_order::relaxed) < *num_pushed) {
 						if for el in queue.pop(thread) {
 							let i = test_element.unpackRefValue(el);
-
-							thread.atomic_sub_global_i32(push_buffer(i), 1, memory_order::relaxed);
+							if i < push_buffer_size {
+								thread.atomic_sub_global_i32(push_buffer(i), 1, memory_order::relaxed);
+							} else {
+								device.print_2xi32("ERROR: popped element (%d) is out of range (%d)!\n", i, push_buffer_size);
+								fail(3, thread);
+							}
 						} > 0 {
 							thread.atomic_add_global_i32(num_popped, 1, memory_order::relaxed);
 						}
