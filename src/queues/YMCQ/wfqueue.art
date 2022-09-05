@@ -11,7 +11,7 @@
 #[import(cc = "C")] fn wfqueue_size(_queue: &mut [u8]) -> i32;
 #[import(cc = "C")] fn wfqueue_destroy(_queue: &mut [u8]) -> ();
 
-fn @createYangMellorCrummeyRefQueue(_device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+fn @createYangMellorCrummeyRefQueue(device: AccDevice, block_dim: i32, _queue_size: i32) -> ProducerConsumerQueue[u32] {
 	// let queue_state_size = 80 as i64;
 
 	let num_handles = (1 << 21);
