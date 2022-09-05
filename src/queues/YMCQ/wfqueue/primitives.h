@@ -8,33 +8,40 @@
  * An atomic fetch-and-add.
  */
 #define FAA(ptr, val) __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED)
+#define FAA_LONG FAA
 /**
  * An atomic fetch-and-add that also ensures sequential consistency.
  */
 #define FAAcs(ptr, val) __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
-
+#define FAAcs_LONG FAAcs
 /**
  * An atomic compare-and-swap.
  */
 #define CAS(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_RELAXED, __ATOMIC_RELAXED)
+#define CAS_LONG CAS
+#define CAS_PTR CAS
 /**
  * An atomic compare-and-swap that also ensures sequential consistency.
  */
 #define CAScs(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-/**
+#define CAScs_PTR CAScs
+ /**
  * An atomic compare-and-swap that ensures release semantic when succeed
  * or acquire semantic when failed.
  */
 #define CASra(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)
-/**
+#define CASra_LONG CASra
+#define CASra_PTR CASra
+ /**
  * An atomic compare-and-swap that ensures acquire semantic when succeed
  * or relaxed semantic when failed.
  */
 #define CASa(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
+#define CASa_LONG CASa
 
 /**
  * An atomic swap.
@@ -61,12 +68,18 @@
  * and stores completes before the current store is visiable.
  */
 #define RELEASE(ptr, val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+#define RELEASE_PTR RELEASE
+#define RELEASE_LONG RELEASE
+#define RELEASE_LONGLLONG RELEASE
 
 /**
  * A load with a following acquire fence to ensure no following load and
  * stores can start before the current load completes.
  */
 #define ACQUIRE(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
+#define ACQUIRE_PTR ACQUIRE
+#define ACQUIRE_LONG ACQUIRE
+#define ACQUIRE_LONGLLONG ACQUIRE
 
 #else /** Non-GCC or old GCC. */
 #if defined(__x86_64__) || defined(_M_X64_)
@@ -113,19 +126,51 @@ _compare_and_swap(void ** ptr, void ** expected, void * desired) {
 
 #include <intrin.h>
 
-#define FAA _InterlockedExchangeAdd
-#define FAAcs FAA
+#define FAA_LONG(ptr, val) _InterlockedExchangeAdd((volatile long*)ptr, val)
+#define FAAcs_LONG FAA_LONG
 
-#define CAS(ptr, cmp, val) (void*)_InterlockedCompareExchange64((volatile long long*)ptr, (long long)val, (long long)*cmp)
-#define CAScs CAS
-#define CASra CAS
-#define CASa  CAS
+static inline int
+_compare_and_swap_long(volatile long* ptr, long* expected, long desired) {
+    long oldval = *expected;
+    long newval = _InterlockedCompareExchange(ptr, desired, oldval);
 
-#define SWAP(ptr, val) (void*)_InterlockedExchange((volatile long long*)ptr, (long long)val)
-#define SWAPra SWAP
+    if (newval == oldval) {
+        return 1;
+    }
+    else {
+        *expected = newval;
+        return 0;
+    }
+}
 
-#define ACQUIRE(ptr) _InterlockedExchangeAdd64((volatile long long*)ptr, 0)
-#define RELEASE(ptr, val) _InterlockedExchange64((volatile long long*)ptr, (long long)val)
+static inline int
+_compare_and_swap_ptr(void* volatile * ptr, void** expected, void* desired) {
+    void* oldval = *expected;
+    void* newval = (void*)_InterlockedCompareExchange64((volatile long long*)ptr, (long long)desired, (long long)oldval);
+
+    if (newval == oldval) {
+        return 1;
+    }
+    else {
+        *expected = newval;
+        return 0;
+    }
+}
+
+#define CAS_LONG(ptr, cmp, val) _compare_and_swap_long(ptr, cmp, val)
+#define CAS_PTR(ptr, cmp, val) _compare_and_swap_ptr(ptr, cmp, val)
+#define CAScs_PTR CAS_PTR
+#define CASra_LONG CAS_LONG
+#define CASra_PTR CAS_PTR
+#define CASa_LONG CAS_LONG
+
+#define ACQUIRE_LONG(ptr) _InterlockedExchangeAdd((volatile long*)ptr, 0)
+#define ACQUIRE_LONGLONG(ptr) _InterlockedExchangeAdd64((volatile long long*)ptr, 0)
+#define ACQUIRE_PTR(ptr) (void*)_InterlockedExchangeAdd64((volatile long long*)ptr, 0)
+
+#define RELEASE_LONG(ptr, val) _InterlockedExchange(ptr, val)
+#define RELEASE_LONGLONG(ptr, val) _InterlockedExchange64(ptr, val)
+#define RELEASE_PTR(ptr, val) (void*)_InterlockedExchange64((volatile long long*)ptr, (long long)val)
 #define FENCE() // noop
 
 #endif

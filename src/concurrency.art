@@ -28,6 +28,7 @@ fn @builtin_memory_order(order: memory_order) -> u32 {
 
 struct grid_context {
 	device: i32,
+	max_concurrency: fn() -> i32,
 
 	groups: fn(fn(group_context) -> ()) -> fn() -> (),
 	waves: fn(fn(wave_context) -> ()) -> fn() -> (),
@@ -123,6 +124,7 @@ struct thread_context {
 	idx: fn(i32) -> u32,
 
 	gid: fn() -> u32,
+	uid: fn() -> i32,
 
 	atomic_load_global_i32: fn(&addrspace(1) i32, memory_order) -> i32,
 	atomic_load_global_u32: fn(&addrspace(1) u32, memory_order) -> u32,

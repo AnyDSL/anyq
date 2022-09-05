@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 // #include <pthread.h>
+#include <assert.h>
 #include "wfqueue.h"
 #include "primitives.h"
 
@@ -46,7 +47,7 @@ static node_t * update(node_t * volatile * pPn, node_t * cur,
   node_t * ptr = *pPn;
 
   if (ptr->id < cur->id) {
-    if (!CAScs(pPn, &ptr, cur)) {
+    if (!CAScs_PTR(pPn, &ptr, cur)) {
       if (ptr->id < cur->id) cur = ptr;
     }
 
@@ -63,11 +64,11 @@ static void cleanup(queue_t * q, handle_t * th) {
 
   if (oid == -1) return;
   if (new->id - oid < MAX_GARBAGE(q->nprocs)) return;
-  if (!CASa(&q->Hi, &oid, -1)) return;
+  if (!CASa_LONG(&q->Hi, &oid, -1)) return;
 
   node_t * old = q->Hp;
   handle_t * ph = th;
-#ifdef __STDC_NO_VLA__
+#if defined(__STDC_NO_VLA__) || defined(_MSC_VER)
   handle_t** phs = (handle_t**)malloc(q->nprocs * sizeof(handle_t*));
 #else
   handle_t* phs[q->nprocs];
@@ -75,7 +76,7 @@ static void cleanup(queue_t * q, handle_t * th) {
   int i = 0;
 
   do {
-    node_t * Hp = ACQUIRE(&ph->Hp);
+    node_t * Hp = ACQUIRE_PTR(&ph->Hp);
     if (Hp && Hp->id < new->id) new = Hp;
 
     new = update(&ph->Ep, new, &ph->Hp);
@@ -86,21 +87,21 @@ static void cleanup(queue_t * q, handle_t * th) {
   } while (new->id > oid && ph != th);
 
   while (new->id > oid && --i >= 0) {
-    node_t * Hp = ACQUIRE(&phs[i]->Hp);
+    node_t * Hp = ACQUIRE_PTR(&phs[i]->Hp);
     if (Hp && Hp->id < new->id) new = Hp;
   }
 
-#ifdef __STDC_NO_VLA__
+#if defined(__STDC_NO_VLA__) || defined(_MSC_VER)
   free(phs);
 #endif // __STDC_NO_VLA__
 
   long nid = new->id;
 
   if (nid <= oid) {
-    RELEASE(&q->Hi, oid);
+    RELEASE_LONG(&q->Hi, oid);
   } else {
     q->Hp = new;
-    RELEASE(&q->Hi, nid);
+    RELEASE_LONG(&q->Hi, nid);
 
     while (old != new) {
       node_t * tmp = old->next;
@@ -127,7 +128,7 @@ static cell_t * find_cell(node_t * volatile * p, long i, handle_t * th) {
 
       t->id = j + 1;
 
-      if (CASra(&c->next, &n, t)) {
+      if (CASra_PTR(&c->next, &n, t)) {
         n = t;
         th->spare = NULL;
       }
@@ -142,11 +143,11 @@ static cell_t * find_cell(node_t * volatile * p, long i, handle_t * th) {
 
 static int enq_fast(queue_t * q, handle_t * th, void * v, long * id)
 {
-  long i = FAAcs(&q->Ei, 1);
+  long i = FAAcs_LONG(&q->Ei, 1);
   cell_t * c = find_cell(&th->Ep, i, th);
   void * cv = BOT;
 
-  if (CAS(&c->val, &cv, v)) {
+  if (CAS_PTR(&c->val, &cv, v)) {
 #ifdef RECORD
     th->fastenq++;
 #endif
@@ -161,18 +162,18 @@ static void enq_slow(queue_t * q, handle_t * th, void * v, long id)
 {
   enq_t * enq = &th->Er;
   enq->val = v;
-  RELEASE(&enq->id, id);
+  RELEASE_LONG(&enq->id, id);
 
   node_t * tail = th->Ep;
   long i; cell_t * c;
 
   do {
-    i = FAA(&q->Ei, 1);
+    i = FAA_LONG(&q->Ei, 1);
     c = find_cell(&tail, i, th);
     enq_t * ce = BOT;
 
-    if (CAScs(&c->enq, &ce, enq) && c->val != TOP) {
-      if (CAS(&enq->id, &id, -i)) id = -i;
+    if (CAScs_PTR(&c->enq, &ce, enq) && c->val != TOP) {
+      if (CAS_LONG(&enq->id, &id, -i)) id = -i;
       break;
     }
   } while (enq->id > 0);
@@ -181,7 +182,7 @@ static void enq_slow(queue_t * q, handle_t * th, void * v, long id)
   c = find_cell(&th->Ep, id, th);
   if (id > i) {
     long Ei = q->Ei;
-    while (Ei <= id && !CAS(&q->Ei, &Ei, id + 1));
+    while (Ei <= id && !CAS_LONG(&q->Ei, &Ei, id + 1));
   }
   c->val = v;
 
@@ -199,7 +200,7 @@ static inline void enqueue(queue_t * q, handle_t * th, void * v)
   while (!enq_fast(q, th, v, &id) && p-- > 0);
   if (p < 0) enq_slow(q, th, v, id);
 
-  RELEASE(&th->Hp, NULL);
+  RELEASE_PTR(&th->Hp, NULL);
 }
 
 static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
@@ -207,7 +208,7 @@ static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
   void * v = spin(&c->val);
 
   if ((v != TOP && v != BOT) ||
-      (v == BOT && !CAScs(&c->val, &v, TOP) && v != TOP)) {
+      (v == BOT && !CAScs_PTR(&c->val, &v, TOP) && v != TOP)) {
     return v;
   }
 
@@ -223,26 +224,26 @@ static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
       ph = th->Eh, pe = &ph->Er, id = pe->id;
     }
 
-    if (id > 0 && id <= i && !CAS(&c->enq, &e, pe))
+    if (id > 0 && id <= i && !CAS_PTR(&c->enq, &e, pe))
       th->Ei = id;
     else
       th->Eh = ph->next;
 
-    if (e == BOT && CAS(&c->enq, &e, TOP)) e = TOP;
+    if (e == BOT && CAS_PTR(&c->enq, &e, TOP)) e = TOP;
   }
 
   if (e == TOP) return (q->Ei <= i ? BOT : TOP);
 
-  long ei = ACQUIRE(&e->id);
-  void * ev = ACQUIRE(&e->val);
+  long ei = ACQUIRE_LONG(&e->id);
+  void * ev = ACQUIRE_PTR(&e->val);
 
   if (ei > i) {
     if (c->val == TOP && q->Ei <= i) return BOT;
   } else {
-    if ((ei > 0 && CAS(&e->id, &ei, -i)) ||
+    if ((ei > 0 && CAS_LONG(&e->id, &ei, -i)) ||
         (ei == -i && c->val == TOP)) {
       long Ei = q->Ei;
-      while (Ei <= i && !CAS(&q->Ei, &Ei, i + 1));
+      while (Ei <= i && !CAS_LONG(&q->Ei, &Ei, i + 1));
       c->val = ev;
     }
   }
@@ -253,7 +254,7 @@ static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
 static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
 {
   deq_t * deq = &ph->Dr;
-  long idx = ACQUIRE(&deq->idx);
+  long idx = ACQUIRE_LONG(&deq->idx);
   long id = deq->id;
 
   if (idx < id) return;
@@ -270,11 +271,11 @@ static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
       cell_t * c = find_cell(&h, i, th);
       void * v = help_enq(q, th, c, i);
       if (v == BOT || (v != TOP && c->deq == BOT)) new = i;
-      else idx = ACQUIRE(&deq->idx);
+      else idx = ACQUIRE_LONG(&deq->idx);
     }
 
     if (new != 0) {
-      if (CASra(&deq->idx, &idx, new)) idx = new;
+      if (CASra_LONG(&deq->idx, &idx, new)) idx = new;
       if (idx >= new) new = 0;
     }
 
@@ -282,8 +283,8 @@ static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
 
     cell_t * c = find_cell(&Dp, idx, th);
     deq_t * cd = BOT;
-    if (c->val == TOP || CAS(&c->deq, &cd, deq) || cd == deq) {
-      CAS(&deq->idx, &idx, -idx);
+    if (c->val == TOP || CAS_PTR(&c->deq, &cd, deq) || cd == deq) {
+      CAS_LONG(&deq->idx, &idx, -idx);
       break;
     }
 
@@ -294,13 +295,13 @@ static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
 
 static void * deq_fast(queue_t * q, handle_t * th, long * id)
 {
-  long i = FAAcs(&q->Di, 1);
+  long i = FAAcs_LONG(&q->Di, 1);
   cell_t * c = find_cell(&th->Dp, i, th);
   void * v = help_enq(q, th, c, i);
   deq_t * cd = BOT;
 
   if (v == BOT) return BOT;
-  if (v != TOP && CAS(&c->deq, &cd, TOP)) return v;
+  if (v != TOP && CAS_PTR(&c->deq, &cd, TOP)) return v;
 
   *id = i;
   return TOP;
@@ -309,8 +310,8 @@ static void * deq_fast(queue_t * q, handle_t * th, long * id)
 static void * deq_slow(queue_t * q, handle_t * th, long id)
 {
   deq_t * deq = &th->Dr;
-  RELEASE(&deq->id, id);
-  RELEASE(&deq->idx, id);
+  RELEASE_LONG(&deq->id, id);
+  RELEASE_LONG(&deq->idx, id);
 
   help_deq(q, th, th);
   long i = -deq->idx;
@@ -318,7 +319,7 @@ static void * deq_slow(queue_t * q, handle_t * th, long id)
   void * val = c->val;
 
   long Di = q->Di;
-  while (Di <= i && !CAS(&q->Di, &Di, i + 1));
+  while (Di <= i && !CAS_LONG(&q->Di, &Di, i + 1));
 #ifdef RECORD
   th->slowdeq++;
 #endif
@@ -347,7 +348,7 @@ static inline void * dequeue(queue_t * q, handle_t * th)
     th->Dh = th->Dh->next;
   }
 
-  RELEASE(&th->Hp, NULL);
+  RELEASE_PTR(&th->Hp, NULL);
 
   if (th->spare == NULL) {
     cleanup(q, th);
@@ -403,7 +404,7 @@ static void queue_free(queue_t * q, handle_t * h)
 #endif
 }
 
-static void queue_register(queue_t * q, handle_t * th, int id)
+static void queue_register(queue_t * q, handle_t* volatile * qtail, handle_t * th, int id)
 {
   th->next = NULL;
   th->Hp = NULL;
@@ -425,21 +426,23 @@ static void queue_register(queue_t * q, handle_t * th, int id)
   th->empty = 0;
 #endif
 
-  static handle_t * volatile _tail;
-  handle_t * tail = _tail;
+  //static handle_t * volatile _tail;
+  handle_t * tail = ACQUIRE_PTR(qtail);
 
   if (tail == NULL) {
     th->next = th;
-    if (CASra(&_tail, &tail, th)) {
+    if (CASra_PTR(qtail, &tail, th)) {
       th->Eh = th->next;
       th->Dh = th->next;
       return;
     }
   }
 
-  handle_t * next = tail->next;
+  assert(tail != NULL);
+
+  handle_t * next = ACQUIRE_PTR(&tail->next);
   do th->next = next;
-  while (!CASra(&tail->next, &next, th));
+  while (!CASra_PTR(&tail->next, &next, th));
 
   th->Eh = th->next;
   th->Dh = th->next;
@@ -453,35 +456,65 @@ typedef struct
 {
   queue_t q;
   volatile long size;
+  volatile handle_t* tail;
   handle_t h[];
 } wfqueue_t;
 
-wfqueue_t* wfqueue_create(int32_t nprocs)
+int wfqueue_create(int32_t nprocs, wfqueue_t** queue_ptr)
 {
   wfqueue_t* queue = align_malloc(_Alignof(wfqueue_t), sizeof(wfqueue_t) + nprocs * sizeof(handle_t));
   queue_init(&queue->q, nprocs);
   queue->size = 0;
-  return queue;
+  queue->tail = NULL;
+
+  for (int i = 0; i < nprocs; ++i) {
+    queue_register(&queue->q, &queue->tail, &queue->h[i], i);
+  }
+
+  *queue_ptr = queue;
+  return 1;
 }
 
-void wfqueue_init(wfqueue_t* queue, int32_t id)
-{
-  queue_register(&queue->q, &queue->h[id], id);
-}
-
+//void wfqueue_init(wfqueue_t* queue, int32_t id)
+//{
+//  queue_register(&queue->q, &queue->h[id], id);
+//}
+/*
 void wfqueue_enqueue(wfqueue_t* queue, int32_t id, uintptr_t v)
 {
   enqueue(&queue->q, &queue->h[id], (void*)v);
-  FAA(&queue->size, 1);
+  FAA_LONG(&queue->size, 1);
 }
 
 uintptr_t wfqueue_dequeue(wfqueue_t* queue, int32_t id)
 {
-  uintptr_t v = (uintptr_t)dequeue(&queue->q, &queue->h[id]);
+  void* v = dequeue(&queue->q, &queue->h[id]);
 
-  if (v) FAA(&queue->size, -1);
+  if (v != 0) FAA_LONG(&queue->size, -1);
 
-  return v;
+  return (uintptr_t)v;
+}
+*/
+
+int wfqueue_try_enqueue_u32(wfqueue_t* queue, int32_t id, uint32_t v)
+{
+    assert(id < queue->q.nprocs);
+    void* value = (void*)(0x00ff000000000000UL | v);
+    enqueue(&queue->q, &queue->h[id], value);
+    FAA_LONG(&queue->size, 1);
+    return 1;
+}
+
+int wfqueue_try_dequeue_u32(wfqueue_t* queue, int32_t id, uint32_t* value)
+{
+    assert(id < queue->q.nprocs);
+    void* v = dequeue(&queue->q, &queue->h[id]);
+
+    if (v == EMPTY) return 0;
+
+    *value = (uint32_t)(0xffffffffUL & (uint64_t)v);
+    FAA_LONG(&queue->size, -1);
+    return 1;
 }
 
 int32_t wfqueue_size(wfqueue_t* queue)
@@ -489,7 +522,8 @@ int32_t wfqueue_size(wfqueue_t* queue)
   return queue->size;
 }
 
-void wfqueue_destroy(wfqueue_t* queue)
+int wfqueue_destroy(wfqueue_t* queue)
 {
   align_free(queue);
+  return 1;
 }

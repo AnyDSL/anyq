@@ -41,9 +41,9 @@ static inline void * align_malloc(size_t align, size_t size)
 static inline void align_free(void* ptr)
 {
 #ifdef _MSC_VER
-  return _aligned_free(ptr);
+  _aligned_free(ptr);
 #else
-  return free(ptr);
+  free(ptr);
 #endif
 }
 

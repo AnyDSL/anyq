@@ -3,18 +3,47 @@
 // In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming (PPoPP '16), pages 1–13.
 // https://doi.org/10.1145/2851141.2851168
 
+type WFQHandle = &mut [u8];
 
-#[import(cc = "C")] fn wfqueue_create(_nprocs: i32) -> &mut [u8];
-#[import(cc = "C")] fn wfqueue_init(_queue: &mut [u8], _id: i32) -> ();
-#[import(cc = "C")] fn wfqueue_enqueue(_queue: &mut [u8], _id: i32, _v: u64) -> ();
-#[import(cc = "C")] fn wfqueue_dequeue(_queue: &mut [u8], _id: i32) -> u64;
-#[import(cc = "C")] fn wfqueue_size(_queue: &mut [u8]) -> i32;
-#[import(cc = "C")] fn wfqueue_destroy(_queue: &mut [u8]) -> ();
+#[import(cc = "C")] fn wfqueue_create(_nprocs: i32, _out_handle: &mut WFQHandle) -> i32;
+#[import(cc = "C")] fn wfqueue_init(_queue: WFQHandle, _id: i32) -> ();
+//#[import(cc = "C")] fn wfqueue_enqueue(_queue: &mut [u8], _id: i32, _v: u64) -> ();
+//#[import(cc = "C")] fn wfqueue_dequeue(_queue: &mut [u8], _id: i32) -> u64;
+#[import(cc = "C")] fn wfqueue_size(_queue: WFQHandle) -> i32;
+#[import(cc = "C")] fn wfqueue_destroy(_queue: WFQHandle) -> i32;
+#[import(cc = "C")] fn wfqueue_try_enqueue_u32(_: WFQHandle, _id: i32, _value: u32) -> i32;
+#[import(cc = "C")] fn wfqueue_try_dequeue_u32(_: WFQHandle, _id: i32, _out_value: &mut u32) -> i32;
 
-fn @createYangMellorCrummeyRefQueue(device: AccDevice, block_dim: i32, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+static default_num_handles = 128;
+
+
+fn @createYangMellorCrummeyRefQueue(device: AccDevice, _block_dim: i32, _queue_size: i32) -> ProducerConsumerQueue[u32] {
 	// let queue_state_size = 80 as i64;
 
-	let num_handles = (1 << 21);
+	//let num_handles = 100; //(1 << 21);
+	// retrieve max_concurrency from device
+	/*
+	let dev_num_handles_buffer = device.alloc(sizeof[i32]());
+	let dev_num_handles = dev_num_handles_buffer.data as &mut addrspace(1) i32;
+
+	for grid in device.launch_1d(1, block_dim) {
+		for thread in grid.threads() {
+			if thread.idx(0) == 0 {
+				*dev_num_handles = grid.max_concurrency();
+			}
+		}
+	}
+
+	let num_handles_buffer = alloc_cpu(sizeof[i32]());
+	copy(dev_num_handles_buffer, num_handles_buffer);
+	let num_handles = *(num_handles_buffer.data as &mut i32);
+	release(num_handles_buffer);
+	release(dev_num_handles_buffer);
+
+	assert(0 < num_handles, "this device does not expose its max_concurrency");
+
+	print_string("num_handles: "); print_i32(num_handles); print_char('\n');
+	*/
 	// let handle_buffer_size = num_handles * sizeof[YangMellorCrummey::Handle]();
 	// let handle_buffer_alignment = alignof[YangMellorCrummey::Handle]();
 
@@ -26,22 +55,32 @@ fn @createYangMellorCrummeyRefQueue(device: AccDevice, block_dim: i32, _queue_si
 	// let queue = &mut queue_device_memory(0) as &mut addrspace(1) [u8];
 	// let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [u8];
 
-	let queue = wfqueue_create(num_handles);
+	let mut queue:WFQHandle;
+
+	let success = wfqueue_create(default_num_handles, &mut queue);
+	assert(success > 0, "wfqueue_create() failed");
 
 	ProducerConsumerQueue[u32] {
 		push = @|source| @|thread| {
-			wfqueue_enqueue(queue, thread.gid() as i32, source() as u64);
-			1
+			let handle = thread.uid();
+			//assert(handle < num_handles, "thread handle out of range");
+			let value = source();
+			let success = wfqueue_try_enqueue_u32(queue, handle, value);
+			//device.print_3xi32("push handle: %d - %d / %d\n", handle, value as i32, success);
+			if success > 0 { 1 } else { 0 }
 		},
 
 		pop = @|sink| @|thread| {
-			let v = wfqueue_dequeue(queue, thread.gid() as i32);
+			let handle = thread.uid();
+			//assert(handle < num_handles, "thread handle out of range");
+			let mut value:u32 = thread.idx(0);
+			let success = wfqueue_try_dequeue_u32(queue, handle, &mut value);
+			//device.print_3xi32("pop handle: %d - %d / %d\n", handle, value as i32, success);
 
-			if v != 0 {
-				sink(v as u32);
+			if success > 0 {
+				sink(value);
 				1
-			}
-			else {
+			} else {
 				0
 			}
 		},
@@ -49,11 +88,25 @@ fn @createYangMellorCrummeyRefQueue(device: AccDevice, block_dim: i32, _queue_si
 		size = @|_thread| wfqueue_size(queue),
 
 		reset = @|grid| {
+			let num_handles = grid.max_concurrency();
+
+			for thread in grid.threads() {
+				if thread.idx(0) == 0 {
+					let mut success:i32;
+					success = wfqueue_destroy(queue);
+					assert(success > 0, "wfqueue_destroy() failed");
+					device.print_i32("num_handles: %d\n", num_handles);
+					success = wfqueue_create(num_handles, &mut queue);
+					assert(success > 0, "wfqueue_create() failed");
+				}
+			}
+			/*
 			for thread in grid.threads() {
 				for i in range_step(thread.idx(0) as i32, num_handles, grid.num_threads(0) as i32) {
 					wfqueue_init(queue, i);
 				}
 			}
+			*/
 		},
 
 		validate = @|_corrupted, _grid| {
