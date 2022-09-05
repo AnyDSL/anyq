@@ -17,7 +17,7 @@ mod MichaelScott {
 	}
 }
 
-fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[T] {
+fn @createMichaelScottQueue[T](device: AccDevice, _block_dim: i32, _queue_size: i32) -> ProducerConsumerQueue[T] {
 	let pool_size = (1 << 21) * 20 * 2;
 	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScott::QueueNode[T]]();
 	let buffer_alignment = alignof[MichaelScott::QueueNode[T]]();

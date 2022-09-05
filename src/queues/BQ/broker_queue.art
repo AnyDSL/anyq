@@ -175,7 +175,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 	}
 }
 
-fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) {
+fn @createBrokerWorkDistributorQueue[T](device: AccDevice, _block_dim: i32, queue_size: i32) {
 	createBrokerWorkDistributorQueue_internal[T](queue_size, device.alloc, @|buffer| release(buffer), false)
 }
 
@@ -191,10 +191,10 @@ fn @bwd_static_alloc(size: i64) {
 	}
 }
 
-fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, queue_size: i32) {
+fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, _block_dim: i32, queue_size: i32) {
 	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, false)
 }
 
-fn @createBrokerWorkDistributorQueueOrig[T](_device: AccDevice, queue_size: i32) {
+fn @createBrokerWorkDistributorQueueOrig[T](_device: AccDevice, _block_dim: i32, queue_size: i32) {
 	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, true)
 }
