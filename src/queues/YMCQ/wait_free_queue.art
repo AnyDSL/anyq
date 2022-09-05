@@ -292,6 +292,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		}
 
 		if thread.atomic_load_global_u64(c.enq, memory_order::relaxed) == BOTTOM_e {
+			// WORKAROUND for thorin issue #130
 			let fun = @|(p: &mut addrspace(1) YangMellorCrummey::Handle, r: &mut addrspace(1) YangMellorCrummey::EnqReq, s: u64)| -> (&mut addrspace(1) YangMellorCrummey::Handle, &mut addrspace(1) YangMellorCrummey::EnqReq, u64) {
 				let h_enq_id = enq_req_id(thread.atomic_load_global_u64(h.enq.req.state, memory_order::relaxed));
 
@@ -327,8 +328,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		}
 
 		let r = thread.atomic_load_global_u64(c.enq, memory_order::relaxed) as &mut addrspace(1) YangMellorCrummey::EnqReq;
-		let s = thread.atomic_load_global_u64(r.state, memory_order::relaxed);
-		let v = thread.atomic_load_global_u64(r.val, memory_order::relaxed);
+		let s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
+		let v = thread.atomic_load_global_u64(r.val, memory_order::acquire);
 
 		if enq_req_id(s) > i {
 			if thread.atomic_load_global_u64(c.val, memory_order::relaxed) == TOP
@@ -346,8 +347,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 	let help_deq = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, helpee: &mut addrspace(1) YangMellorCrummey::Handle| -> () {
 		let r = &mut helpee.deq.req;
-		let mut s = thread.atomic_load_global_u64(r.state, memory_order::relaxed);
-		let id = thread.atomic_load_global_i64(r.id, memory_order::relaxed);
+		let mut s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
+		let id = thread.atomic_load_global_i64(r.id, memory_order::acquire);
 
 		if !deq_req_pending(s) || deq_req_idx(s) < id { return() }
 
@@ -368,7 +369,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 							cand = i;
 						}
 						else {
-							s = thread.atomic_load_global_u64(r.state, memory_order::relaxed);
+							s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
 						}
 				}
 			}
@@ -419,8 +420,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 	let deq_slow = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, cid: i64| -> YangMellorCrummey::dequeue_result {
 		let r = &mut h.deq.req;
-		thread.atomic_store_global_i64(r.id, cid, memory_order::relaxed);
-		thread.atomic_store_global_u64(r.state, deq_req_state(true, cid), memory_order::relaxed);
+		thread.atomic_store_global_i64(r.id, cid, memory_order::release);
+		thread.atomic_store_global_u64(r.state, deq_req_state(true, cid), memory_order::release);
 
 		help_deq(thread, h, h);
 
@@ -500,13 +501,14 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 				}
 
 				for i in range_step(thread.idx(0) as i32, num_handles as i32, grid.num_threads(0) as i32) {
+					let next = (i + 1) as u32 % num_handles as u32;
 					handle(i).head = 0;
 					handle(i).tail = 0;
-					handle(i).next = (i + 1) as u32 % num_handles as u32;
-					handle(i).enq.peer = 0;
+					handle(i).next = next;
+					handle(i).enq.peer = next;
 					handle(i).enq.req.val = BOTTOM;
 					handle(i).enq.req.state = enq_req_state(false, 0);
-					handle(i).deq.peer = 0;
+					handle(i).deq.peer = next;
 					handle(i).deq.req.id = 0;
 					handle(i).deq.req.state = deq_req_state(false, 0);
 					handle(i).hzpt = 0;
