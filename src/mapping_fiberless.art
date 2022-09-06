@@ -106,6 +106,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		idx = tid,
 
 		gid = @|| gid_offset + self,
+		uid = @|| -1, // TODO
 
 		atomic_load_global_i32 = cpu_atomic_load[i32],
 		atomic_load_global_u32 = cpu_atomic_load[u32],
@@ -319,6 +320,7 @@ fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) ->
 
 			let context = grid_context {
 				device = 0,
+				max_concurrency = @|| -1, // TODO
 				groups = @|body| @|| fiberless_block(logical_block_id, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, body),
 				waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id, warp_id = warp_id as u32, local_id = idx.local_id }, body),
 				threads = @|body| @|| fiberless_thread(@|_i:i32| warp_id as u32 * warp_size + idx.local_id, @|| warp_size, warp_id as u32 * warp_size, idx, body),

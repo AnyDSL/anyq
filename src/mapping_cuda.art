@@ -121,6 +121,7 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 		idx = idx,
 
 		gid = gid,
+		uid = @|| gid() as i32,
 
 		atomic_load_global_i32 = cuda_legacy_atomic_memory_order_wrap_load[i32](@|location| { let mut res:i32; asm("atom.global.add.s32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u32 = cuda_legacy_atomic_memory_order_wrap_load[u32](@|location| { let mut res:u32; asm("atom.global.add.u32 %0, [%1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
@@ -346,6 +347,7 @@ fn @cuda_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_
 
 	cuda(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(grid_context {
 		device = device,
+		max_concurrency = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) as i32 * num_threads_per_block() as i32,
 		groups = @|body|@|| cuda_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, its, body),
 		waves = @|body|@|| cuda_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, its, body),
 		threads = @|body|@|| cuda_thread(global_thread_idx, global_linear_thread_idx, its, body),
