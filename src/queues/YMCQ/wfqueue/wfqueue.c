@@ -498,17 +498,17 @@ uintptr_t wfqueue_dequeue(wfqueue_t* queue, int32_t id)
 
 int wfqueue_try_enqueue_u32(wfqueue_t* queue, int32_t id, uint32_t v)
 {
-    assert(id < queue->q.nprocs);
+    assert(0 <= id && id < queue->q.nprocs);
     void* value = (void*)(0x00ff000000000000UL | v);
-    enqueue(&queue->q, &queue->h[id], value);
+    enqueue(&queue->q, queue->h + id, value);
     FAA_LONG(&queue->size, 1);
     return 1;
 }
 
 int wfqueue_try_dequeue_u32(wfqueue_t* queue, int32_t id, uint32_t* value)
 {
-    assert(id < queue->q.nprocs);
-    void* v = dequeue(&queue->q, &queue->h[id]);
+    assert(0 <= id && id < queue->q.nprocs);
+    void* v = dequeue(&queue->q, queue->h + id);
 
     if (v == EMPTY) return 0;
 
