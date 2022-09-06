@@ -3,16 +3,17 @@ struct QueueTest[T] {
 	finish: fn() -> i32
 }
 
-fn createQueueTest[T](device: AccDevice, block_dim: i32, create_queue: fn(AccDevice, i32, i32) -> ProducerConsumerQueue[T], additional_mem: i64) -> QueueTest[T] {
+fn createQueueTest[T](device: AccDevice, block_dim: i32, create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[T], additional_mem: i64) -> QueueTest[T] {
 	let test = createBaseTest(device, additional_mem);
 
 	QueueTest[T] {
 		run_test = @|body|@|queue_size| {
 			for device_memory, device_failed_flag in test.run_test() {
-				let queue = create_queue(device, block_dim, queue_size);
+				let queue = create_queue(device, queue_size);
 
 				let num_blocks = (queue_size + block_dim - 1) / block_dim;
 
+				// queue reset shall use same launch config as the actual run to allow for proper setup
 				for grid in device.launch_1d(num_blocks, block_dim) {
 					queue.reset(grid);
 				}

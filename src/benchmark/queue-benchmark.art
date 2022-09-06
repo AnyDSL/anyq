@@ -24,7 +24,7 @@ struct QueueBenchmark {
 	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
 
-fn @run_queue_benchmark(device: AccDevice, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
+fn @run_queue_benchmark(device: AccDevice, block_size: i32, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
 	let queue = create_queue(device, queue_size);
 
 	let instrumentation = create_instrumentation(device);
@@ -53,7 +53,8 @@ fn @run_queue_benchmark(device: AccDevice, benchmark: QueueBenchmark, queue_name
 				r.enum_i32(num_threads);
 
 				// TODO: better launch config (launch based on occupancy?)
-				for grid in device.launch_1d(1, 512) {
+				// TODO: the queue reset may require launch config of benchmark
+				for grid in device.launch_1d(1, block_size) {
 					queue.reset(grid);
 					queue_instrumentation.reset(grid);
 					benchmark.reset(grid);

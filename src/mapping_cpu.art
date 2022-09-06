@@ -1,7 +1,7 @@
 static cpu_threads = 0;
 //static vec_width = 8u;
 static warp_size:u32 = 8;
-static num_blocks_in_flight:i32 = 32;
+static max_num_blocks_in_flight:i32 = 32;
 
 fn @createAccDevice(device: i32) = AccDevice {
 	launch_1d = @|body|@|num_groups, group_size| {
@@ -115,7 +115,7 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 // 	}
 // }
 
-fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
+fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
@@ -125,6 +125,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 		idx = tid,
 
 		gid = @|| gid_offset + self,
+		uid = uid,
 
 		atomic_load_global_i32 = cpu_atomic_load[i32],
 		atomic_load_global_u32 = cpu_atomic_load[u32],
@@ -272,7 +273,7 @@ fn @cpu_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, i
 	});
 }
 
-fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(wave_context) -> ()) -> () {
+fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid: fn() -> i32, idx: Index, body: fn(wave_context) -> ()) -> () {
 
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
@@ -306,7 +307,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx:
 		membermask = @|| membermask,
 
 		// TODO: return simd_lane
-		threads = @|body| @|| cpu_thread(@|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
+		threads = @|body| @|| cpu_thread(uid, @|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
 
 		num_threads = num_threads,
 
@@ -352,8 +353,8 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 	@body(group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
-		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
-		threads = @|body| @|| cpu_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
+		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), @|| (idx.block_id * num_threads() + idx.warp_id * warp_size + idx.local_id) as i32, idx, body),
+		threads = @|body| @|| cpu_thread(@|| (idx.block_id * num_threads() + idx.warp_id * warp_size + idx.local_id) as i32, @|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
 		num_waves = num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads = @|_i:i32| num_threads(),
@@ -405,7 +406,13 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -
 	let num_blocks = grid_dim as u32;
 	let num_warps = num_blocks * num_warps_per_block;
 	let num_threads = num_blocks * num_threads_per_block;
-	let num_blocks_in_flight = min(grid_dim, num_blocks_in_flight);
+	let num_blocks_in_flight = min(grid_dim, max_num_blocks_in_flight);
+
+	//print_string("launch config (cpu):\n");
+	//print_string("  num_blocks: "); print_u32(num_blocks); print_char('\n');
+	//print_string("  num_warps_per_block: "); print_u32(num_warps_per_block); print_char('\n');
+	//print_string("  num_threads_per_block: "); print_u32(num_threads_per_block); print_char('\n');
+	//print_string("  num_blocks_in_flight: "); print_i32(num_blocks_in_flight); print_char('\n');
 
 	// TODO: assert(warp_size/l == vec_width)
 	fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
@@ -435,9 +442,10 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -
 
 				let context = grid_context {
 					device = 0,
+					max_concurrency = @|| max_num_blocks_in_flight * num_warps_per_block as i32 * warp_size as i32,
 					groups = @|body| @|| cpu_block(logical_block_id as u32, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, @|x| { &mut(addr(num_block_variables*block_id + x)) }, body),
-					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
-					threads = @|body| @|| cpu_thread(@|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size, idx, body),
+					waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, @|| ((idx.block_id * num_warps_per_block + idx.warp_id) * warp_size + idx.local_id) as i32, Index { block_id = logical_block_id as u32, warp_id = logical_block_id as u32 * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+					threads = @|body| @|| cpu_thread(@|| ((idx.block_id * num_warps_per_block + idx.warp_id) * warp_size + idx.local_id) as i32, @|_i:i32| logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, logical_block_id as u32 * num_threads_per_block + idx.warp_id * warp_size, idx, body),
 					num_groups = @|_i:i32| num_blocks,
 					num_waves = @|| num_warps,
 					num_threads = @|_i:i32| num_threads

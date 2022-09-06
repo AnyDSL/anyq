@@ -220,5 +220,5 @@ fn @indexQueueElementType() = QueueElementType[u32] {
 	}
 };
 
-fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, _block_dim: i32, num_elements: i32) = createConcurrentProducerConsumerQueue[u32](device, indexQueueElementType(), num_elements);
-fn @createConcurrentProducerConsumerQueueGeneric[T](device: AccDevice, _block_dim: i32, num_elements: i32) = createConcurrentProducerConsumerQueue[T](device, genericQueueElementType[T](), num_elements);
+fn @createConcurrentProducerConsumerIndexQueue(device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue[u32](device, indexQueueElementType(), num_elements);
+fn @createConcurrentProducerConsumerQueueGeneric[T](device: AccDevice, num_elements: i32) = createConcurrentProducerConsumerQueue[T](device, genericQueueElementType[T](), num_elements);
