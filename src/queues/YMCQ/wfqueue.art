@@ -17,7 +17,7 @@ type WFQHandle = &mut [u8];
 static default_num_handles = 128;
 
 
-fn @createYangMellorCrummeyRefQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+fn @createYangMellorCrummeyRefQueue(_device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
 	// let queue_state_size = 80 as i64;
 
 	//let num_handles = 100; //(1 << 21);
