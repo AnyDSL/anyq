@@ -3,7 +3,7 @@
 // In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming (PPoPP '16), pages 1–13.
 // https://doi.org/10.1145/2851141.2851168
 
-mod YangMellorCrummey {
+mod YMC {
 	type T = u64;
 
 	struct EnqReq {
@@ -75,20 +75,24 @@ mod YangMellorCrummey {
 	}
 }
 
-fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
-	let queue_state_size = sizeof[YangMellorCrummey::Queue]();
-	// let queue_state_alignment = alignof[YangMellorCrummey::Queue]();
+static mem_rlx = memory_order::seq_cst; //relaxed;
+static mem_rel = memory_order::seq_cst; //release;
+static mem_acq = memory_order::seq_cst; //acquire;
 
-	let pool_size = div_up_i64(1 << 24, YangMellorCrummey::N as i64);
-	let segment_pool_size = pool_size * sizeof[YangMellorCrummey::Segment]();
-	let segment_pool_alignment = alignof[YangMellorCrummey::Segment]();
+fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+	let queue_state_size = sizeof[YMC::Queue]();
+	// let queue_state_alignment = alignof[YMC::Queue]();
+
+	let pool_size = div_up_i64(1 << 24, YMC::N as i64);
+	let segment_pool_size = pool_size * sizeof[YMC::Segment]();
+	let segment_pool_alignment = alignof[YMC::Segment]();
 
 	let free_segment_list_size = pool_size * sizeof[u32]();
 	let free_segment_list_alignment = alignof[u32]();
 
-	let num_handles = (1 << 24) as i64;
-	let handle_buffer_size = num_handles * sizeof[YangMellorCrummey::Handle]();
-	let handle_buffer_alignment = alignof[YangMellorCrummey::Handle]();
+	let max_num_handles = (1 << 24) as i64;
+	let handle_buffer_size = max_num_handles * sizeof[YMC::Handle]();
+	let handle_buffer_alignment = alignof[YMC::Handle]();
 
 	let queue_state_offset = 0 as i64;
 	let segment_data_offset = round_up_i64(queue_state_offset + queue_state_size, segment_pool_alignment);
@@ -98,19 +102,19 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 	let queue_device_state_alloc = device.alloc(handle_data_offset + handle_buffer_size);
 	let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
 
-	let queue = &mut queue_device_memory(0) as &mut addrspace(1) YangMellorCrummey::Queue;
-	let segment = &mut queue_device_memory(segment_data_offset) as &mut addrspace(1) [YangMellorCrummey::Segment];
+	let queue = &mut queue_device_memory(0) as &mut addrspace(1) YMC::Queue;
+	let segment = &mut queue_device_memory(segment_data_offset) as &mut addrspace(1) [YMC::Segment];
 	// let free_segment = &mut queue_device_memory(free_segment_list_offset) as &mut addrspace(1) [u32];
-	let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [YangMellorCrummey::Handle];
+	let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [YMC::Handle];
 
-	let BOTTOM: YangMellorCrummey::T = -1;
-	let TOP: YangMellorCrummey::T = -2;
+	let BOTTOM: YMC::T = -1;
+	let TOP: YMC::T = -2;
 
-	let BOTTOM_e: u64 = 0; // as &mut addrspace(1) YangMellorCrummey::EnqReq;
-	let TOP_e: u64 = -1; // as &mut addrspace(1) YangMellorCrummey::EnqReq;
+	let BOTTOM_e: u64 = 0; // as &mut addrspace(1) YMC::EnqReq;
+	let TOP_e: u64 = -1; // as &mut addrspace(1) YMC::EnqReq;
 
-	let BOTTOM_d: u64 = 0; // as &mut addrspace(1) YangMellorCrummey::DeqReq;
-	let TOP_d: u64 = -1; // as &mut addrspace(1) YangMellorCrummey::DeqReq;
+	let BOTTOM_d: u64 = 0; // as &mut addrspace(1) YMC::DeqReq;
+	let TOP_d: u64 = -1; // as &mut addrspace(1) YMC::DeqReq;
 
 	let enq_req_state = @|pending: bool, id: i64| {
 		(id as u64 << 1) | (if pending { 1 as u64 } else { 0 as u64 })
@@ -142,31 +146,37 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		// free_segment(next_free)
 
 		while true {
-			let next = thread.atomic_load_global_u32(queue.next_free, memory_order::acquire);
+			let next = thread.atomic_load_global_u32(queue.next_free, mem_acq);
 
 			if (next == 0) {
 				break()
 			}
 
-			if thread.atomic_cas_global_u32(queue.next_free, next, segment(next).next, memory_order::relaxed, memory_order::relaxed).1 {
+			if thread.atomic_cas_global_u32(queue.next_free, next, segment(next).next, mem_rlx, mem_rlx).1 {
+				//device.print_i32("reuse segment %d\n", next as i32);
 				return(next)
 			}
 		}
 
-		thread.atomic_add_global_u32(queue.alloc_next, 1, memory_order::relaxed)
+		let next = thread.atomic_add_global_u32(queue.alloc_next, 1, mem_rlx);
+		//device.print_i32("alloc segment %d\n", next as i32);
+		assert(0 <= next && next < pool_size as u32, "memory pool is running out of segments");
+
+		next
 	};
 
 	let free_segment = @|thread: thread_context, s: u32| -> () {
 		// let next_free = thread.atomic_sub_global_i32(queue.next_free, 1, memory_order::relaxed);
 
 		// free_segment(next_free) = s;
+		assert(0 < s && s < pool_size as u32, "invalid segment index");
 
 		while true {
-			let next = thread.atomic_load_global_u32(queue.next_free, memory_order::relaxed);
+			let next = thread.atomic_load_global_u32(queue.next_free, mem_rlx);
 
 			segment(s).next = next;
 
-			if thread.atomic_cas_global_u32(queue.next_free, next, s, memory_order::release, memory_order::relaxed).1 {
+			if thread.atomic_cas_global_u32(queue.next_free, next, s, mem_rel, mem_rlx).1 {
 				break()
 			}
 		}
@@ -178,8 +188,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		segment(s).id = id;
 		segment(s).next = 0;
 
-		for i in range(0, YangMellorCrummey::N) {
-			segment(s).cells(i) = YangMellorCrummey::Cell { val = BOTTOM, enq = BOTTOM_e, deq = BOTTOM_d };
+		for i in range(0, YMC::N) {
+			segment(s).cells(i) = YMC::Cell { val = BOTTOM, enq = BOTTOM_e, deq = BOTTOM_d };
 		}
 
 		s
@@ -188,13 +198,13 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 	let find_cell = @|thread: thread_context, start: u32, cell_id: i64| {
 		let mut s = start;
 
-		for i in range(segment(s).id as i32, (cell_id / YangMellorCrummey::N as i64) as i32) {
-			let next = thread.atomic_load_global_u32(segment(s).next, memory_order::relaxed);
+		for i in range(segment(s).id as i32, (cell_id / YMC::N as i64) as i32) {
+			let next = thread.atomic_load_global_u32(segment(s).next, mem_rlx);
 
 			if next == 0 {
 				let tmp = new_segment(thread, (i + 1) as i64);
 
-				let (new_next, succ) = thread.atomic_cas_global_u32(segment(s).next, 0, tmp, memory_order::relaxed, memory_order::relaxed);
+				let (new_next, succ) = thread.atomic_cas_global_u32(segment(s).next, 0, tmp, mem_rlx, mem_rlx);
 
 				s = if !succ {
 					free_segment(thread, tmp);
@@ -206,100 +216,100 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			}
 		}
 
-		(s, &mut segment(s).cells(cell_id % YangMellorCrummey::N as i64))
+		(s, &mut segment(s).cells(cell_id % YMC::N as i64))
 	};
 
 	let advance_end_for_linearizability = @|thread: thread_context, E: &mut addrspace(1) i64, cid: i64| {
 		while true {
-			let e = thread.atomic_load_global_i64(E, memory_order::relaxed);
+			let e = thread.atomic_load_global_i64(E, mem_rlx);
 
-			if e >= cid || thread.atomic_cas_global_i64(E, e, cid, memory_order::relaxed, memory_order::relaxed).1 {
+			if e >= cid || thread.atomic_cas_global_i64(E, e, cid, mem_rlx, mem_rlx).1 {
 				break()
 			}
 		}
 	};
 
 	let try_to_claim_req = @|thread: thread_context, s: &mut addrspace(1) u64, id: i64, cell_id: i64| {
-		thread.atomic_cas_global_u64(s, enq_req_state(true, id), enq_req_state(false, cell_id), memory_order::relaxed, memory_order::relaxed).1
+		thread.atomic_cas_global_u64(s, enq_req_state(true, id), enq_req_state(false, cell_id), mem_rlx, mem_rlx).1
 	};
 
-	let enq_commit = @|thread: thread_context, c: &mut addrspace(1) YangMellorCrummey::Cell, v: YangMellorCrummey::T, cid: i64| {
+	let enq_commit = @|thread: thread_context, c: &mut addrspace(1) YMC::Cell, v: YMC::T, cid: i64| {
 		advance_end_for_linearizability(thread, queue.T, cid + 1);
-		thread.atomic_store_global_u64(c.val, v, memory_order::relaxed);
+		thread.atomic_store_global_u64(c.val, v, mem_rlx);
 	};
 
-	let enq_fast = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, v: YangMellorCrummey::T| -> YangMellorCrummey::enq_fast_result {
-		let i = thread.atomic_add_global_i64(queue.T, 1, memory_order::relaxed);
+	let enq_fast = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T| -> YMC::enq_fast_result {
+		let i = thread.atomic_add_global_i64(queue.T, 1, mem_rlx);
 
-		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, memory_order::relaxed), i);
-		thread.atomic_store_global_u32(h.tail, tail, memory_order::relaxed);
+		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, mem_rlx), i);
+		thread.atomic_store_global_u32(h.tail, tail, mem_rlx);
 
-		if thread.atomic_cas_global_u64(c.val, BOTTOM, v, memory_order::relaxed, memory_order::relaxed).1 {
-			YangMellorCrummey::enq_fast_result::SUCCESS
+		if thread.atomic_cas_global_u64(c.val, BOTTOM, v, mem_rlx, mem_rlx).1 {
+			YMC::enq_fast_result::SUCCESS
 		}
 		else {
-			YangMellorCrummey::enq_fast_result::FAIL(i)
+			YMC::enq_fast_result::FAIL(i)
 		}
 	};
 
-	let enq_slow = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, v: YangMellorCrummey::T, cell_id: i64| -> () {
+	let enq_slow = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T, cell_id: i64| -> () {
 		let r = &mut h.enq.req;
-		thread.atomic_store_global_u64(r.val, v, memory_order::relaxed);
-		thread.atomic_store_global_u64(r.state, enq_req_state(true, cell_id), memory_order::release);
+		thread.atomic_store_global_u64(r.val, v, mem_rlx);
+		thread.atomic_store_global_u64(r.state, enq_req_state(true, cell_id), mem_rel);
 
-		let mut tmp_tail = thread.atomic_load_global_u32(h.tail, memory_order::relaxed);
+		let mut tmp_tail = thread.atomic_load_global_u32(h.tail, mem_rlx);
 
 		while true {
-			let i = thread.atomic_add_global_i64(queue.T, 1, memory_order::relaxed);
+			let i = thread.atomic_add_global_i64(queue.T, 1, mem_rlx);
 
 			let (tail, c) = find_cell(thread, tmp_tail, i);
 			tmp_tail = tail;
 
-			if thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, memory_order::relaxed, memory_order::relaxed).1
-			   && thread.atomic_load_global_u64(c.val, memory_order::relaxed) == BOTTOM {
+			if thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, mem_rlx, mem_rlx).1
+			   && thread.atomic_load_global_u64(c.val, mem_rlx) == BOTTOM {
 				try_to_claim_req(thread, r.state, cell_id, i);
 				break()
 			}
 
-			if !enq_req_pending(thread.atomic_load_global_u64(r.state, memory_order::relaxed)) {
+			if !enq_req_pending(thread.atomic_load_global_u64(r.state, mem_rlx)) {
 				break()
 			}
 		}
 
-		let id = enq_req_id(thread.atomic_load_global_u64(r.state, memory_order::relaxed));
-		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, memory_order::relaxed), id);
-		thread.atomic_store_global_u32(h.tail, tail, memory_order::relaxed);
+		let id = enq_req_id(thread.atomic_load_global_u64(r.state, mem_rlx));
+		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, mem_rlx), id);
+		thread.atomic_store_global_u32(h.tail, tail, mem_rlx);
 		enq_commit(thread, c, v, id);
 	};
 
-	let enqueue = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, v: YangMellorCrummey::T| -> () {
+	let enqueue = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T| -> () {
 		let mut cell_id: i64;
 		for _ in range(0, PATIENCE) {
 			match enq_fast(thread, h, v) {
-				YangMellorCrummey::enq_fast_result::SUCCESS => return(),
-				YangMellorCrummey::enq_fast_result::FAIL(i) => { cell_id = i; }
+				YMC::enq_fast_result::SUCCESS => return(),
+				YMC::enq_fast_result::FAIL(i) => { cell_id = i; }
 			}
 		}
 
 		enq_slow(thread, h, v, cell_id);
 	};
 
-	let help_enq = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, c: &mut addrspace(1) YangMellorCrummey::Cell, i: i64| -> YangMellorCrummey::dequeue_result {
-		let (val, succ) = thread.atomic_cas_global_u64(c.val, BOTTOM, TOP, memory_order::relaxed, memory_order::relaxed);
+	let help_enq = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, c: &mut addrspace(1) YMC::Cell, i: i64| -> YMC::dequeue_result {
+		let (val, succ) = thread.atomic_cas_global_u64(c.val, BOTTOM, TOP, mem_rlx, mem_rlx);
 
 		if !succ && val != TOP {
-			return(YangMellorCrummey::dequeue_result::SUCCESS(val))
+			return(YMC::dequeue_result::SUCCESS(val))
 		}
 
-		if thread.atomic_load_global_u64(c.enq, memory_order::relaxed) == BOTTOM_e {
+		if thread.atomic_load_global_u64(c.enq, mem_rlx) == BOTTOM_e {
 			// WORKAROUND for thorin issue #130
-			let fun = @|(p: &mut addrspace(1) YangMellorCrummey::Handle, r: &mut addrspace(1) YangMellorCrummey::EnqReq, s: u64)| -> (&mut addrspace(1) YangMellorCrummey::Handle, &mut addrspace(1) YangMellorCrummey::EnqReq, u64) {
-				let h_enq_id = enq_req_id(thread.atomic_load_global_u64(h.enq.req.state, memory_order::relaxed));
+			let fun = @|(p: &mut addrspace(1) YMC::Handle, r: &mut addrspace(1) YMC::EnqReq, s: u64)| -> (&mut addrspace(1) YMC::Handle, &mut addrspace(1) YMC::EnqReq, u64) {
+				let h_enq_id = enq_req_id(thread.atomic_load_global_u64(h.enq.req.state, mem_rlx));
 
 				if h_enq_id == 0 || h_enq_id == enq_req_id(s) { return(p, r, s) }
 
-				thread.atomic_store_global_u64(h.enq.req.state, enq_req_state(false, 0), memory_order::relaxed);
-				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, memory_order::relaxed), memory_order::relaxed);
+				thread.atomic_store_global_u64(h.enq.req.state, enq_req_state(false, 0), mem_rlx);
+				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, mem_rlx), mem_rlx);
 
 				(p, r, s)
 			};
@@ -307,53 +317,53 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			let (p, r, s) = {
 				let p = &mut handle(h.enq.peer);
 				let r = &mut p.enq.req;
-				let s = thread.atomic_load_global_u64(r.state, memory_order::relaxed);
+				let s = thread.atomic_load_global_u64(r.state, mem_rlx);
 				fun(fun(p, r, s))
 			};
 
-			if enq_req_pending(s) && enq_req_id(s) <= i && !thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, memory_order::relaxed, memory_order::relaxed).1 {
+			if enq_req_pending(s) && enq_req_id(s) <= i && !thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, mem_rlx, mem_rlx).1 {
 				h.enq.req.state = enq_req_state(false, enq_req_id(s));
 			}
 			else {
-				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, memory_order::relaxed), memory_order::relaxed);
+				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, mem_rlx), mem_rlx);
 			}
 
-			if thread.atomic_load_global_u64(c.enq, memory_order::relaxed) == BOTTOM_e {
-				thread.atomic_cas_global_u64(c.enq, BOTTOM_e, TOP_e, memory_order::relaxed, memory_order::relaxed);
+			if thread.atomic_load_global_u64(c.enq, mem_rlx) == BOTTOM_e {
+				thread.atomic_cas_global_u64(c.enq, BOTTOM_e, TOP_e, mem_rlx, mem_rlx);
 			}
 		}
 
-		if thread.atomic_load_global_u64(c.enq, memory_order::relaxed) == TOP_e {
-			return(if thread.atomic_load_global_i64(queue.T, memory_order::relaxed) < i { YangMellorCrummey::dequeue_result::EMPTY } else { YangMellorCrummey::dequeue_result::SUCCESS(TOP) })
+		if thread.atomic_load_global_u64(c.enq, mem_rlx) == TOP_e {
+			return(if thread.atomic_load_global_i64(queue.T, mem_rlx) < i { YMC::dequeue_result::EMPTY } else { YMC::dequeue_result::SUCCESS(TOP) })
 		}
 
-		let r = thread.atomic_load_global_u64(c.enq, memory_order::relaxed) as &mut addrspace(1) YangMellorCrummey::EnqReq;
-		let s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
-		let v = thread.atomic_load_global_u64(r.val, memory_order::acquire);
+		let r = thread.atomic_load_global_u64(c.enq, mem_rlx) as &mut addrspace(1) YMC::EnqReq;
+		let s = thread.atomic_load_global_u64(r.state, mem_acq);
+		let v = thread.atomic_load_global_u64(r.val, mem_acq);
 
 		if enq_req_id(s) > i {
-			if thread.atomic_load_global_u64(c.val, memory_order::relaxed) == TOP
-			   && thread.atomic_load_global_i64(queue.T, memory_order::relaxed) <= i {
-				return(YangMellorCrummey::dequeue_result::EMPTY)
+			if thread.atomic_load_global_u64(c.val, mem_rlx) == TOP
+			   && thread.atomic_load_global_i64(queue.T, mem_rlx) <= i {
+				return(YMC::dequeue_result::EMPTY)
 			}
 		}
 		else if try_to_claim_req(thread, &mut r.state, enq_req_id(s), i)
-		        || (s == enq_req_state(false, i) && thread.atomic_load_global_u64(c.val, memory_order::relaxed) == TOP) {
+		        || (s == enq_req_state(false, i) && thread.atomic_load_global_u64(c.val, mem_rlx) == TOP) {
 					enq_commit(thread, c, v, i);
 		}
 
-		YangMellorCrummey::dequeue_result::SUCCESS(thread.atomic_load_global_u64(c.val, memory_order::relaxed))
+		YMC::dequeue_result::SUCCESS(thread.atomic_load_global_u64(c.val, mem_rlx))
 	};
 
-	let help_deq = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, helpee: &mut addrspace(1) YangMellorCrummey::Handle| -> () {
+	let help_deq = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, helpee: &mut addrspace(1) YMC::Handle| -> () {
 		let r = &mut helpee.deq.req;
-		let mut s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
-		let id = thread.atomic_load_global_i64(r.id, memory_order::acquire);
+		let mut s = thread.atomic_load_global_u64(r.state, mem_acq);
+		let id = thread.atomic_load_global_i64(r.id, mem_acq);
 
 		if !deq_req_pending(s) || deq_req_idx(s) < id { return() }
 
-		let mut ha = thread.atomic_load_global_u32(helpee.head, memory_order::relaxed);
-		s = thread.atomic_load_global_u64(r.state, memory_order::relaxed);
+		let mut ha = thread.atomic_load_global_u32(helpee.head, mem_rlx);
+		s = thread.atomic_load_global_u64(r.state, mem_rlx);
 		let mut prior = id;
 		let mut i = id;
 		let mut cand = 0 as i64;
@@ -363,29 +373,29 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 				i = i + 1;
 				let (hc, c) = find_cell(thread, ha, i);
 				match help_enq(thread, h, c, i) {
-					YangMellorCrummey::dequeue_result::EMPTY => { cand = i; },
-					YangMellorCrummey::dequeue_result::SUCCESS(v) =>
-						if v != TOP && thread.atomic_load_global_u64(c.deq, memory_order::relaxed) == BOTTOM_d {
+					YMC::dequeue_result::EMPTY => { cand = i; },
+					YMC::dequeue_result::SUCCESS(v) =>
+						if v != TOP && thread.atomic_load_global_u64(c.deq, mem_rlx) == BOTTOM_d {
 							cand = i;
 						}
 						else {
-							s = thread.atomic_load_global_u64(r.state, memory_order::acquire);
+							s = thread.atomic_load_global_u64(r.state, mem_acq);
 						}
 				}
 			}
 
 			if cand != 0 {
-				s = thread.atomic_cas_global_u64(r.state, deq_req_state(true, prior), deq_req_state(true, cand), memory_order::relaxed, memory_order::relaxed).0;
+				s = thread.atomic_cas_global_u64(r.state, deq_req_state(true, prior), deq_req_state(true, cand), mem_rlx, mem_rlx).0;
 			}
 
-			if deq_req_pending(s) || thread.atomic_load_global_i64(r.id, memory_order::relaxed) != id { return() }
+			if deq_req_pending(s) || thread.atomic_load_global_i64(r.id, mem_rlx) != id { return() }
 
 			let (h, c) = find_cell(thread, ha, deq_req_idx(s));
 			ha = h;
 
-			if thread.atomic_load_global_u64(c.val, memory_order::relaxed) == TOP
-			   || { let (val, succ) = thread.atomic_cas_global_u64(c.deq, BOTTOM_d, r as u64, memory_order::relaxed, memory_order::relaxed); succ || val == r as u64 } {
-				thread.atomic_cas_global_u64(r.state, s, deq_req_state(false, deq_req_idx(s)), memory_order::relaxed, memory_order::relaxed);
+			if thread.atomic_load_global_u64(c.val, mem_rlx) == TOP
+			   || { let (val, succ) = thread.atomic_cas_global_u64(c.deq, BOTTOM_d, r as u64, mem_rlx, mem_rlx); succ || val == r as u64 } {
+				thread.atomic_cas_global_u64(r.state, s, deq_req_state(false, deq_req_idx(s)), mem_rlx, mem_rlx);
 				return()
 			}
 
@@ -398,68 +408,68 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		}
 	};
 
-	let deq_fast = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle| -> YangMellorCrummey::deq_fast_result {
-		let i = thread.atomic_add_global_i64(queue.H, 1, memory_order::relaxed);
+	let deq_fast = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle| -> YMC::deq_fast_result {
+		let i = thread.atomic_add_global_i64(queue.H, 1, mem_rlx);
 
-		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, memory_order::relaxed), i);
-		thread.atomic_store_global_u32(h.head, head, memory_order::relaxed);
+		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, mem_rlx), i);
+		thread.atomic_store_global_u32(h.head, head, mem_rlx);
 
 		let res = help_enq(thread, h, c, i);
 
 		match res {
-			YangMellorCrummey::dequeue_result::EMPTY => YangMellorCrummey::deq_fast_result::SUCCESS(res),
-			YangMellorCrummey::dequeue_result::SUCCESS(v) =>
-				if v != TOP && thread.atomic_cas_global_u64(c.deq, BOTTOM_d, TOP_d, memory_order::relaxed, memory_order::relaxed).1 {
-					YangMellorCrummey::deq_fast_result::SUCCESS(res)
+			YMC::dequeue_result::EMPTY => YMC::deq_fast_result::SUCCESS(res),
+			YMC::dequeue_result::SUCCESS(v) =>
+				if v != TOP && thread.atomic_cas_global_u64(c.deq, BOTTOM_d, TOP_d, mem_rlx, mem_rlx).1 {
+					YMC::deq_fast_result::SUCCESS(res)
 				}
 				else {
-					YangMellorCrummey::deq_fast_result::FAIL(i)
+					YMC::deq_fast_result::FAIL(i)
 				}
 		}
 	};
 
-	let deq_slow = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle, cid: i64| -> YangMellorCrummey::dequeue_result {
+	let deq_slow = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, cid: i64| -> YMC::dequeue_result {
 		let r = &mut h.deq.req;
-		thread.atomic_store_global_i64(r.id, cid, memory_order::release);
-		thread.atomic_store_global_u64(r.state, deq_req_state(true, cid), memory_order::release);
+		thread.atomic_store_global_i64(r.id, cid, mem_rel);
+		thread.atomic_store_global_u64(r.state, deq_req_state(true, cid), mem_rel);
 
 		help_deq(thread, h, h);
 
-		let i = deq_req_idx(thread.atomic_load_global_u64(r.state, memory_order::relaxed));
-		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, memory_order::relaxed), i);
-		thread.atomic_store_global_u32(h.head, head, memory_order::relaxed);
+		let i = deq_req_idx(thread.atomic_load_global_u64(r.state, mem_rlx));
+		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, mem_rlx), i);
+		thread.atomic_store_global_u32(h.head, head, mem_rlx);
 
-		let v = thread.atomic_load_global_u64(c.val, memory_order::relaxed);
+		let v = thread.atomic_load_global_u64(c.val, mem_rlx);
 
 		advance_end_for_linearizability(thread, queue.H, i + 1);
 
 		if v == TOP {
-			YangMellorCrummey::dequeue_result::EMPTY
+			YMC::dequeue_result::EMPTY
 		}
 		else {
-			YangMellorCrummey::dequeue_result::SUCCESS(v)
+			YMC::dequeue_result::SUCCESS(v)
 		}
 	};
 
-	let dequeue = @|thread: thread_context, h: &mut addrspace(1) YangMellorCrummey::Handle| -> YangMellorCrummey::dequeue_result {
-		let mut res: YangMellorCrummey::deq_fast_result;
+	let dequeue = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle| -> YMC::dequeue_result {
+		let mut res: YMC::deq_fast_result;
 		for _ in range(0, PATIENCE) {
 			res = deq_fast(thread, h);
 
 			match res {
-				YangMellorCrummey::deq_fast_result::SUCCESS(_) => break(),
+				YMC::deq_fast_result::SUCCESS(_) => break(),
 				_ => ()
 			}
 		}
 
 		match res {
-			YangMellorCrummey::deq_fast_result::FAIL(i) => deq_slow(thread, h, i),
-			YangMellorCrummey::deq_fast_result::SUCCESS(v) => {
+			YMC::deq_fast_result::FAIL(i) => deq_slow(thread, h, i),
+			YMC::deq_fast_result::SUCCESS(v) => {
 				match v {
-					YangMellorCrummey::dequeue_result::SUCCESS(_) => {
-						let helpee = &mut handle(thread.atomic_load_global_u32(h.deq.peer, memory_order::relaxed));
+					YMC::dequeue_result::SUCCESS(_) => {
+						let helpee = &mut handle(thread.atomic_load_global_u32(h.deq.peer, mem_rlx));
 						help_deq(thread, h, helpee);
-						thread.atomic_store_global_u32(h.deq.peer, thread.atomic_load_global_u32(helpee.next, memory_order::relaxed), memory_order::relaxed);
+						thread.atomic_store_global_u32(h.deq.peer, thread.atomic_load_global_u32(helpee.next, mem_rlx), mem_rlx);
 					},
 					_ => ()
 				}
@@ -470,37 +480,40 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 	ProducerConsumerQueue[u32] {
 		push = @|source| @|thread| {
-			thread.atomic_add_global_i32(queue.size, 1, memory_order::relaxed);
+			thread.atomic_add_global_i32(queue.size, 1, mem_rlx);
 
-			enqueue(thread, handle(thread.gid()), source() as YangMellorCrummey::T);
+			enqueue(thread, handle(thread.uid()), source() as YMC::T);
 
 			1
 		},
 
 		pop = @|sink| @|thread| {
-			match dequeue(thread, handle(thread.gid())) {
-				YangMellorCrummey::dequeue_result::SUCCESS(v) => { thread.atomic_sub_global_i32(queue.size, 1, memory_order::relaxed); sink(v as u32); 1 },
-				YangMellorCrummey::dequeue_result::EMPTY => 0
+			match dequeue(thread, handle(thread.uid())) {
+				YMC::dequeue_result::SUCCESS(v) => { thread.atomic_sub_global_i32(queue.size, 1, mem_rlx); sink(v as u32); 1 },
+				YMC::dequeue_result::EMPTY => 0
 			}
 		},
 
 		size = @|thread| {
-			thread.atomic_load_global_i32(queue.size, memory_order::relaxed)
+			thread.atomic_load_global_i32(queue.size, mem_rlx)
 		},
 
 		reset = @|grid| {
 			for thread in grid.threads() {
+				let num_handles = grid.max_concurrency();
+
 				if thread.idx(0) == 0 {
-					queue.Q = 0;
+					queue.next_free = 0;
+					queue.alloc_next = 0;
+
+					queue.Q = new_segment(thread, 0);
 					queue.T = 0;
 					queue.H = 0;
 					queue.I = 0;
 					queue.size = 0;
-					queue.next_free = 0;
-					queue.alloc_next = 1;
 				}
 
-				for i in range_step(thread.idx(0) as i32, num_handles as i32, grid.num_threads(0) as i32) {
+				for i in range_step(thread.idx(0) as i32, num_handles, grid.num_threads(0) as i32) {
 					let next = (i + 1) as u32 % num_handles as u32;
 					handle(i).head = 0;
 					handle(i).tail = 0;
