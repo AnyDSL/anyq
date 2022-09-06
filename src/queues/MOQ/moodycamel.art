@@ -9,7 +9,7 @@ type MoodycamelValue = i64;
 #[import(cc = "C", name = "moodycamel_cq_size_approx")]  fn moodycamel_cq_size_approx(_: MoodycamelCQHandle) -> i64;
 
 
-fn @createMoodyCamelQueueGeneric[T](device: AccDevice, _block_dim: i32, pool_size: i32) -> ProducerConsumerQueue[T] {
+fn @createMoodyCamelQueueGeneric[T](device: AccDevice, pool_size: i32) -> ProducerConsumerQueue[T] {
 	let num_producer:u32 = cpu_threads as u32;
 
 	let buffer_size = pool_size as i64 * sizeof[T]();
@@ -97,7 +97,7 @@ fn @createMoodyCamelQueueGeneric[T](device: AccDevice, _block_dim: i32, pool_siz
 #[import(cc = "C")] fn moodycamel_cq_size_approx_u32(_: MoodycamelCQHandle) -> u64;
 
 
-fn @createMoodyCamelIndexQueue(device: AccDevice, _block_dim: i32, num_elements: i32) -> ProducerConsumerQueue[u32] {
+fn @createMoodyCamelIndexQueue(device: AccDevice, num_elements: i32) -> ProducerConsumerQueue[u32] {
 	let num_producer:u32 = cpu_threads as u32;
 
 	assert(device.platform_device == 0, "moodycamel::ConcurrentQueue is CPU only");
