@@ -95,7 +95,7 @@ fn @createYangMellorCrummeyRefQueue(device: AccDevice, _block_dim: i32, _queue_s
 					let mut success:i32;
 					success = wfqueue_destroy(queue);
 					assert(success > 0, "wfqueue_destroy() failed");
-					device.print_i32("num_handles: %d\n", num_handles);
+					//device.print_i32("num_handles: %d\n", num_handles);
 					success = wfqueue_create(num_handles, &mut queue);
 					assert(success > 0, "wfqueue_create() failed");
 				}

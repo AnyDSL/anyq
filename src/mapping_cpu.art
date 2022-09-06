@@ -406,13 +406,13 @@ fn @cpu_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -
 	let num_blocks = grid_dim as u32;
 	let num_warps = num_blocks * num_warps_per_block;
 	let num_threads = num_blocks * num_threads_per_block;
-	let num_blocks_in_flight = min(grid_dim, num_blocks_in_flight);
+	let num_blocks_in_flight = min(grid_dim, max_num_blocks_in_flight);
 
-	print_string("launch config (cpu):\n");
-	print_string("  num_blocks: "); print_u32(num_blocks); print_char('\n');
-	print_string("  num_warps_per_block: "); print_u32(num_warps_per_block); print_char('\n');
-	print_string("  num_threads_per_block: "); print_u32(num_threads_per_block); print_char('\n');
-	print_string("  num_blocks_in_flight: "); print_i32(num_blocks_in_flight); print_char('\n');
+	//print_string("launch config (cpu):\n");
+	//print_string("  num_blocks: "); print_u32(num_blocks); print_char('\n');
+	//print_string("  num_warps_per_block: "); print_u32(num_warps_per_block); print_char('\n');
+	//print_string("  num_threads_per_block: "); print_u32(num_threads_per_block); print_char('\n');
+	//print_string("  num_blocks_in_flight: "); print_i32(num_blocks_in_flight); print_char('\n');
 
 	// TODO: assert(warp_size/l == vec_width)
 	fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
