@@ -524,6 +524,22 @@ int32_t wfqueue_size(wfqueue_t* queue)
 
 int wfqueue_destroy(wfqueue_t* queue)
 {
+  queue_t* q = &queue->q;
+  node_t* n = q->Hp;
+
+  while (n != NULL) {
+    node_t* tmp = n->next;
+    align_free(n);
+    n = tmp;
+  }
+
+  for (int i = 0; i < q->nprocs; ++i) {
+    //cleanup(&queue->q, &queue->h[i]);
+    n = queue->h[i].spare;
+    if (n != NULL)
+      align_free(n);
+  }
+
   align_free(queue);
   return 1;
 }
