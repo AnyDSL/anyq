@@ -111,7 +111,8 @@ static void cleanup(queue_t * q, handle_t * th) {
   }
 }
 
-static cell_t * find_cell(node_t * volatile * p, long i, handle_t * th) {
+//static
+cell_t * find_cell(node_t * volatile * p, long i, handle_t * th) {
   node_t * c = *p;
 
   long j;
@@ -191,7 +192,8 @@ static void enq_slow(queue_t * q, handle_t * th, void * v, long id)
 #endif
 }
 
-static inline void enqueue(queue_t * q, handle_t * th, void * v)
+//static inline
+int enqueue(queue_t * q, handle_t * th, void * v)
 {
   th->Hp = th->Ep;
 
@@ -201,6 +203,7 @@ static inline void enqueue(queue_t * q, handle_t * th, void * v)
   if (p < 0) enq_slow(q, th, v, id);
 
   RELEASE_PTR(&th->Hp, NULL);
+  return 1;
 }
 
 static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
@@ -326,7 +329,8 @@ static void * deq_slow(queue_t * q, handle_t * th, long id)
   return val == TOP ? BOT : val;
 }
 
-static inline void * dequeue(queue_t * q, handle_t * th)
+//static inline
+void * dequeue(queue_t * q, handle_t * th)
 {
   th->Hp = th->Dp;
 
@@ -363,7 +367,7 @@ static inline void * dequeue(queue_t * q, handle_t * th)
 
 // static pthread_barrier_t barrier;
 
-static void queue_init(queue_t * q, int nprocs)
+static int queue_init(queue_t * q, int nprocs)
 {
   q->Hi = 0;
   q->Hp = new_node();
@@ -381,6 +385,7 @@ static void queue_init(queue_t * q, int nprocs)
   q->empty = 0;
 #endif
   // pthread_barrier_init(&barrier, NULL, nprocs);
+  return 1;
 }
 
 static void queue_free(queue_t * q, handle_t * h)
@@ -404,7 +409,7 @@ static void queue_free(queue_t * q, handle_t * h)
 #endif
 }
 
-static void queue_register(queue_t * q, handle_t* volatile * qtail, handle_t * th, int id)
+static int queue_register(queue_t * q, handle_t* volatile * qtail, handle_t * th, int id)
 {
   th->next = NULL;
   th->Hp = NULL;
@@ -434,7 +439,7 @@ static void queue_register(queue_t * q, handle_t* volatile * qtail, handle_t * t
     if (CASra_PTR(qtail, &tail, th)) {
       th->Eh = th->next;
       th->Dh = th->next;
-      return;
+      return 1;
     }
   }
 
@@ -446,26 +451,31 @@ static void queue_register(queue_t * q, handle_t* volatile * qtail, handle_t * t
 
   th->Eh = th->next;
   th->Dh = th->next;
+
+  return 1;
 }
 
 
 
 #include <stdint.h>
+#include <stdio.h>
 
 typedef struct
 {
   queue_t q;
   volatile long size;
   volatile handle_t* tail;
-  handle_t h[];
+  handle_t* h;
 } wfqueue_t;
 
 int wfqueue_create(int32_t nprocs, wfqueue_t** queue_ptr)
 {
+  printf("sizeof(long): %zd\nsizeof(wfqueue_t): %zd\nsizeof(queue_t): %zd\nsizeof(handle_t): %zd\n", sizeof(long), sizeof(wfqueue_t), sizeof(queue_t), sizeof(handle_t));
   wfqueue_t* queue = align_malloc(_Alignof(wfqueue_t), sizeof(wfqueue_t) + nprocs * sizeof(handle_t));
   queue_init(&queue->q, nprocs);
   queue->size = 0;
   queue->tail = NULL;
+  queue->h = (handle_t*)((int8_t*)queue + sizeof(wfqueue_t));
 
   for (int i = 0; i < nprocs; ++i) {
     queue_register(&queue->q, &queue->tail, &queue->h[i], i);

@@ -12,8 +12,10 @@
 #define CACHE_LINE_SIZE 64
 #define DOUBLE_CACHE_LINE_SIZE 128
 #ifdef _MSC_VER
-#define CACHE_ALIGNED __declspec(align(CACHE_LINE_SIZE))
-#define DOUBLE_CACHE_ALIGNED __declspec(align(DOUBLE_CACHE_LINE_SIZE))
+//#define CACHE_ALIGNED __declspec(align(CACHE_LINE_SIZE))
+//#define DOUBLE_CACHE_ALIGNED __declspec(align(DOUBLE_CACHE_LINE_SIZE))
+#define CACHE_ALIGNED
+#define DOUBLE_CACHE_ALIGNED
 #else
 #define CACHE_ALIGNED __attribute__((aligned(CACHE_LINE_SIZE)))
 #define DOUBLE_CACHE_ALIGNED __attribute__((aligned(2 * CACHE_LINE_SIZE)))
