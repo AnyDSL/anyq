@@ -10,6 +10,7 @@ fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32,
 
 	run_queue_benchmark(
 		device,
+		block_size,
 		bwd_comparison_benchmark(device, block_size, num_attempts),
 		"@queue_short_name@",
 		@queue_constructor_name@,
