@@ -27,6 +27,9 @@ steps:
         - cuda-its/index.html
         - cuda-its/main.js
         - cuda-its/*.json
+        - arm-lse/index.html
+        - arm-lse/main.js
+        - arm-lse/*.json
     when:
       branch:
         - master
