@@ -28,13 +28,8 @@ set(YangMellorCrummeyQueue_ref_constructor "")
 set(YangMellorCrummeyQueue_ref_constructor_u32 "createYangMellorCrummeyRefQueue")
 
 
-set(YangMellorCrummeyQueue_configure_target YangMellorCrummeyQueue_configure)
 set(YangMellorCrummeyQueue_ref_configure_target YangMellorCrummeyQueue_ref_configure)
 
 function (YangMellorCrummeyQueue_ref_configure target)
 	target_link_libraries(${target} PRIVATE wfqueue)
-endfunction()
-
-function (YangMellorCrummeyQueue_configure target)
-	YangMellorCrummeyQueue_ref_configure(${target})
 endfunction()
