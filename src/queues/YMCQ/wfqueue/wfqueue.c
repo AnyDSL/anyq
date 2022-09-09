@@ -192,8 +192,7 @@ static void enq_slow(queue_t * q, handle_t * th, void * v, long id)
 #endif
 }
 
-//static inline
-int enqueue(queue_t * q, handle_t * th, void * v)
+static inline int enqueue(queue_t * q, handle_t * th, void * v)
 {
   th->Hp = th->Ep;
 
@@ -206,7 +205,8 @@ int enqueue(queue_t * q, handle_t * th, void * v)
   return 1;
 }
 
-static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
+//static
+void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
 {
   void * v = spin(&c->val);
 
@@ -254,13 +254,14 @@ static void * help_enq(queue_t * q, handle_t * th, cell_t * c, long i)
   return c->val;
 }
 
-static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
+//static
+int help_deq(queue_t * q, handle_t * th, handle_t * ph)
 {
   deq_t * deq = &ph->Dr;
   long idx = ACQUIRE_LONG(&deq->idx);
   long id = deq->id;
 
-  if (idx < id) return;
+  if (idx < id) return 0;
 
   node_t * Dp = ph->Dp;
   th->Hp = Dp;
@@ -294,6 +295,8 @@ static void help_deq(queue_t * q, handle_t * th, handle_t * ph)
     old = idx;
     if (idx >= i) i = idx + 1;
   }
+
+  return 0;
 }
 
 static void * deq_fast(queue_t * q, handle_t * th, long * id)
@@ -329,8 +332,7 @@ static void * deq_slow(queue_t * q, handle_t * th, long id)
   return val == TOP ? BOT : val;
 }
 
-//static inline
-void * dequeue(queue_t * q, handle_t * th)
+static inline void * dequeue(queue_t * q, handle_t * th)
 {
   th->Hp = th->Dp;
 

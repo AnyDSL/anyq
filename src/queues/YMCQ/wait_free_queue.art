@@ -35,6 +35,7 @@ struct node_t {
   cells: [cell_t*1022],
 }
 
+type node_ref = u64;
 
 struct queue_t {
   /**
@@ -60,7 +61,7 @@ struct queue_t {
   /**
    * Pointer to the head node of the queue.
    */
-  Hp: &mut node_t,
+  Hp: node_ref, //&mut node_t,
 
   /**
    * Number of processors.
@@ -79,17 +80,17 @@ struct handle_t {
   /**
    * Hazard pointer.
    */
-  Hp: &mut node_t,
+  Hp: node_ref, //&mut node_t,
 
   /**
    * Pointer to the node for enqueue.
    */
-  Ep: &mut node_t,
+  Ep: node_ref, //&mut node_t,
 
   /**
    * Pointer to the node for dequeue.
    */
-  Dp: &mut node_t,
+  Dp: node_ref, //&mut node_t,
 
   /**
    * Enqueue request.
@@ -118,7 +119,7 @@ struct handle_t {
   /**
    * Pointer to a spare node to use, to speedup adding a new node.
    */
-  spare: &mut node_t,
+  spare: node_ref, //&mut node_t,
 
   /**
    * Count the delay rounds of helping another dequeuer.
@@ -140,16 +141,18 @@ struct wfqueue_t
 type WFQHandle = &mut wfqueue_t;
 
 
-#[import(cc = "C")] fn wfqueue_create(_nprocs: i32, _out_handle: &mut WFQHandle) -> i32;
-#[import(cc = "C")] fn wfqueue_size(_queue: WFQHandle) -> i32;
-#[import(cc = "C")] fn wfqueue_destroy(_queue: WFQHandle) -> i32;
-#[import(cc = "C")] fn wfqueue_try_enqueue_u32(_: WFQHandle, _id: i32, _value: u32) -> i32;
-#[import(cc = "C")] fn wfqueue_try_dequeue_u32(_: WFQHandle, _id: i32, _out_value: &mut u32) -> i32;
+//#[import(cc = "C")] fn wfqueue_create(_nprocs: i32, _out_handle: &mut WFQHandle) -> i32;
+//#[import(cc = "C")] fn wfqueue_size(_queue: WFQHandle) -> i32;
+//#[import(cc = "C")] fn wfqueue_destroy(_queue: WFQHandle) -> i32;
+//#[import(cc = "C")] fn wfqueue_try_enqueue_u32(_: WFQHandle, _id: i32, _value: u32) -> i32;
+//#[import(cc = "C")] fn wfqueue_try_dequeue_u32(_: WFQHandle, _id: i32, _out_value: &mut u32) -> i32;
 
-#[import(cc = "C")] fn enqueue(_q: &mut queue_t, _th: &mut handle_t, _value: u64) -> i32;
-#[import(cc = "C")] fn dequeue(_q: &mut queue_t, _th: &mut handle_t) -> u64;
+//#[import(cc = "C")] fn enqueue(_q: &mut queue_t, _th: &mut handle_t, _value: u64) -> i32;
+//#[import(cc = "C")] fn dequeue(_q: &mut queue_t, _th: &mut handle_t) -> u64;
 
-#[import(cc = "C")] fn find_cell(_n: &mut &mut node_t, _i: i32, _th: &mut handle_t) -> &mut cell_t;
+#[import(cc = "C")] fn find_cell(_n: &mut node_ref, _i: i32, _th: &mut handle_t) -> &mut cell_t;
+//#[import(cc = "C")] fn help_enq(_q: &mut queue_t, _th: &mut handle_t, _c: &mut cell_t, _i: i32) -> u64;
+//#[import(cc = "C")] fn help_deq(_q: &mut queue_t, _th: &mut handle_t, _ph: &mut handle_t) -> i32;
 
 
 static default_num_handles = 128;
@@ -160,18 +163,18 @@ static BOT:u64 = 0;
 static TOP:u64 = -1 as u64;
 
 static MAX_PATIENCE = 10;
+static MAX_SPIN = 100;
 
-
-fn new_node(device: AccDevice) -> &mut node_t {
+fn new_node(device: AccDevice) -> node_ref {
 	let s = sizeof[node_t]();
 	let b = device.alloc(s);
 	for i in range(0, s as i32) {
 		b.data(i) = 0;
 	}
-	b.data as &mut node_t
+	b.data as node_ref
 }
 
-fn release_node(node: &mut node_t) -> () {
+fn release_node(node: node_ref) -> () {
 	runtime_release(0, node as &mut [i8]);
 }
 
@@ -208,7 +211,7 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32, queue_ptr: &mut &mut 
 		let th = &mut (*queue).h(i);
 
 		(*th).next = 0;
-		(*th).Hp = 0 as &mut node_t;
+		(*th).Hp = 0 as node_ref;
 		(*th).Ep = queue.q.Hp;
 		(*th).Dp = queue.q.Hp;
 
@@ -240,19 +243,19 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32, queue_ptr: &mut &mut 
 fn wfqueue_destroy_internal(queue: &mut wfqueue_t) -> i32
 {
 	//queue_t* q = &queue->q;
-	let mut n:u64 = queue.q.Hp as u64;
+	let mut n:node_ref = queue.q.Hp;
 
 	while (n != 0) {
 		let tmp = (n as &mut node_t).next;
-		release_node(n as &mut node_t);
+		release_node(n);
 		n = tmp;
 	}
 
 	for i in range(0, queue.q.nprocs) {
 		//cleanup(&queue->q, &queue->h[i]);
-		n = queue.h(i).spare as u64;
-		if (n != 0) {
-			release_node(n as &mut node_t);
+		n = queue.h(i).spare;
+		if (n != 0 as node_ref) {
+			release_node(n);
 		}
 	}
 
@@ -261,75 +264,111 @@ fn wfqueue_destroy_internal(queue: &mut wfqueue_t) -> i32
 	1
 }
 
+/*
+fn find_cell_internal(device: AccDevice, thread: thread_context, p: &u64, i: i32, th: &mut handle_t) -> &mut cell_t {
 
-fn enq_fast(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64, id: &mut i32) -> bool
-{
-	let i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+	//let mut p_ref:u64 = *p;
 
-	let c = find_cell(&mut (*th).Ep, i, th);
-	let cv:u64 = BOT;
+	let c:u64 = thread.atomic_load_global_u64(p as &addrspace(1) u64, memory_order::seq_cst); // as &mut node_t;
 
-	let res = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, cv, v, memory_order::seq_cst, memory_order::seq_cst);
-	*id = i;
+	for j in range((*c).id, i / WFQUEUE_NODE_SIZE) {
+		let mut n:&mut node_t = thread.atomic_load_global_u64(&mut (*c).next as &mut addrspace(1) u64, memory_order::seq_cst) as &mut node_t;
 
-	res.1
-}
+		if (n as u64 == 0) {
+			let mut t:&mut node_t = (*th).spare;
 
+			if (t as u64 == 0) {
+				t = new_node(device);
+				(*th).spare = t;
+			}
 
-fn enq_slow(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64, id: i32) -> ()
-{
-	let enq:&mut enq_t = &mut (*th).Er;
-	let mut mid:i32 = id;
-	
-	thread.atomic_store_global_u64(&mut (*enq).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
-	thread.atomic_store_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, memory_order::seq_cst);
+			(*t).id = j + 1;
 
-	let mut tail:&mut node_t = thread.atomic_load_global_u64(&mut (*th).Ep as &mut addrspace(1) u64, memory_order::seq_cst) as &mut node_t;
-
-	let mut i:i32;
-	let mut c:&mut cell_t;
-
-	// TODO: do-while
-	while (thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst) > 0) {
-		i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
-		c = find_cell(&mut tail, i, th);
-		let mut ce:u64 = BOT;
-
-		let res_c = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, ce, enq as u64, memory_order::seq_cst, memory_order::seq_cst);
-		let val_c = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
-		if res_c.1 && val_c != TOP {
-			let res_id = thread.atomic_cas_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, -i, memory_order::seq_cst, memory_order::seq_cst);
-			if res_id.1 {
-				mid = -i;
-				break()
+			let res = thread.atomic_cas_global_u64(&mut (*c).next as &mut addrspace(1) u64, n as u64, t as u64, memory_order::seq_cst, memory_order::seq_cst);
+			if res.1 {
+				n = t;
+				(*th).spare = 0 as &mut node_t;
+			} else {
+				n = res.0 as &mut node_t;
 			}
 		}
-	} 
 
-	mid = -thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst);
-	c = find_cell(&mut (*th).Ep, mid, th);
-
-	if (mid > i) {
-		let mut Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
-		while (Ei <= mid) {
-			let res_Ei = thread.atomic_cas_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, Ei, mid + 1, memory_order::seq_cst, memory_order::seq_cst);
-			Ei = res_Ei.0;
-			if res_Ei.1 { break() }
-		}
+		c = n;
 	}
 
-	thread.atomic_store_global_u64(&mut (*c).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
-}
+	//thread.atomic_store_global_u64(&mut (*p) as &mut addrspace(1) u64, c, memory_order::seq_cst);
 
-fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64) -> i32
+	let c_ref = c as &mut node_t;
+	&mut (*c_ref).cells(i % WFQUEUE_NODE_SIZE)
+} */
+
+fn enqueue_internal(_device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64) -> i32
 {
+	fn enq_fast(v: u64, id: &mut i32) -> bool
+	{
+		let i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+
+		let c = find_cell(&mut (*th).Ep, i, th);
+		//let c = find_cell_internal(device, thread, &mut (*th).Ep, i, th);
+
+		let res = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, BOT, v, memory_order::seq_cst, memory_order::seq_cst);
+		if res.1 { true } else { *id = i; false }
+		//false
+	}
+
+	fn enq_slow(v: u64, id: i32) -> ()
+	{
+		let enq:&mut enq_t = &mut (*th).Er;
+		let mut mid:i32 = id;
+	
+		thread.atomic_store_global_u64(&mut (*enq).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
+		thread.atomic_store_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, memory_order::seq_cst);
+
+		let mut tail:node_ref = thread.atomic_load_global_u64(&mut (*th).Ep as &mut addrspace(1) u64, memory_order::seq_cst); // as &mut node_t;
+
+		let mut i:i32;
+		let mut c:&mut cell_t;
+
+		// TODO: do-while
+		while (thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst) > 0) {
+			i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+			c = find_cell(&mut tail, i, th);
+			//c = find_cell_internal(device, thread, &mut tail, i, th);
+
+			let res_c = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, BOT, enq as u64, memory_order::seq_cst, memory_order::seq_cst);
+			let val_c = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if res_c.1 && val_c != TOP {
+				let res_id = thread.atomic_cas_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, -i, memory_order::seq_cst, memory_order::seq_cst);
+				if res_id.1 {
+					mid = -i;
+					break()
+				}
+			}
+		} 
+
+		mid = -thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+		c = find_cell(&mut (*th).Ep, mid, th);
+		//c = find_cell_internal(device, thread, &mut (*th).Ep, mid, th);
+
+		if (mid > i) {
+			let mut Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			while (Ei <= mid) {
+				let res_Ei = thread.atomic_cas_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, Ei, mid + 1, memory_order::seq_cst, memory_order::seq_cst);
+				if res_Ei.1 { break() }
+				Ei = res_Ei.0;
+			}
+		}
+
+		thread.atomic_store_global_u64(&mut (*c).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
+	}
+
 	let Ep:u64 = thread.atomic_load_global_u64(&mut (*th).Ep as &mut addrspace(1) u64, memory_order::seq_cst);
 	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, Ep, memory_order::seq_cst);
 
 	let mut id:i32;
 	let mut p = MAX_PATIENCE;
-	while (!enq_fast(thread, q, th, v, &mut id) && p-- > 0) { };
-	if (p < 0) { enq_slow(thread, q, th, v, id); }
+	while (!enq_fast(v, &mut id) && p-- > 0) { };
+	if (p < 0) { enq_slow(v, id); }
 
 	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, 0, memory_order::seq_cst);
 
@@ -337,6 +376,253 @@ fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, 
 }
 
 
+
+
+
+
+
+fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t) -> u64
+{
+	fn spin(ptr: &mut u64) -> u64 {
+		let mut p = MAX_SPIN;
+		let mut v = thread.atomic_load_global_u64(ptr as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		while (v == 0 && p-- > 0) {
+			v = thread.atomic_load_global_u64(ptr as &mut addrspace(1) u64, memory_order::seq_cst);
+			//PAUSE();
+		}
+
+		v
+	}
+
+	fn help_enq_internal(c: &mut cell_t, i: i32) -> u64
+	{
+		let v:u64 = spin(&mut (*c).val);
+
+		if (v != TOP && v != BOT) { return(v) }
+		if (v == BOT) {
+			let res_v = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, BOT, TOP, memory_order::seq_cst, memory_order::seq_cst);
+			if !res_v.1 && res_v.0 != TOP { return (res_v.0) }
+		}
+
+		let mut e:u64 = thread.atomic_load_global_u64(&mut (*c).enq as &mut addrspace(1) u64, memory_order::seq_cst); // as &mut enq_t;
+
+		if (e == BOT) {
+			let mut ph:&mut handle_t = (*th).Eh as &mut handle_t;
+			let mut pe:&mut enq_t = &mut (*ph).Er;
+			let mut id:i32 = thread.atomic_load_global_i32(&mut (*pe).id as &mut addrspace(1) i32, memory_order::seq_cst);
+
+			if ((*th).Ei != 0 && (*th).Ei != id) {
+				(*th).Ei = 0;
+				(*th).Eh = (*ph).next;
+
+				ph = (*th).Eh as &mut handle_t;
+				pe = &mut (*ph).Er;
+				id = thread.atomic_load_global_i32(&mut (*pe).id as &mut addrspace(1) i32, memory_order::seq_cst);
+			}
+
+			if (id > 0 && id <= i) {
+				let res = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, e, pe as u64, memory_order::seq_cst, memory_order::seq_cst);
+				e = res.0;
+				if !res.1 {
+					(*th).Ei = id;
+				} else {
+					(*th).Eh = (*ph).next;
+				}
+			} else {
+				(*th).Eh = (*ph).next;
+			}
+
+			if (e == BOT) {
+				thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, e, TOP, memory_order::seq_cst, memory_order::seq_cst);
+				e = TOP;
+			}
+		}
+
+		if (e == TOP) {
+			let Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			if Ei <= i {
+				return (BOT)
+			} else {
+				return (TOP)
+			}
+		}
+
+		let er:&mut enq_t = e as &mut enq_t;
+		let ei:i32 = thread.atomic_load_global_i32(&mut (*er).id as &mut addrspace(1) i32, memory_order::seq_cst);
+		let ev:u64 = thread.atomic_load_global_u64(&mut (*er).val as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		if (ei > i) {
+			let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			let Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			if (val == TOP && Ei <= i) { return(BOT) }
+		} else {
+			let res_ei = thread.atomic_cas_global_i32(&mut (*er).id as &mut addrspace(1) i32, ei, -i, memory_order::seq_cst, memory_order::seq_cst);
+			let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if ((ei > 0 && res_ei.1) || (ei == -i && val == TOP))
+			{
+				let mut Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+				let mut cas:bool = false;
+				while (Ei <= i && !cas) {
+					let res = thread.atomic_cas_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, Ei, i+1, memory_order::seq_cst, memory_order::seq_cst);
+					Ei = res.0;
+					cas = res.1;
+				}
+				thread.atomic_store_global_u64(&mut (*c).val as &mut addrspace(1) u64, ev, memory_order::seq_cst);
+			}
+		}
+
+		thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst)
+	}
+	
+	fn help_deq_internal(ph: &mut handle_t) -> ()
+	{
+		let deq:&mut deq_t = (*ph).Dr;
+		let mut idx:i32 = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+		let id:i32 = thread.atomic_load_global_i32(&mut (*deq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+
+		if (idx < id) { return() }
+
+		let mut Dp:u64 = thread.atomic_load_global_u64(&mut (*ph).Dp as &mut addrspace(1) u64, memory_order::seq_cst);
+		thread.atomic_store_global_u64(&mut (*ph).Hp as &mut addrspace(1) u64, Dp, memory_order::seq_cst);
+		//FENCE();
+		idx = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+
+		let mut i:i32 = id + 1;
+		let mut old:i32 = id;
+		let mut new:i32 = 0;
+
+		while (true) {
+			let mut h:u64 = Dp;
+			let mut c:&mut cell_t;
+
+			while (idx == old && new == 0) {
+				c = find_cell(&mut h, i, th);
+				//let v:u64 = help_enq(q, th, c, i);
+				let v:u64 = help_enq_internal(c, i);
+				let c_deq:u64 = thread.atomic_load_global_u64(&mut (*c).deq as &mut addrspace(1) u64, memory_order::seq_cst);
+				if (v == BOT || (v != TOP && c_deq == BOT)) {
+					new = i;
+				} else {
+					idx = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+				}
+				++i;
+			}
+
+			if (new != 0) {
+				let res = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, new, memory_order::seq_cst, memory_order::seq_cst);
+				if res.1 { idx = new; } else { idx = res.0; }
+				if idx >= new { new = 0; }
+			}
+
+			let d_id:i32 = thread.atomic_load_global_i32(&mut (*deq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+			if (idx < 0 || d_id != id) { break() }
+
+			c = find_cell(&mut Dp, idx, th);
+			let mut cd:u64 = BOT; // &mut deq_t
+			let c_val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if (c_val == TOP) {
+				let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+				idx = res_idx.0;
+				break ()
+			} else {
+				let res_d = thread.atomic_cas_global_u64(&mut (*c).deq as &mut addrspace(1) u64, cd, deq as u64, memory_order::seq_cst, memory_order::seq_cst);
+				cd = res_d.0;
+				if res_d.1 {
+					let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+					idx = res_idx.0;
+					break ()
+				} else {
+					if cd == deq as u64 {
+						let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+						idx = res_idx.0;
+						break ()
+					}
+				}
+			}
+
+			old = idx;
+			if (idx >= i) { i = idx + 1; }
+		}
+	}
+
+	fn deq_fast(id: &mut i32) -> u64
+	{
+		let i:i32 = thread.atomic_add_global_i32(&mut (*q).Di as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+		let c:&mut cell_t = find_cell(&mut (*th).Dp, i, th);
+		//let v:u64 = help_enq(q, th, c, i);
+		let v:u64 = help_enq_internal(c, i);
+
+		if (v == BOT) {
+			BOT
+		} else {
+			let res = thread.atomic_cas_global_u64(&mut (*c).deq as &mut addrspace(1) u64, BOT, TOP, memory_order::seq_cst, memory_order::seq_cst);
+			if (v != TOP && res.1) {
+				v
+			} else {
+				*id = i;
+				TOP
+			}
+		}
+	}
+
+	fn deq_slow(id: i32) -> u64
+	{
+		let deq:&mut deq_t = &mut (*th).Dr;
+
+		thread.atomic_store_global_i32(&mut (*deq).id as &mut addrspace(1) i32, id, memory_order::seq_cst);
+		thread.atomic_store_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, id, memory_order::seq_cst);
+
+		//help_deq(q, th, th);
+		help_deq_internal(th);
+		let i = -thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+		let c:&mut cell_t = find_cell(&mut (*th).Dp, i, th);
+
+		let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		let mut Di:i32 = thread.atomic_load_global_i32(&mut (*q).Di as &mut addrspace(1) i32, memory_order::seq_cst);
+		while (Di <= i) {
+			let res_Di = thread.atomic_cas_global_i32(&mut (*q).Di as &mut addrspace(1) i32, Di, i + 1, memory_order::seq_cst, memory_order::seq_cst);
+			if res_Di.1 { break() }
+			Di = res_Di.0;
+		}
+
+		if val == TOP { BOT } else { val }
+	}
+
+	let Dp:u64 = thread.atomic_load_global_u64(&mut (*th).Dp as &mut addrspace(1) u64, memory_order::seq_cst);
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, Dp, memory_order::seq_cst);
+
+	let mut v:u64 = TOP;
+	let mut id:i32;
+	let mut p = MAX_PATIENCE;
+
+	// TODO: do-while
+	while (v == TOP && p-- > 0) {
+		v = deq_fast(&mut id);
+	}
+
+	if (v == TOP) {
+		v = deq_slow(id);
+	}
+
+	if (v != EMPTY) {
+		// TODO: this kills the vectorizer with division by zero
+		let Dh = (*th).Dh as &mut handle_t;
+		//help_deq(q, th, Dh);
+		help_deq_internal(Dh);
+		(*th).Dh = Dh.next;
+	}
+
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, 0, memory_order::seq_cst);
+
+	if ((*th).spare == 0 as node_ref) {
+		//cleanup(q, th);
+		(*th).spare = new_node(device);
+	}
+
+	v
+}
 
 
 
@@ -404,7 +690,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			//let success = wfqueue_try_enqueue_u32(queue, id, value);
 			//void* value = (void*)(0x00ff000000000000UL | v);
 			//let success = enqueue(&mut (*queue).q, &mut (*queue).h(id), value);
-			let success = enqueue_internal(thread, &mut (*queue).q, &mut (*queue).h(id), value);
+			let success = enqueue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id), value);
 			//device.print_3xi32("push handle: %d - %d / %d\n", handle, value as i32, success);
 			if success > 0 {
 				thread.atomic_add_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, memory_order::seq_cst);
@@ -417,16 +703,24 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			//assert(handle < num_handles, "thread handle out of range");
 			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
 			let mut value:u32 = thread.idx(0);
-			let success = wfqueue_try_dequeue_u32(queue, id, &mut value);
+			//let success = wfqueue_try_dequeue_u32(queue, id, &mut value);
+			//let v = dequeue(&mut (*queue).q, &mut (*queue).h(id));
+			let v = dequeue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id));
+
+			//let  (v == EMPTY) return 0;
+
+			//*value = (uint32_t)(0xffffffffUL & (uint64_t)v);
+			//FAA_LONG(&queue->size, -1);
+			//return 1;
 			//let v:u64 = dequeue(&mut (*queue).q, (*queue).h(id));
 
-			//let success = (v != EMPTY);
-			//value = (v & 0xffffffff) as u32;
+			let success = (v != EMPTY);
+			value = (v & 0xffffffff) as u32;
 
 			//device.print_3xi32("pop handle: %d - %d / %d\n", handle, value as i32, success);
 
-			if success > 0 {
-				//thread.atomic_sub_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+			if success {
+				thread.atomic_sub_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, memory_order::seq_cst);
 				sink(value);
 				1
 			} else {
@@ -467,7 +761,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		},
 
 		release = @|| {
-			wfqueue_destroy(queue);
+			wfqueue_destroy_internal(queue);
 		}
 	}
 }
