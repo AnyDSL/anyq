@@ -14,7 +14,7 @@ from results import *
 default_bin_dir = Path(__file__).parent / "build" / "bin"
 default_results_dir = Path(__file__).parent / "results"
 default_export_dir = Path(__file__).parent / "plot_data"
-default_template_file = Path(__file__).parent / "index.html"
+default_template_file = Path(__file__).parent / "html" / "index.html"
 
 
 def device_id(name):
@@ -518,7 +518,7 @@ def export(out_dir, results_dir, template_file, include):
 					d.visit(DatasetAggregationVisitor(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale))
 
 	shutil.copy(template_file, out_dir / "index.html")
-	shutil.copy(Path(__file__).parent / "main.js", out_dir / "main.js")
+	shutil.copy(Path(__file__).parent / "html" / "main.js", out_dir / "main.js")
 
 
 def serve(port):
