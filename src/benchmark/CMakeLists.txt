@@ -145,4 +145,8 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)
 	endif()
+
+	if (${_platform} STREQUAL "scalar")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "YangMellorCrummeyQueue;YangMellorCrummeyQueue_ref" "100000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
+	endif()
 endforeach()
