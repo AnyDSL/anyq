@@ -8,6 +8,7 @@ steps:
     commands:
       - python benchmark.py export --out baseline "benchmark-queue-concurrent--.*"
       - python benchmark.py export --out cuda-its --template html/result_group.html "benchmark-(queue-concurrent)--.*-cuda" "benchmark-(queue-concurrent-its)--.*-cuda"
+      - python benchmark.py export --out arm-lse --template html/result_group.html "benchmark-(queue-concurrent)--.*-Apple_M1-cpu" "benchmark-(queue-concurrent-nolse)--.*-Apple_M1-cpu"
 
   - name: upload
     image: beeblebrox.cg.uni-saarland.de/alpine/drone-plugin-sftp
