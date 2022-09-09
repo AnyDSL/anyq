@@ -105,7 +105,7 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT)
-	list(APPEND AnyQ_PLATFORMS fiberless)
+	# list(APPEND AnyQ_PLATFORMS fiberless)
 	if (AnyQ_FIBER_SUPPORT)
 		list(APPEND AnyQ_PLATFORMS cpu)
 	endif()
