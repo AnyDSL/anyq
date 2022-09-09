@@ -3,537 +3,726 @@
 // In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming (PPoPP '16), pages 1–13.
 // https://doi.org/10.1145/2851141.2851168
 
-mod YMC {
-	type T = u64;
+type PADDING = [u8*4];
 
-	struct EnqReq {
-		val: T,
-		state: u64
-	}
-
-	struct DeqReq {
-		id: i64,
-		state: u64
-	}
-
-	struct Cell {
-		val: T,
-		enq: u64, // &mut addrspace(1) EnqReq,
-		deq: u64  // &mut addrspace(1) DeqReq
-	}
-
-	static N = 1024;
-
-	struct Segment {
-		id: i64,
-		next: u32,
-		cells: [Cell * 1024]
-	}
-
-	struct Queue {
-		Q: u32,
-		T: i64,
-		H: i64,
-		I: i64,
-		size: i32,
-		next_free: u32,
-		alloc_next: u32
-	}
-
-	struct EnqPeer {
-		req: EnqReq,
-		peer: u32, // &mut addrspace(1) Handle
-	}
-
-	struct DeqPeer {
-		req: DeqReq,
-		peer: u32, // &mut addrspace(1) Handle
-	}
-
-	struct Handle {
-		tail: u32, // &mut addrspace(1) Segment,
-		head: u32, // &mut addrspace(1) Segment,
-		next: u32, // &mut addrspace(1) Handle,
-		enq: EnqPeer,
-		deq: DeqPeer,
-		hzpt: u32, // &mut addrspace(1) Segment
-	}
-
-	enum dequeue_result {
-		SUCCESS(T),
-		EMPTY,
-	}
-
-	enum enq_fast_result {
-		SUCCESS,
-		FAIL(i64)
-	}
-
-	enum deq_fast_result {
-		SUCCESS(dequeue_result),
-		FAIL(i64)
-	}
+struct enq_t {
+  id: i32,
+  pad: PADDING,
+  val: u64, // void*
 }
 
-static mem_rlx = memory_order::seq_cst; //relaxed;
-static mem_rel = memory_order::seq_cst; //release;
-static mem_acq = memory_order::seq_cst; //acquire;
+struct deq_t {
+  id: i32,
+  idx: i32,
+}
+
+struct cell_t {
+  val: u64, // void*
+  enq: &mut enq_t,
+  deq: &mut enq_t,
+  pad: [u64*5], // void*[5]
+}
+
+static WFQUEUE_NODE_SIZE = ((1 << 10) - 2);
+
+struct node_t {
+  next: u64, // &mut node_t
+  id: i32,
+  pad: PADDING,
+  cells: [cell_t*1022],
+}
+
+type node_ref = u64;
+
+struct queue_t {
+  /**
+   * Index of the next position for enqueue.
+   */
+  // DOUBLE_CACHE_ALIGNED
+  Ei: i32,
+
+  /**
+   * Index of the next position for dequeue.
+   */
+  // DOUBLE_CACHE_ALIGNED
+  Di: i32,
+
+  /**
+   * Index of the head of the queue.
+   */
+  // DOUBLE_CACHE_ALIGNED
+  Hi: i32,
+
+  pad1: PADDING,
+
+  /**
+   * Pointer to the head node of the queue.
+   */
+  Hp: node_ref, //&mut node_t,
+
+  /**
+   * Number of processors.
+   */
+  nprocs: i32,
+
+  pad2: PADDING,
+}
+
+struct handle_t {
+  /**
+   * Pointer to the next handle.
+   */
+  next: u64, // &mut handle_t
+
+  /**
+   * Hazard pointer.
+   */
+  Hp: node_ref, //&mut node_t,
+
+  /**
+   * Pointer to the node for enqueue.
+   */
+  Ep: node_ref, //&mut node_t,
+
+  /**
+   * Pointer to the node for dequeue.
+   */
+  Dp: node_ref, //&mut node_t,
+
+  /**
+   * Enqueue request.
+   */
+  Er: enq_t,
+
+  /**
+   * Dequeue request.
+   */
+  Dr: deq_t,
+
+  /**
+   * Handle of the next enqueuer to help.
+   */
+  Eh: u64, // &mut handle_t
+
+  Ei: i32,
+
+  pad1: PADDING,
+
+  /**
+   * Handle of the next dequeuer to help.
+   */
+  Dh: u64, // &mut handle_t
+
+  /**
+   * Pointer to a spare node to use, to speedup adding a new node.
+   */
+  spare: node_ref, //&mut node_t,
+
+  /**
+   * Count the delay rounds of helping another dequeuer.
+   */
+  delay: i32,
+
+  pad2: PADDING,
+}
+
+struct wfqueue_t
+{
+  q: queue_t,
+  size: i32,
+  tail: &mut handle_t,
+  h: &mut [handle_t],
+}
+
+type WFQHandle = &mut wfqueue_t;
+
+
+static default_num_handles = 128;
+
+static EMPTY:u64 = 0; // void*
+static BOT:u64 = 0;
+static TOP:u64 = -1 as u64;
+
+static MAX_PATIENCE = 10;
+static MAX_SPIN = 100;
+
+fn new_node(device: AccDevice) -> node_ref {
+	let s = sizeof[node_t]();
+	let b = device.alloc(s);
+	for i in range(0, s as i32) {
+		b.data(i) = 0;
+	}
+	b.data as node_ref
+}
+
+fn release_node(node: node_ref) -> () {
+	runtime_release(0, node as &mut [i8]);
+}
+
+fn wfqueue_create_internal(device: AccDevice, nprocs: i32, queue_ptr: &mut &mut wfqueue_t) -> i32
+{
+	//device.print_3xi32("sizeof(wfqueue_t): %d\nsizeof(queue_t): %d\nsizeof(handle_t): %d\n", sizeof[wfqueue_t]() as i32, sizeof[queue_t]() as i32, sizeof[handle_t]() as i32);
+	//device.print_3xi32("sizeof(enq_t): %d\nsizeof(deq_t): %d\nsizeof(node_t): %d\n", sizeof[enq_t]() as i32, sizeof[deq_t]() as i32, sizeof[node_t]() as i32);
+
+	let queue_size = sizeof[wfqueue_t]();
+
+	let handles_offset = round_up_i64(queue_size, 64);
+	let handles_size = nprocs as i64 * sizeof[handle_t]();
+
+	let dev_queue_buffer = device.alloc(handles_offset + handles_size);
+	let dev_data = dev_queue_buffer.data;
+
+	let queue = &dev_data(0) as &mut wfqueue_t;
+	let handles = &dev_data(handles_offset) as &mut [handle_t];
+
+	queue.q.Hi = 0;
+	queue.q.Hp = new_node(device);
+
+	queue.q.Ei = 1;
+	queue.q.Di = 1;
+
+	queue.q.nprocs = nprocs;
+
+	queue.size = 0;
+	queue.h = handles;
+
+	for i in range(0, nprocs) {
+		let th = &mut (*queue).h(i);
+
+		(*th).next = 0;
+		(*th).Hp = 0 as node_ref;
+		(*th).Ep = queue.q.Hp;
+		(*th).Dp = queue.q.Hp;
+
+		(*th).Er.id = 0;
+		(*th).Er.val = BOT;
+		(*th).Dr.id = 0;
+		(*th).Dr.idx = -1;
+
+		(*th).Ei = 0;
+		(*th).spare = new_node(device);
+
+		(*th).next = &mut queue.h(i + 1) as u64;
+		(*th).Eh = th.next;
+		(*th).Dh = th.next;
+	}
+
+	let last_th = &mut queue.h(queue.q.nprocs - 1);
+	(*last_th).next = &mut queue.h(0) as u64;
+	(*last_th).Eh = last_th.next;
+	(*last_th).Dh = last_th.next;
+
+	(*queue).tail = &mut queue.h(0);
+
+	*queue_ptr = queue;
+
+	1
+}
+
+fn wfqueue_destroy_internal(queue: &mut wfqueue_t) -> i32
+{
+	let mut n:node_ref = queue.q.Hp;
+
+	while (n != 0) {
+		let tmp = (n as &mut node_t).next;
+		release_node(n);
+		n = tmp;
+	}
+
+	for i in range(0, queue.q.nprocs) {
+		//cleanup(&queue->q, &queue->h[i]);
+		n = queue.h(i).spare;
+		if (n != 0 as node_ref) {
+			release_node(n);
+		}
+	}
+
+	runtime_release(0, queue as &mut [i8]);
+
+	1
+}
+
+
+fn @find_cell_internal(device: AccDevice, thread: thread_context, p: &node_ref, i: i32, th: &mut handle_t) -> &mut cell_t {
+
+	let mut c:node_ref = thread.atomic_load_global_u64(p as &addrspace(1) node_ref, memory_order::seq_cst); // as &mut node_t;
+
+	for j in range((*(c as &mut node_t)).id, i / WFQUEUE_NODE_SIZE) {
+		let mut n:node_ref = thread.atomic_load_global_u64(&mut (*(c as &mut node_t)).next as &mut addrspace(1) node_ref, memory_order::seq_cst); // as &mut node_t;
+
+		if (n == 0) {
+			let mut t:node_ref = (*th).spare;
+
+			if (t == 0 as node_ref) {
+				t = new_node(device);
+				(*th).spare = t;
+			}
+
+			(*(t as &mut node_t)).id = j + 1;
+
+			let res = thread.atomic_cas_global_u64(&mut (*(c as &mut node_t)).next as &mut addrspace(1) node_ref, n, t, memory_order::seq_cst, memory_order::seq_cst);
+			if res.1 {
+				n = t;
+				(*th).spare = 0;
+			} else {
+				n = res.0;
+			}
+		}
+
+		c = n;
+	}
+
+	thread.atomic_store_global_u64(p as &mut addrspace(1) node_ref, c, memory_order::seq_cst);
+
+	let c_ref = c as &mut node_t;
+	let c_i:&mut cell_t = &mut (*c_ref).cells(i % WFQUEUE_NODE_SIZE);
+	c_i
+}
+
+fn enqueue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64) -> i32
+{
+	fn enq_fast(v: u64, id: &mut i32) -> bool
+	{
+		let i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+
+		//let c = find_cell(&mut (*th).Ep, i, th);
+		let c = @find_cell_internal(device, thread, &mut (*th).Ep, i, th);
+
+		let res = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, BOT, v, memory_order::seq_cst, memory_order::seq_cst);
+		if res.1 { true } else { *id = i; false }
+		//false
+	}
+
+	fn enq_slow(v: u64, id: i32) -> ()
+	{
+		let enq:&mut enq_t = &mut (*th).Er;
+		let mut mid:i32 = id;
+	
+		thread.atomic_store_global_u64(&mut (*enq).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
+		thread.atomic_store_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, memory_order::seq_cst);
+
+		let mut tail:node_ref = thread.atomic_load_global_u64(&mut (*th).Ep as &mut addrspace(1) node_ref, memory_order::seq_cst); // as &mut node_t;
+
+		let mut i:i32;
+		let mut c:&mut cell_t;
+
+		// TODO: do-while
+		while (thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst) > 0) {
+			i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+			//c = find_cell(&mut tail, i, th);
+			c = @find_cell_internal(device, thread, &mut tail, i, th);
+
+			let res_c = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, BOT, enq as u64, memory_order::seq_cst, memory_order::seq_cst);
+			let val_c = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if res_c.1 && val_c != TOP {
+				let res_id = thread.atomic_cas_global_i32(&mut (*enq).id as &mut addrspace(1) i32, mid, -i, memory_order::seq_cst, memory_order::seq_cst);
+				if res_id.1 {
+					mid = -i;
+					break()
+				}
+			}
+		} 
+
+		mid = -thread.atomic_load_global_i32(&mut (*enq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+		//c = find_cell(&mut (*th).Ep, mid, th);
+		c = @find_cell_internal(device, thread, &mut (*th).Ep, mid, th);
+
+		if (mid > i) {
+			let mut Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			while (Ei <= mid) {
+				let res_Ei = thread.atomic_cas_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, Ei, mid + 1, memory_order::seq_cst, memory_order::seq_cst);
+				if res_Ei.1 { break() }
+				Ei = res_Ei.0;
+			}
+		}
+
+		thread.atomic_store_global_u64(&mut (*c).val as &mut addrspace(1) u64, v, memory_order::seq_cst);
+	}
+
+	let Ep:node_ref = thread.atomic_load_global_u64(&mut (*th).Ep as &mut addrspace(1) node_ref, memory_order::seq_cst);
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) node_ref, Ep, memory_order::seq_cst);
+
+	let mut id:i32;
+	let mut p = MAX_PATIENCE;
+	while (!enq_fast(v, &mut id) && p-- > 0) { };
+	if (p < 0) { enq_slow(v, id); }
+
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) node_ref, 0 as node_ref, memory_order::seq_cst);
+
+	1
+}
+
+
+fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t) -> u64
+{
+	fn spin(ptr: &mut u64) -> u64 {
+		let mut p = MAX_SPIN;
+		let mut v = thread.atomic_load_global_u64(ptr as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		while (v == 0 && p-- > 0) {
+			v = thread.atomic_load_global_u64(ptr as &mut addrspace(1) u64, memory_order::seq_cst);
+			//PAUSE();
+		}
+
+		v
+	}
+
+	fn help_enq_internal(c: &mut cell_t, i: i32) -> u64
+	{
+		let v:u64 = spin(&mut (*c).val);
+
+		if (v != TOP && v != BOT) { return(v) }
+		if (v == BOT) {
+			let res_v = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, BOT, TOP, memory_order::seq_cst, memory_order::seq_cst);
+			if !res_v.1 && res_v.0 != TOP { return (res_v.0) }
+		}
+
+		let mut e:u64 = thread.atomic_load_global_u64(&mut (*c).enq as &mut addrspace(1) u64, memory_order::seq_cst); // as &mut enq_t;
+
+		if (e == BOT) {
+			let mut ph:&mut handle_t = (*th).Eh as &mut handle_t;
+			let mut pe:&mut enq_t = &mut (*ph).Er;
+			let mut id:i32 = thread.atomic_load_global_i32(&mut (*pe).id as &mut addrspace(1) i32, memory_order::seq_cst);
+
+			if ((*th).Ei != 0 && (*th).Ei != id) {
+				(*th).Ei = 0;
+				(*th).Eh = (*ph).next;
+
+				ph = (*th).Eh as &mut handle_t;
+				pe = &mut (*ph).Er;
+				id = thread.atomic_load_global_i32(&mut (*pe).id as &mut addrspace(1) i32, memory_order::seq_cst);
+			}
+
+			if (id > 0 && id <= i) {
+				let res = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, e, pe as u64, memory_order::seq_cst, memory_order::seq_cst);
+				e = res.0;
+				if !res.1 {
+					(*th).Ei = id;
+				} else {
+					(*th).Eh = (*ph).next;
+				}
+			} else {
+				(*th).Eh = (*ph).next;
+			}
+
+			if (e == BOT) {
+				thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, e, TOP, memory_order::seq_cst, memory_order::seq_cst);
+				e = TOP;
+			}
+		}
+
+		if (e == TOP) {
+			let Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			if Ei <= i {
+				return (BOT)
+			} else {
+				return (TOP)
+			}
+		}
+
+		let er:&mut enq_t = e as &mut enq_t;
+		let ei:i32 = thread.atomic_load_global_i32(&mut (*er).id as &mut addrspace(1) i32, memory_order::seq_cst);
+		let ev:u64 = thread.atomic_load_global_u64(&mut (*er).val as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		if (ei > i) {
+			let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			let Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+			if (val == TOP && Ei <= i) { return(BOT) }
+		} else {
+			let res_ei = thread.atomic_cas_global_i32(&mut (*er).id as &mut addrspace(1) i32, ei, -i, memory_order::seq_cst, memory_order::seq_cst);
+			let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if ((ei > 0 && res_ei.1) || (ei == -i && val == TOP))
+			{
+				let mut Ei:i32 = thread.atomic_load_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, memory_order::seq_cst);
+				let mut cas:bool = false;
+				while (Ei <= i && !cas) {
+					let res = thread.atomic_cas_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, Ei, i+1, memory_order::seq_cst, memory_order::seq_cst);
+					Ei = res.0;
+					cas = res.1;
+				}
+				thread.atomic_store_global_u64(&mut (*c).val as &mut addrspace(1) u64, ev, memory_order::seq_cst);
+			}
+		}
+
+		thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst)
+	}
+	
+	fn help_deq_internal(ph: &mut handle_t) -> ()
+	{
+		let deq:&mut deq_t = (*ph).Dr;
+		let mut idx:i32 = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+		let id:i32 = thread.atomic_load_global_i32(&mut (*deq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+
+		if (idx < id) { return() }
+
+		let mut Dp:u64 = thread.atomic_load_global_u64(&mut (*ph).Dp as &mut addrspace(1) u64, memory_order::seq_cst);
+		thread.atomic_store_global_u64(&mut (*ph).Hp as &mut addrspace(1) u64, Dp, memory_order::seq_cst);
+		//FENCE();
+		idx = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+
+		let mut i:i32 = id + 1;
+		let mut old:i32 = id;
+		let mut new:i32 = 0;
+
+		while (true) {
+			let mut h:u64 = Dp;
+			let mut c:&mut cell_t;
+
+			while (idx == old && new == 0) {
+				//c = find_cell(&mut h, i, th);
+				c = @find_cell_internal(device, thread, &mut h, i, th);
+				//let v:u64 = help_enq(q, th, c, i);
+				let v:u64 = help_enq_internal(c, i);
+				let c_deq:u64 = thread.atomic_load_global_u64(&mut (*c).deq as &mut addrspace(1) u64, memory_order::seq_cst);
+				if (v == BOT || (v != TOP && c_deq == BOT)) {
+					new = i;
+				} else {
+					idx = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+				}
+				++i;
+			}
+
+			if (new != 0) {
+				let res = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, new, memory_order::seq_cst, memory_order::seq_cst);
+				if res.1 { idx = new; } else { idx = res.0; }
+				if idx >= new { new = 0; }
+			}
+
+			let d_id:i32 = thread.atomic_load_global_i32(&mut (*deq).id as &mut addrspace(1) i32, memory_order::seq_cst);
+			if (idx < 0 || d_id != id) { break() }
+
+			//c = find_cell(&mut Dp, idx, th);
+			c = @find_cell_internal(device, thread, &mut Dp, idx, th);
+			let mut cd:u64 = BOT; // &mut deq_t
+			let c_val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+			if (c_val == TOP) {
+				let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+				idx = res_idx.0;
+				break ()
+			} else {
+				let res_d = thread.atomic_cas_global_u64(&mut (*c).deq as &mut addrspace(1) u64, cd, deq as u64, memory_order::seq_cst, memory_order::seq_cst);
+				cd = res_d.0;
+				if res_d.1 {
+					let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+					idx = res_idx.0;
+					break ()
+				} else {
+					if cd == deq as u64 {
+						let res_idx = thread.atomic_cas_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, idx, -idx, memory_order::seq_cst, memory_order::seq_cst);
+						idx = res_idx.0;
+						break ()
+					}
+				}
+			}
+
+			old = idx;
+			if (idx >= i) { i = idx + 1; }
+		}
+	}
+
+	fn deq_fast(id: &mut i32) -> u64
+	{
+		let i:i32 = thread.atomic_add_global_i32(&mut (*q).Di as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+		//let c:&mut cell_t = find_cell(&mut (*th).Dp, i, th);
+		let c:&mut cell_t = @find_cell_internal(device, thread, &mut (*th).Dp, i, th);
+		//let v:u64 = help_enq(q, th, c, i);
+		let v:u64 = help_enq_internal(c, i);
+
+		if (v == BOT) {
+			BOT
+		} else {
+			let res = thread.atomic_cas_global_u64(&mut (*c).deq as &mut addrspace(1) u64, BOT, TOP, memory_order::seq_cst, memory_order::seq_cst);
+			if (v != TOP && res.1) {
+				v
+			} else {
+				*id = i;
+				TOP
+			}
+		}
+	}
+
+	fn deq_slow(id: i32) -> u64
+	{
+		let deq:&mut deq_t = &mut (*th).Dr;
+
+		thread.atomic_store_global_i32(&mut (*deq).id as &mut addrspace(1) i32, id, memory_order::seq_cst);
+		thread.atomic_store_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, id, memory_order::seq_cst);
+
+		//help_deq(q, th, th);
+		help_deq_internal(th);
+		let i = -thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, memory_order::seq_cst);
+		//let c:&mut cell_t = find_cell(&mut (*th).Dp, i, th);
+		let c:&mut cell_t = find_cell_internal(device, thread, &mut (*th).Dp, i, th);
+
+		let val:u64 = thread.atomic_load_global_u64(&mut (*c).val as &mut addrspace(1) u64, memory_order::seq_cst);
+
+		let mut Di:i32 = thread.atomic_load_global_i32(&mut (*q).Di as &mut addrspace(1) i32, memory_order::seq_cst);
+		while (Di <= i) {
+			let res_Di = thread.atomic_cas_global_i32(&mut (*q).Di as &mut addrspace(1) i32, Di, i + 1, memory_order::seq_cst, memory_order::seq_cst);
+			if res_Di.1 { break() }
+			Di = res_Di.0;
+		}
+
+		if val == TOP { BOT } else { val }
+	}
+
+	let Dp:u64 = thread.atomic_load_global_u64(&mut (*th).Dp as &mut addrspace(1) u64, memory_order::seq_cst);
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, Dp, memory_order::seq_cst);
+
+	let mut v:u64 = TOP;
+	let mut id:i32;
+	let mut p = MAX_PATIENCE;
+
+	// TODO: do-while
+	while (v == TOP && p-- > 0) {
+		v = deq_fast(&mut id);
+	}
+
+	if (v == TOP) {
+		v = deq_slow(id);
+	}
+
+	if (v != EMPTY) {
+		// TODO: this kills the vectorizer with division by zero
+		let Dh = (*th).Dh as &mut handle_t;
+		//help_deq(q, th, Dh);
+		help_deq_internal(Dh);
+		(*th).Dh = Dh.next;
+	}
+
+	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, 0, memory_order::seq_cst);
+
+	if ((*th).spare == 0 as node_ref) {
+		//cleanup(q, th);
+		(*th).spare = new_node(device);
+	}
+
+	v
+}
+
+
+
 
 fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
-	let queue_state_size = sizeof[YMC::Queue]();
-	// let queue_state_alignment = alignof[YMC::Queue]();
+	// let queue_state_size = 80 as i64;
 
-	let pool_size = div_up_i64(1 << 24, YMC::N as i64);
-	let segment_pool_size = pool_size * sizeof[YMC::Segment]();
-	let segment_pool_alignment = alignof[YMC::Segment]();
+	//let num_handles = 100; //(1 << 21);
+	// retrieve max_concurrency from device
+	/*
+	let dev_num_handles_buffer = device.alloc(sizeof[i32]());
+	let dev_num_handles = dev_num_handles_buffer.data as &mut addrspace(1) i32;
 
-	let free_segment_list_size = pool_size * sizeof[u32]();
-	let free_segment_list_alignment = alignof[u32]();
-
-	let max_num_handles = (1 << 24) as i64;
-	let handle_buffer_size = max_num_handles * sizeof[YMC::Handle]();
-	let handle_buffer_alignment = alignof[YMC::Handle]();
-
-	let queue_state_offset = 0 as i64;
-	let segment_data_offset = round_up_i64(queue_state_offset + queue_state_size, segment_pool_alignment);
-	let free_segment_list_offset = round_up_i64(segment_data_offset + segment_pool_size, free_segment_list_alignment);
-	let handle_data_offset = round_up_i64(free_segment_list_offset + free_segment_list_size, handle_buffer_alignment);
-
-	let queue_device_state_alloc = device.alloc(handle_data_offset + handle_buffer_size);
-	let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
-
-	let queue = &mut queue_device_memory(0) as &mut addrspace(1) YMC::Queue;
-	let segment = &mut queue_device_memory(segment_data_offset) as &mut addrspace(1) [YMC::Segment];
-	// let free_segment = &mut queue_device_memory(free_segment_list_offset) as &mut addrspace(1) [u32];
-	let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [YMC::Handle];
-
-	let BOTTOM: YMC::T = -1;
-	let TOP: YMC::T = -2;
-
-	let BOTTOM_e: u64 = 0; // as &mut addrspace(1) YMC::EnqReq;
-	let TOP_e: u64 = -1; // as &mut addrspace(1) YMC::EnqReq;
-
-	let BOTTOM_d: u64 = 0; // as &mut addrspace(1) YMC::DeqReq;
-	let TOP_d: u64 = -1; // as &mut addrspace(1) YMC::DeqReq;
-
-	let enq_req_state = @|pending: bool, id: i64| {
-		(id as u64 << 1) | (if pending { 1 as u64 } else { 0 as u64 })
-	};
-
-	let enq_req_pending = @|state: u64| (state & 1) != 0;
-
-	let enq_req_id = @|state: u64| (state >> 1) as i64;
-
-	let deq_req_state = @|pending: bool, idx: i64| {
-		(idx as u64 << 1) | (if pending { 1 as u64 } else { 0 as u64 })
-	};
-
-	let deq_req_pending = @|state: u64| (state & 1) != 0;
-
-	let deq_req_idx = @|state: u64| (state >> 1) as i64;
-
-	let PATIENCE = 10;
-
-	let alloc_segment = @|thread: thread_context| -> u32 {
-		// 0
-		// let next_free = thread.atomic_sub_global_i32(queue.next_free, 1, memory_order::relaxed);
-
-		// if next_free < 0 {
-		// 	thread.atomic_add_global_i32(queue.next_free, 1, memory_order::relaxed);
-		// 	return(thread.atomic_add_global_u32(queue.alloc_next, 1, memory_order::relaxed))
-		// }
-
-		// free_segment(next_free)
-
-		while true {
-			let next = thread.atomic_load_global_u32(queue.next_free, mem_acq);
-
-			if (next == 0) {
-				break()
-			}
-
-			if thread.atomic_cas_global_u32(queue.next_free, next, segment(next).next, mem_rlx, mem_rlx).1 {
-				//device.print_i32("reuse segment %d\n", next as i32);
-				return(next)
+	for grid in device.launch_1d(1, block_dim) {
+		for thread in grid.threads() {
+			if thread.idx(0) == 0 {
+				*dev_num_handles = grid.max_concurrency();
 			}
 		}
-
-		let next = thread.atomic_add_global_u32(queue.alloc_next, 1, mem_rlx);
-		//device.print_i32("alloc segment %d\n", next as i32);
-		assert(0 <= next && next < pool_size as u32, "memory pool is running out of segments");
-
-		next
-	};
-
-	let free_segment = @|thread: thread_context, s: u32| -> () {
-		// let next_free = thread.atomic_sub_global_i32(queue.next_free, 1, memory_order::relaxed);
-
-		// free_segment(next_free) = s;
-		assert(0 < s && s < pool_size as u32, "invalid segment index");
-
-		while true {
-			let next = thread.atomic_load_global_u32(queue.next_free, mem_rlx);
-
-			segment(s).next = next;
-
-			if thread.atomic_cas_global_u32(queue.next_free, next, s, mem_rel, mem_rlx).1 {
-				break()
-			}
-		}
-	};
-
-	let new_segment = @|thread: thread_context, id: i64| {
-		let s = alloc_segment(thread);
-
-		segment(s).id = id;
-		segment(s).next = 0;
-
-		for i in range(0, YMC::N) {
-			segment(s).cells(i) = YMC::Cell { val = BOTTOM, enq = BOTTOM_e, deq = BOTTOM_d };
-		}
-
-		s
-	};
-
-	let find_cell = @|thread: thread_context, start: u32, cell_id: i64| {
-		let mut s = start;
-
-		for i in range(segment(s).id as i32, (cell_id / YMC::N as i64) as i32) {
-			let next = thread.atomic_load_global_u32(segment(s).next, mem_rlx);
-
-			if next == 0 {
-				let tmp = new_segment(thread, (i + 1) as i64);
-
-				let (new_next, succ) = thread.atomic_cas_global_u32(segment(s).next, 0, tmp, mem_rlx, mem_rlx);
-
-				s = if !succ {
-					free_segment(thread, tmp);
-					new_next
-				}
-				else {
-					tmp
-				}
-			}
-		}
-
-		(s, &mut segment(s).cells(cell_id % YMC::N as i64))
-	};
-
-	let advance_end_for_linearizability = @|thread: thread_context, E: &mut addrspace(1) i64, cid: i64| {
-		while true {
-			let e = thread.atomic_load_global_i64(E, mem_rlx);
-
-			if e >= cid || thread.atomic_cas_global_i64(E, e, cid, mem_rlx, mem_rlx).1 {
-				break()
-			}
-		}
-	};
-
-	let try_to_claim_req = @|thread: thread_context, s: &mut addrspace(1) u64, id: i64, cell_id: i64| {
-		thread.atomic_cas_global_u64(s, enq_req_state(true, id), enq_req_state(false, cell_id), mem_rlx, mem_rlx).1
-	};
-
-	let enq_commit = @|thread: thread_context, c: &mut addrspace(1) YMC::Cell, v: YMC::T, cid: i64| {
-		advance_end_for_linearizability(thread, queue.T, cid + 1);
-		thread.atomic_store_global_u64(c.val, v, mem_rlx);
-	};
-
-	let enq_fast = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T| -> YMC::enq_fast_result {
-		let i = thread.atomic_add_global_i64(queue.T, 1, mem_rlx);
-
-		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, mem_rlx), i);
-		thread.atomic_store_global_u32(h.tail, tail, mem_rlx);
-
-		if thread.atomic_cas_global_u64(c.val, BOTTOM, v, mem_rlx, mem_rlx).1 {
-			YMC::enq_fast_result::SUCCESS
-		}
-		else {
-			YMC::enq_fast_result::FAIL(i)
-		}
-	};
-
-	let enq_slow = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T, cell_id: i64| -> () {
-		let r = &mut h.enq.req;
-		thread.atomic_store_global_u64(r.val, v, mem_rlx);
-		thread.atomic_store_global_u64(r.state, enq_req_state(true, cell_id), mem_rel);
-
-		let mut tmp_tail = thread.atomic_load_global_u32(h.tail, mem_rlx);
-
-		while true {
-			let i = thread.atomic_add_global_i64(queue.T, 1, mem_rlx);
-
-			let (tail, c) = find_cell(thread, tmp_tail, i);
-			tmp_tail = tail;
-
-			if thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, mem_rlx, mem_rlx).1
-			   && thread.atomic_load_global_u64(c.val, mem_rlx) == BOTTOM {
-				try_to_claim_req(thread, r.state, cell_id, i);
-				break()
-			}
-
-			if !enq_req_pending(thread.atomic_load_global_u64(r.state, mem_rlx)) {
-				break()
-			}
-		}
-
-		let id = enq_req_id(thread.atomic_load_global_u64(r.state, mem_rlx));
-		let (tail, c) = find_cell(thread, thread.atomic_load_global_u32(h.tail, mem_rlx), id);
-		thread.atomic_store_global_u32(h.tail, tail, mem_rlx);
-		enq_commit(thread, c, v, id);
-	};
-
-	let enqueue = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, v: YMC::T| -> () {
-		let mut cell_id: i64;
-		for _ in range(0, PATIENCE) {
-			match enq_fast(thread, h, v) {
-				YMC::enq_fast_result::SUCCESS => return(),
-				YMC::enq_fast_result::FAIL(i) => { cell_id = i; }
-			}
-		}
-
-		enq_slow(thread, h, v, cell_id);
-	};
-
-	let help_enq = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, c: &mut addrspace(1) YMC::Cell, i: i64| -> YMC::dequeue_result {
-		let (val, succ) = thread.atomic_cas_global_u64(c.val, BOTTOM, TOP, mem_rlx, mem_rlx);
-
-		if !succ && val != TOP {
-			return(YMC::dequeue_result::SUCCESS(val))
-		}
-
-		if thread.atomic_load_global_u64(c.enq, mem_rlx) == BOTTOM_e {
-			// WORKAROUND for thorin issue #130
-			let fun = @|(p: &mut addrspace(1) YMC::Handle, r: &mut addrspace(1) YMC::EnqReq, s: u64)| -> (&mut addrspace(1) YMC::Handle, &mut addrspace(1) YMC::EnqReq, u64) {
-				let h_enq_id = enq_req_id(thread.atomic_load_global_u64(h.enq.req.state, mem_rlx));
-
-				if h_enq_id == 0 || h_enq_id == enq_req_id(s) { return(p, r, s) }
-
-				thread.atomic_store_global_u64(h.enq.req.state, enq_req_state(false, 0), mem_rlx);
-				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, mem_rlx), mem_rlx);
-
-				(p, r, s)
-			};
-
-			let (p, r, s) = {
-				let p = &mut handle(h.enq.peer);
-				let r = &mut p.enq.req;
-				let s = thread.atomic_load_global_u64(r.state, mem_rlx);
-				fun(fun(p, r, s))
-			};
-
-			if enq_req_pending(s) && enq_req_id(s) <= i && !thread.atomic_cas_global_u64(c.enq, BOTTOM_e, r as u64, mem_rlx, mem_rlx).1 {
-				h.enq.req.state = enq_req_state(false, enq_req_id(s));
-			}
-			else {
-				thread.atomic_store_global_u32(h.enq.peer, thread.atomic_load_global_u32(p.next, mem_rlx), mem_rlx);
-			}
-
-			if thread.atomic_load_global_u64(c.enq, mem_rlx) == BOTTOM_e {
-				thread.atomic_cas_global_u64(c.enq, BOTTOM_e, TOP_e, mem_rlx, mem_rlx);
-			}
-		}
-
-		if thread.atomic_load_global_u64(c.enq, mem_rlx) == TOP_e {
-			return(if thread.atomic_load_global_i64(queue.T, mem_rlx) < i { YMC::dequeue_result::EMPTY } else { YMC::dequeue_result::SUCCESS(TOP) })
-		}
-
-		let r = thread.atomic_load_global_u64(c.enq, mem_rlx) as &mut addrspace(1) YMC::EnqReq;
-		let s = thread.atomic_load_global_u64(r.state, mem_acq);
-		let v = thread.atomic_load_global_u64(r.val, mem_acq);
-
-		if enq_req_id(s) > i {
-			if thread.atomic_load_global_u64(c.val, mem_rlx) == TOP
-			   && thread.atomic_load_global_i64(queue.T, mem_rlx) <= i {
-				return(YMC::dequeue_result::EMPTY)
-			}
-		}
-		else if try_to_claim_req(thread, &mut r.state, enq_req_id(s), i)
-		        || (s == enq_req_state(false, i) && thread.atomic_load_global_u64(c.val, mem_rlx) == TOP) {
-					enq_commit(thread, c, v, i);
-		}
-
-		YMC::dequeue_result::SUCCESS(thread.atomic_load_global_u64(c.val, mem_rlx))
-	};
-
-	let help_deq = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, helpee: &mut addrspace(1) YMC::Handle| -> () {
-		let r = &mut helpee.deq.req;
-		let mut s = thread.atomic_load_global_u64(r.state, mem_acq);
-		let id = thread.atomic_load_global_i64(r.id, mem_acq);
-
-		if !deq_req_pending(s) || deq_req_idx(s) < id { return() }
-
-		let mut ha = thread.atomic_load_global_u32(helpee.head, mem_rlx);
-		s = thread.atomic_load_global_u64(r.state, mem_rlx);
-		let mut prior = id;
-		let mut i = id;
-		let mut cand = 0 as i64;
-
-		while true {
-			while cand != 0 && deq_req_idx(s) == prior {
-				i = i + 1;
-				let (hc, c) = find_cell(thread, ha, i);
-				match help_enq(thread, h, c, i) {
-					YMC::dequeue_result::EMPTY => { cand = i; },
-					YMC::dequeue_result::SUCCESS(v) =>
-						if v != TOP && thread.atomic_load_global_u64(c.deq, mem_rlx) == BOTTOM_d {
-							cand = i;
-						}
-						else {
-							s = thread.atomic_load_global_u64(r.state, mem_acq);
-						}
-				}
-			}
-
-			if cand != 0 {
-				s = thread.atomic_cas_global_u64(r.state, deq_req_state(true, prior), deq_req_state(true, cand), mem_rlx, mem_rlx).0;
-			}
-
-			if deq_req_pending(s) || thread.atomic_load_global_i64(r.id, mem_rlx) != id { return() }
-
-			let (h, c) = find_cell(thread, ha, deq_req_idx(s));
-			ha = h;
-
-			if thread.atomic_load_global_u64(c.val, mem_rlx) == TOP
-			   || { let (val, succ) = thread.atomic_cas_global_u64(c.deq, BOTTOM_d, r as u64, mem_rlx, mem_rlx); succ || val == r as u64 } {
-				thread.atomic_cas_global_u64(r.state, s, deq_req_state(false, deq_req_idx(s)), mem_rlx, mem_rlx);
-				return()
-			}
-
-			prior = deq_req_idx(s);
-
-			if deq_req_idx(s) >= i {
-				cand = 0;
-				i = deq_req_idx(s);
-			}
-		}
-	};
-
-	let deq_fast = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle| -> YMC::deq_fast_result {
-		let i = thread.atomic_add_global_i64(queue.H, 1, mem_rlx);
-
-		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, mem_rlx), i);
-		thread.atomic_store_global_u32(h.head, head, mem_rlx);
-
-		let res = help_enq(thread, h, c, i);
-
-		match res {
-			YMC::dequeue_result::EMPTY => YMC::deq_fast_result::SUCCESS(res),
-			YMC::dequeue_result::SUCCESS(v) =>
-				if v != TOP && thread.atomic_cas_global_u64(c.deq, BOTTOM_d, TOP_d, mem_rlx, mem_rlx).1 {
-					YMC::deq_fast_result::SUCCESS(res)
-				}
-				else {
-					YMC::deq_fast_result::FAIL(i)
-				}
-		}
-	};
-
-	let deq_slow = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle, cid: i64| -> YMC::dequeue_result {
-		let r = &mut h.deq.req;
-		thread.atomic_store_global_i64(r.id, cid, mem_rel);
-		thread.atomic_store_global_u64(r.state, deq_req_state(true, cid), mem_rel);
-
-		help_deq(thread, h, h);
-
-		let i = deq_req_idx(thread.atomic_load_global_u64(r.state, mem_rlx));
-		let (head, c) = find_cell(thread, thread.atomic_load_global_u32(h.head, mem_rlx), i);
-		thread.atomic_store_global_u32(h.head, head, mem_rlx);
-
-		let v = thread.atomic_load_global_u64(c.val, mem_rlx);
-
-		advance_end_for_linearizability(thread, queue.H, i + 1);
-
-		if v == TOP {
-			YMC::dequeue_result::EMPTY
-		}
-		else {
-			YMC::dequeue_result::SUCCESS(v)
-		}
-	};
-
-	let dequeue = @|thread: thread_context, h: &mut addrspace(1) YMC::Handle| -> YMC::dequeue_result {
-		let mut res: YMC::deq_fast_result;
-		for _ in range(0, PATIENCE) {
-			res = deq_fast(thread, h);
-
-			match res {
-				YMC::deq_fast_result::SUCCESS(_) => break(),
-				_ => ()
-			}
-		}
-
-		match res {
-			YMC::deq_fast_result::FAIL(i) => deq_slow(thread, h, i),
-			YMC::deq_fast_result::SUCCESS(v) => {
-				match v {
-					YMC::dequeue_result::SUCCESS(_) => {
-						let helpee = &mut handle(thread.atomic_load_global_u32(h.deq.peer, mem_rlx));
-						help_deq(thread, h, helpee);
-						thread.atomic_store_global_u32(h.deq.peer, thread.atomic_load_global_u32(helpee.next, mem_rlx), mem_rlx);
-					},
-					_ => ()
-				}
-				v
-			},
-		}
-	};
+	}
+
+	let num_handles_buffer = alloc_cpu(sizeof[i32]());
+	copy(dev_num_handles_buffer, num_handles_buffer);
+	let num_handles = *(num_handles_buffer.data as &mut i32);
+	release(num_handles_buffer);
+	release(dev_num_handles_buffer);
+
+	assert(0 < num_handles, "this device does not expose its max_concurrency");
+
+	print_string("num_handles: "); print_i32(num_handles); print_char('\n');
+	*/
+	// let handle_buffer_size = num_handles * sizeof[YangMellorCrummey::Handle]();
+	// let handle_buffer_alignment = alignof[YangMellorCrummey::Handle]();
+
+	// let handle_data_offset = round_up_i64(queue_state_size, handle_buffer_alignment);
+
+	// let queue_device_state_alloc = device.alloc(handle_data_offset + handle_buffer_size);
+	// let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
+
+	// let queue = &mut queue_device_memory(0) as &mut addrspace(1) [u8];
+	// let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [u8];
+
+	let mut queue:WFQHandle;
+
+	//let success = wfqueue_create(default_num_handles, &mut queue);
+	let success = wfqueue_create_internal(device, default_num_handles, &mut queue);
+	assert(success > 0, "wfqueue_create() failed");
+
+	let q = (*queue).q;
+	device.print_i32("queue.q.Ei  %d\n", q.Ei);
+	device.print_i32("queue.q.Di  %d\n", q.Di);
+	device.print_i32("queue.q.Hi  %d\n", q.Hi);
+	device.print_i32("queue.q.Hp  0x%x\n", q.Hp as i32);
+	device.print_i32("queue.q.nprocs  %d\n", q.nprocs);
+	print_string("queue.tail        "); print_i64((*queue).tail as i64); print_char('\n');
+	print_string("queue.h(0)        "); print_i64((&mut (*queue).h(0)) as i64); print_char('\n');
+	print_string("queue.h(-1).next  "); print_i64((*queue).h(q.nprocs - 1).next as i64); print_char('\n');
 
 	ProducerConsumerQueue[u32] {
-		push = @|source| @|thread| {
-			thread.atomic_add_global_i32(queue.size, 1, mem_rlx);
-
-			enqueue(thread, handle(thread.uid()), source() as YMC::T);
-
-			1
+		push = @|source:fn()->u32| @|thread| {
+			let id = thread.uid();
+			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
+			let value = source() as u64 | 0x00ff000000000000;
+			let success = enqueue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id), value);
+			//device.print_3xi32("push handle: %d - %d / %d\n", handle, value as i32, success);
+			if success > 0 {
+				thread.atomic_add_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+				1
+			} else { 0 }
 		},
 
 		pop = @|sink| @|thread| {
-			match dequeue(thread, handle(thread.uid())) {
-				YMC::dequeue_result::SUCCESS(v) => { thread.atomic_sub_global_i32(queue.size, 1, mem_rlx); sink(v as u32); 1 },
-				YMC::dequeue_result::EMPTY => 0
+			let id = thread.uid();
+			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
+			let mut value:u32 = thread.idx(0);
+
+			let v = dequeue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id));
+			let success = (v != EMPTY);
+			value = (v & 0xffffffff) as u32;
+
+			//device.print_3xi32("pop handle: %d - %d / %d\n", handle, value as i32, success);
+
+			if success {
+				thread.atomic_sub_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, memory_order::seq_cst);
+				sink(value);
+				1
+			} else {
+				0
 			}
 		},
 
 		size = @|thread| {
-			thread.atomic_load_global_i32(queue.size, mem_rlx)
+			thread.atomic_load_global_i32(&mut (*queue).size as &addrspace(1) i32, memory_order::seq_cst)
 		},
 
 		reset = @|grid| {
+			let num_handles = grid.max_concurrency();
+
 			for thread in grid.threads() {
-				let num_handles = grid.max_concurrency();
-
 				if thread.idx(0) == 0 {
-					queue.next_free = 0;
-					queue.alloc_next = 0;
-
-					queue.Q = new_segment(thread, 0);
-					queue.T = 0;
-					queue.H = 0;
-					queue.I = 0;
-					queue.size = 0;
-				}
-
-				for i in range_step(thread.idx(0) as i32, num_handles, grid.num_threads(0) as i32) {
-					let next = (i + 1) as u32 % num_handles as u32;
-					handle(i).head = 0;
-					handle(i).tail = 0;
-					handle(i).next = next;
-					handle(i).enq.peer = next;
-					handle(i).enq.req.val = BOTTOM;
-					handle(i).enq.req.state = enq_req_state(false, 0);
-					handle(i).deq.peer = next;
-					handle(i).deq.req.id = 0;
-					handle(i).deq.req.state = deq_req_state(false, 0);
-					handle(i).hzpt = 0;
+					let mut success:i32;
+					//success = wfqueue_destroy(queue);
+					success = wfqueue_destroy_internal(queue);
+					assert(success > 0, "wfqueue_destroy() failed");
+					//device.print_i32("num_handles: %d\n", num_handles);
+					//success = wfqueue_create(num_handles, &mut queue);
+					success = wfqueue_create_internal(device, num_handles, &mut queue);
+					assert(success > 0, "wfqueue_create() failed");
 				}
 			}
+			/*
+			for thread in grid.threads() {
+				for i in range_step(thread.idx(0) as i32, num_handles, grid.num_threads(0) as i32) {
+					wfqueue_init(queue, i);
+				}
+			}
+			*/
 		},
 
 		validate = @|_corrupted, _grid| {
 		},
 
 		release = @|| {
-			release(queue_device_state_alloc);
+			wfqueue_destroy_internal(queue);
 		}
 	}
 }
