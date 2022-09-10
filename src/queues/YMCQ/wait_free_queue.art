@@ -648,9 +648,9 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 	let mut id:i32;
 	let mut p = MAX_PATIENCE;
 
-	// TODO: do-while
-	while (v == TOP && p-- > 0) {
+	for do_while () {
 		v = deq_fast(&mut id);
+		v == TOP && p-- > 0
 	}
 
 	if (v == TOP) {
