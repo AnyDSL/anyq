@@ -590,15 +590,15 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 	let mut queue:WFQHandle = wfqueue_create_internal(device, default_num_handles);
 
-	let q = (*queue).q;
-	device.print_i32("queue.q.Ei  %d\n", q.Ei);
-	device.print_i32("queue.q.Di  %d\n", q.Di);
-	device.print_i32("queue.q.Hi  %d\n", q.Hi);
-	device.print_i32("queue.q.Hp  0x%x\n", q.Hp as i32);
-	device.print_i32("queue.q.nprocs  %d\n", q.nprocs);
-	print_string("queue.tail        "); print_i64((*queue).tail as i64); print_char('\n');
-	print_string("queue.h(0)        "); print_i64((&mut (*queue).h(0)) as i64); print_char('\n');
-	print_string("queue.h(-1).next  "); print_i64((*queue).h(q.nprocs - 1).next as i64); print_char('\n');
+	//let q = (*queue).q;
+	//device.print_i32("queue.q.Ei  %d\n", q.Ei);
+	//device.print_i32("queue.q.Di  %d\n", q.Di);
+	//device.print_i32("queue.q.Hi  %d\n", q.Hi);
+	//device.print_i32("queue.q.Hp  0x%x\n", q.Hp as i32);
+	//device.print_i32("queue.q.nprocs  %d\n", q.nprocs);
+	//print_string("queue.tail        "); print_i64((*queue).tail as i64); print_char('\n');
+	//print_string("queue.h(0)        "); print_i64((&mut (*queue).h(0)) as i64); print_char('\n');
+	//print_string("queue.h(-1).next  "); print_i64((*queue).h(q.nprocs - 1).next as i64); print_char('\n');
 
 	ProducerConsumerQueue[u32] {
 		push = @|source:fn()->u32| @|thread| {
