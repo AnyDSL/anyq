@@ -118,10 +118,17 @@ static vol_store = memory_order::relaxed; // memory_order::release;
 
 fn new_node(device: AccDevice) -> node_ref {
 	let s = sizeof[node_t]();
-	let b = device.alloc(s);
-	for i in range(0, s as i32) {
-		b.data(i) = 0;
+	// alignment of 4k
+	let b = alloc_host(device.platform_device, s);
+	let p:&mut [u64] = b.data as &mut [u64];
+	for i in range(0, (s / sizeof[u64]()) as i32) {
+		p(i) = 0;
 	}
+	// alignment of 32
+	//let b = device.alloc(s);
+	//for i in range(0, s as i32) {
+	//	b.data(i) = 0;
+	//}
 	b.data as node_ref
 }
 
