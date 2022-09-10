@@ -468,33 +468,12 @@ int wfqueue_create(int32_t nprocs, wfqueue_t** queue_ptr)
   queue->tail = NULL;
 
   for (int i = 0; i < nprocs; ++i) {
-    queue_register(&queue->q, &queue->tail, &queue->h[i], i);
+    queue_register(&queue->q, &queue->tail, queue->h + i, i);
   }
 
   *queue_ptr = queue;
   return 1;
 }
-
-//void wfqueue_init(wfqueue_t* queue, int32_t id)
-//{
-//  queue_register(&queue->q, &queue->h[id], id);
-//}
-/*
-void wfqueue_enqueue(wfqueue_t* queue, int32_t id, uintptr_t v)
-{
-  enqueue(&queue->q, &queue->h[id], (void*)v);
-  FAA_LONG(&queue->size, 1);
-}
-
-uintptr_t wfqueue_dequeue(wfqueue_t* queue, int32_t id)
-{
-  void* v = dequeue(&queue->q, &queue->h[id]);
-
-  if (v != 0) FAA_LONG(&queue->size, -1);
-
-  return (uintptr_t)v;
-}
-*/
 
 int wfqueue_try_enqueue_u32(wfqueue_t* queue, int32_t id, uint32_t v)
 {
@@ -527,6 +506,8 @@ int wfqueue_destroy(wfqueue_t* queue)
   queue_t* q = &queue->q;
   node_t* n = q->Hp;
 
+  // some nodes survive below's cleanup and thus cause a memleak
+  // therefore we will free all nodes of the queue manually
   while (n != NULL) {
     node_t* tmp = n->next;
     align_free(n);
@@ -534,7 +515,7 @@ int wfqueue_destroy(wfqueue_t* queue)
   }
 
   for (int i = 0; i < q->nprocs; ++i) {
-    //cleanup(&queue->q, &queue->h[i]);
+    //cleanup(&queue->q, queue->h + i);
     n = queue->h[i].spare;
     if (n != NULL)
       align_free(n);
