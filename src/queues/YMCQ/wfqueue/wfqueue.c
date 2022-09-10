@@ -456,7 +456,7 @@ typedef struct
 {
   queue_t q;
   volatile long size;
-  volatile handle_t* tail;
+  handle_t* volatile tail;
   handle_t h[];
 } wfqueue_t;
 
