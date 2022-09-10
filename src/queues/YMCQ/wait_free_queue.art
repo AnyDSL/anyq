@@ -108,6 +108,7 @@ static TOP:u64 = -1 as u64;
 
 static MAX_PATIENCE = 10;
 static MAX_SPIN = 100;
+fn @MAX_GARBAGE(n:i32) = 2*n;
 
 static mem_acq = memory_order::acquire;
 static mem_rel = memory_order::release;
@@ -134,6 +135,15 @@ fn new_node(device: AccDevice) -> node_ref {
 
 fn release_node(node: node_ref) -> () {
 	runtime_release(0, node as &mut [i8]);
+}
+
+fn @do_while(body: fn() -> bool) -> fn()->() {
+	@|| {
+		let mut cond = body();
+		while (cond) {
+			cond = body();
+		}
+	}
 }
 
 fn wfqueue_create_internal(device: AccDevice, nprocs: i32) -> &mut wfqueue_t
@@ -220,6 +230,104 @@ fn @volatile_load_u64(thread: thread_context, ptr: &u64) -> u64 = thread.atomic_
 fn @volatile_load_i32(thread: thread_context, ptr: &i32) -> i32 = thread.atomic_load_global_i32(ptr as &addrspace(1) i32, vol_load);
 fn @volatile_store_u64(thread: thread_context, ptr: &mut u64, val: u64) -> () = thread.atomic_store_global_u64(ptr as &mut addrspace(1) u64, val, vol_store);
 fn @volatile_store_i32(thread: thread_context, ptr: &mut i32, val: i32) -> () = thread.atomic_store_global_i32(ptr as &mut addrspace(1) i32, val, vol_store);
+
+
+
+fn cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t) -> () {
+
+	fn update(pPn: &mut node_ref, cur_: node_ref, pHp: &mut node_ref) -> node_ref {
+		let mut ptr:node_ref = volatile_load_u64(thread, pPn);
+		let mut cur:node_ref = cur_;
+
+		let mut ptr_id:i32 = (*(ptr as &mut node_t)).id;
+		let mut cur_id:i32 = (*(cur as &mut node_t)).id;
+
+		if ptr_id < cur_id {
+			let res = thread.atomic_cas_global_u64(pPn as &mut addrspace(1) node_ref, ptr, cur, mem_seq, mem_seq);
+			if (!res.1) {
+				ptr = res.0;
+				ptr_id = (*(ptr as &mut node_t)).id;
+				if ptr_id < cur_id {
+					cur = ptr;
+				}
+			}
+
+			let Hp:node_ref = volatile_load_u64(thread, pHp);
+			if Hp != 0 as node_ref {
+				let Hp_id:i32 = (*(Hp as &mut node_t)).id;
+				cur_id = (*(cur as &mut node_t)).id;
+				if Hp_id < cur_id {
+					cur = Hp;
+				}
+			}
+		}
+
+		cur
+	}
+
+	let mut oid:i32 = volatile_load_i32(thread, &mut (*q).Hi);
+	let mut new:u64 = volatile_load_u64(thread, &mut (*th).Dp);
+
+	if (oid == -1) { return() }
+	let mut new_id:i32 = (*(new as &mut node_t)).id;
+	if (new_id - oid < MAX_GARBAGE((*q).nprocs)) { return() }
+	let res = thread.atomic_cas_global_i32(&mut (*q).Hi as &mut addrspace(1) i32, oid, -1, mem_acq, mem_rlx);
+	if (!res.1) { return() }
+	oid = res.0;
+
+	let mut old:u64 = volatile_load_u64(thread, (*q).Hp);
+	let mut ph:&mut handle_t = th;
+	let phs_buffer = device.alloc((*q).nprocs as i64 * sizeof[&mut handle_t]());
+	let phs = phs_buffer.data as &mut [&mut handle_t];
+	let mut i:i32 = 0;
+
+	for do_while() {
+		let Hp:node_ref = thread.atomic_load_global_u64(&mut (*ph).Hp as &mut addrspace(1) u64, mem_acq);
+		if Hp != 0 as node_ref {
+			let Hp_id:i32 = (*(Hp as &mut node_t)).id;
+			new_id = (*(new as &mut node_t)).id;
+			if Hp_id < new_id { new = Hp; }
+		}
+
+		new = update(&mut (*ph).Ep, new, &mut (*ph).Hp);
+		new = update(&mut (*ph).Dp, new, &mut (*ph).Hp);
+
+		phs(i++) = ph;
+		ph = (*ph).next as &mut handle_t;
+		new_id = (*(new as &mut node_t)).id;
+
+		(new_id > oid) && (ph as u64 != th as u64)
+	}
+
+	while (new_id > oid && --i >= 0) {
+		let Hp:node_ref = thread.atomic_load_global_u64(&mut (*(phs(i))).Hp as &mut addrspace(1) u64, mem_acq);
+		if Hp != 0 as node_ref {
+			let Hp_id = (*(Hp as &mut node_t)).id;
+			if Hp_id < new_id {
+				new = Hp;
+				new_id = (*(new as &mut node_t)).id;
+			}
+		}
+	}
+
+	release(phs_buffer);
+
+	let nid:i32 = (*(new as &mut node_t)).id;
+
+	if (nid <= oid) {
+		thread.atomic_store_global_i32(&mut (*q).Hi as &mut addrspace(1) i32, oid, mem_rel);
+	} else {
+		volatile_store_u64(thread, &mut (*q).Hp, new);
+		thread.atomic_store_global_i32(&mut (*q).Hi as &mut addrspace(1) i32, nid, mem_rel);
+
+		while (old != new) {
+			let tmp:node_ref = volatile_load_u64(thread, &mut (*(old as &mut node_t)).next);
+			release_node(old);
+			old = tmp;
+		}
+	}
+}
+
 
 fn @find_cell_internal(device: AccDevice, thread: thread_context, p: &mut node_ref, i: i32, th: &mut handle_t) -> &mut cell_t {
 
@@ -559,7 +667,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, 0, mem_rel);
 
 	if ((*th).spare == 0 as node_ref) {
-		//cleanup(q, th);
+		cleanup_internal(device, thread, q, th);
 		(*th).spare = new_node(device);
 	}
 
