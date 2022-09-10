@@ -15,6 +15,10 @@ set_target_properties(wfqueue PROPERTIES
 	FOLDER "wfqueue"
 )
 
+if (MSVC)
+	target_compile_options(wfqueue PRIVATE "/volatile:iso")
+endif()
+
 
 set(YangMellorCrummeyQueue_short_name YMCQ)
 set(YangMellorCrummeyQueue_ref_short_name YMCQ_ref)
