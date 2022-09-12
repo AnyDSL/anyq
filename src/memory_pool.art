@@ -1,0 +1,87 @@
+
+struct Allocator[T] {
+	alloc: fn() -> u64,
+	free: fn(u64) -> (),
+	alloc_ptr: fn() -> &mut T,
+	free_ptr: fn(&mut T) -> (),
+	clear: fn()->(),
+	release: fn()->(),
+	alignment: i64,
+}
+
+
+type pool_idx = i32;
+
+fn createPool[T](capacity: pool_idx, alignment: pool_idx) -> Allocator[T] {
+	let size = max_i64(sizeof[T](), sizeof[pool_idx]());
+	let align = if alignment > 0 { alignment as i64 } else { alignof[T]() };
+	let width = round_up_i64(size, max_i64(align, alignof[pool_idx]()));
+	let offset = 2*sizeof[pool_idx]();
+
+	//print_string("size: "); print_i64(size); print_char('\n');
+	//print_string("align: "); print_i64(align); print_char('\n');
+	//print_string("width: "); print_i64(width); print_char('\n');
+	//print_string("offset: "); print_i64(offset); print_char('\n');
+
+	let buffer = alloc_cpu(offset + capacity as i64 * width + width);
+	let begin = buffer.data as u64;
+	let data:u64 = (begin + offset as u64 + width as u64) & !(width as u64 - 1);
+
+	let next_alloc:&mut pool_idx = begin as &mut pool_idx;
+	let next_free:&mut pool_idx = (begin + sizeof[pool_idx]() as u64) as &mut pool_idx;
+
+	fn clear() -> () {
+		atomic_store[pool_idx](next_alloc, 0, 5 /* rel */, "");
+		atomic_store[pool_idx](next_free, -1 as u8 as pool_idx, 5 /* rel */, "");
+	}
+
+	clear();
+
+	fn pool_alloc() -> u64 {
+		while true {
+			let idx = atomic_load[pool_idx](next_free, 4 /* acq */, "");
+
+			if (idx == -1 as u8 as pool_idx) {
+				break()
+			}
+
+			let ptr = data + (idx as u64) * (width as u64);
+			let next:pool_idx = *(ptr as &pool_idx);
+			if cmpxchg[pool_idx](next_free, idx, next, 5 /* rel */, 2 /* rlx */, "").1 {
+				return(ptr)
+			}
+		}
+		let i = atomic[pool_idx](1, next_alloc, 1, 2 /* rlx */, "");
+		assert(0 <= i && i < capacity, "pool is running out of memory");
+
+		data + (i as u64) * (width as u64)
+	}
+
+	fn @pool_free(t: u64) -> () {
+		let j = t - data;
+		let i = (j / width as u64) as pool_idx;
+
+		assert(j % width as u64 == 0, "invalid pointer to element");
+		assert(0 <= i && i < capacity, "invalid pool element index");
+
+		while true {
+			let next = atomic_load[pool_idx](next_free, 2 /* rlx */, "");
+
+			*(t as &mut pool_idx) = next;
+
+			if cmpxchg[pool_idx](next_free, next, i, 5 /* rel */, 2 /* rlx */, "").1 {
+				break()
+			}
+		}
+	}
+
+	Allocator[T] {
+		alloc = pool_alloc,
+		alloc_ptr = @|| { pool_alloc() as &mut T },
+		free = pool_free,
+		free_ptr = @|t: &mut T| { pool_free(t as u64); },
+		clear = @|| { clear(); },
+		release = @|| { release(buffer); },
+		alignment = width
+	}
+}

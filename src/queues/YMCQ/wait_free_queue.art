@@ -117,25 +117,7 @@ static mem_seq = memory_order::seq_cst;
 static vol_load  = memory_order::relaxed; // memory_order::acquire;
 static vol_store = memory_order::relaxed; // memory_order::release;
 
-fn new_node(device: AccDevice) -> node_ref {
-	let s = sizeof[node_t]();
-	// alignment of 4k
-	let b = alloc_host(device.platform_device, s);
-	let p:&mut [u64] = b.data as &mut [u64];
-	for i in range(0, (s / sizeof[u64]()) as i32) {
-		p(i) = 0;
-	}
-	// alignment of 32
-	//let b = device.alloc(s);
-	//for i in range(0, s as i32) {
-	//	b.data(i) = 0;
-	//}
-	b.data as node_ref
-}
-
-fn release_node(node: node_ref) -> () {
-	runtime_release(0, node as &mut [i8]);
-}
+type NodeAllocator = Allocator[node_t];
 
 fn @do_while(body: fn() -> bool) -> fn()->() {
 	@|| {
@@ -146,7 +128,7 @@ fn @do_while(body: fn() -> bool) -> fn()->() {
 	}
 }
 
-fn wfqueue_create_internal(device: AccDevice, nprocs: i32) -> &mut wfqueue_t
+fn wfqueue_create_internal(device: AccDevice, nprocs: i32, nodes: NodeAllocator) -> &mut wfqueue_t
 {
 	//device.print_3xi32("sizeof(wfqueue_t): %d\nsizeof(queue_t): %d\nsizeof(handle_t): %d\n", sizeof[wfqueue_t]() as i32, sizeof[queue_t]() as i32, sizeof[handle_t]() as i32);
 	//device.print_3xi32("sizeof(enq_t): %d\nsizeof(deq_t): %d\nsizeof(node_t): %d\n", sizeof[enq_t]() as i32, sizeof[deq_t]() as i32, sizeof[node_t]() as i32);
@@ -163,7 +145,7 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32) -> &mut wfqueue_t
 	let handles = &dev_data(handles_offset) as &mut [handle_t];
 
 	queue.q.Hi = 0;
-	queue.q.Hp = new_node(device);
+	queue.q.Hp = nodes.alloc();
 
 	queue.q.Ei = 1;
 	queue.q.Di = 1;
@@ -187,7 +169,7 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32) -> &mut wfqueue_t
 		(*th).Dr.idx = -1;
 
 		(*th).Ei = 0;
-		(*th).spare = new_node(device);
+		(*th).spare = nodes.alloc();
 
 		(*th).next = &mut queue.h(i + 1) as u64;
 		(*th).Eh = th.next;
@@ -204,13 +186,13 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32) -> &mut wfqueue_t
 	queue
 }
 
-fn wfqueue_destroy_internal(queue: &mut wfqueue_t) -> ()
+fn wfqueue_destroy_internal(queue: &mut wfqueue_t, nodes: NodeAllocator) -> ()
 {
 	let mut n:node_ref = queue.q.Hp;
 
 	while (n != 0) {
 		let tmp:node_ref = (n as &mut node_t).next;
-		release_node(n);
+		nodes.free(n);
 		n = tmp;
 	}
 
@@ -218,7 +200,7 @@ fn wfqueue_destroy_internal(queue: &mut wfqueue_t) -> ()
 		//cleanup(&queue->q, &queue->h[i]);
 		n = queue.h(i).spare;
 		if (n != 0 as node_ref) {
-			release_node(n);
+			nodes.free(n);
 		}
 	}
 
@@ -233,7 +215,7 @@ fn @volatile_store_i32(thread: thread_context, ptr: &mut i32, val: i32) -> () = 
 
 
 
-fn cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t) -> () {
+fn cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> () {
 
 	fn update(pPn: &mut node_ref, cur_: node_ref, pHp: &mut node_ref) -> node_ref {
 		let mut ptr:node_ref = volatile_load_u64(thread, pPn);
@@ -322,14 +304,14 @@ fn cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 
 		while (old != new) {
 			let tmp:node_ref = volatile_load_u64(thread, &mut (*(old as &mut node_t)).next);
-			release_node(old);
+			nodes.free(old);
 			old = tmp;
 		}
 	}
 }
 
 
-fn @find_cell_internal(device: AccDevice, thread: thread_context, p: &mut node_ref, i: i32, th: &mut handle_t) -> &mut cell_t {
+fn @find_cell_internal(thread: thread_context, p: &mut node_ref, i: i32, th: &mut handle_t, nodes: NodeAllocator) -> &mut cell_t {
 
 	let mut c:node_ref = volatile_load_u64(thread, p); // as &mut node_t;
 
@@ -340,7 +322,7 @@ fn @find_cell_internal(device: AccDevice, thread: thread_context, p: &mut node_r
 			let mut t:node_ref = (*th).spare;
 
 			if (t == 0 as node_ref) {
-				t = new_node(device);
+				t = nodes.alloc();
 				(*th).spare = t;
 			}
 
@@ -365,13 +347,13 @@ fn @find_cell_internal(device: AccDevice, thread: thread_context, p: &mut node_r
 	c_i
 }
 
-fn enqueue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64) -> i32
+fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64, nodes: NodeAllocator) -> i32
 {
 	fn enq_fast(v: u64, id: &mut i32) -> bool
 	{
 		let i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, mem_seq);
 
-		let c = @find_cell_internal(device, thread, &mut (*th).Ep, i, th);
+		let c = @find_cell_internal(thread, &mut (*th).Ep, i, th, nodes);
 
 		let res = thread.atomic_cas_global_u64(&mut (*c).val as &mut addrspace(1) u64, BOT, v, mem_rlx, mem_rlx);
 		if res.1 { true } else { *id = i; false }
@@ -393,7 +375,7 @@ fn enqueue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		// TODO: do-while
 		while (volatile_load_i32(thread, &mut (*enq).id) > 0) {
 			i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, mem_rlx);
-			c = @find_cell_internal(device, thread, &mut tail, i, th);
+			c = @find_cell_internal(thread, &mut tail, i, th, nodes);
 
 			let res_c = thread.atomic_cas_global_u64(&mut (*c).enq as &mut addrspace(1) u64, BOT, enq as u64, mem_seq, mem_seq);
 			let val_c = volatile_load_u64(thread, &mut (*c).val);
@@ -407,7 +389,7 @@ fn enqueue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		} 
 
 		mid = -volatile_load_i32(thread, &mut (*enq).id);
-		c = @find_cell_internal(device, thread, &mut (*th).Ep, mid, th);
+		c = @find_cell_internal(thread, &mut (*th).Ep, mid, th, nodes);
 
 		if (mid > i) {
 			let mut Ei:i32 = volatile_load_i32(thread, &mut (*q).Ei);
@@ -435,7 +417,7 @@ fn enqueue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 }
 
 
-fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t) -> u64
+fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> u64
 {
 	fn @spin(ptr: &u64) -> u64 {
 		let mut p = MAX_SPIN;
@@ -551,7 +533,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 			let mut c:&mut cell_t;
 
 			while (idx == old && new == 0) {
-				c = @find_cell_internal(device, thread, &mut h, i, th);
+				c = @find_cell_internal(thread, &mut h, i, th, nodes);
 				let v:u64 = help_enq_internal(c, i);
 				let c_deq:u64 = volatile_load_u64(thread, &mut (*c).deq as &mut u64);
 				if (v == BOT || (v != TOP && c_deq == BOT)) {
@@ -571,7 +553,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 			let d_id:i32 = volatile_load_i32(thread, &mut (*deq).id);
 			if (idx < 0 || d_id != id) { break() }
 
-			c = @find_cell_internal(device, thread, &mut Dp, idx, th);
+			c = @find_cell_internal(thread, &mut Dp, idx, th, nodes);
 			let mut cd:u64 = BOT; // &mut deq_t
 			let c_val:u64 = volatile_load_u64(thread, &mut (*c).val);
 			if (c_val == TOP) {
@@ -602,7 +584,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 	fn deq_fast(id: &mut i32) -> u64
 	{
 		let i:i32 = thread.atomic_add_global_i32(&mut (*q).Di as &mut addrspace(1) i32, 1, mem_seq);
-		let c:&mut cell_t = @find_cell_internal(device, thread, &mut (*th).Dp, i, th);
+		let c:&mut cell_t = @find_cell_internal(thread, &mut (*th).Dp, i, th, nodes);
 		let v:u64 = help_enq_internal(c, i);
 
 		if (v == BOT) {
@@ -627,7 +609,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 
 		help_deq_internal(th);
 		let i = -volatile_load_i32(thread, &mut (*deq).idx);
-		let c:&mut cell_t = @find_cell_internal(device, thread, &mut (*th).Dp, i, th);
+		let c:&mut cell_t = @find_cell_internal(thread, &mut (*th).Dp, i, th, nodes);
 
 		let val:u64 = volatile_load_u64(thread, &mut (*c).val);
 
@@ -667,8 +649,8 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 	thread.atomic_store_global_u64(&mut (*th).Hp as &mut addrspace(1) u64, 0, mem_rel);
 
 	if ((*th).spare == 0 as node_ref) {
-		cleanup_internal(device, thread, q, th);
-		(*th).spare = new_node(device);
+		cleanup_internal(device, thread, q, th, nodes);
+		(*th).spare = nodes.alloc();
 	}
 
 	v
@@ -676,46 +658,46 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 
 
 
-
 fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
-	// let queue_state_size = 80 as i64;
 
-	//let num_handles = 100; //(1 << 21);
-	// retrieve max_concurrency from device
-	/*
-	let dev_num_handles_buffer = device.alloc(sizeof[i32]());
-	let dev_num_handles = dev_num_handles_buffer.data as &mut addrspace(1) i32;
+	let num_max_nodes = 1 << 14;
+	let nodes_align = 4096;
+	//let nodes = createPool[node_t](num_max_nodes, nodes_align);
+	print_flush();
 
-	for grid in device.launch_1d(1, block_dim) {
-		for thread in grid.threads() {
-			if thread.idx(0) == 0 {
-				*dev_num_handles = grid.max_concurrency();
-			}
+
+	fn new_node() -> node_ref {
+		let s = sizeof[node_t]();
+		// alignment of 4k
+		let b = alloc_host(device.platform_device, s);
+		let p:&mut [u64] = b.data as &mut [u64];
+		for i in range(0, (s / sizeof[u64]()) as i32) {
+			p(i) = 0;
 		}
+		// alignment of 32
+		//let b = device.alloc(s);
+		//for i in range(0, s as i32) {
+		//	b.data(i) = 0;
+		//}
+		b.data as node_ref
 	}
 
-	let num_handles_buffer = alloc_cpu(sizeof[i32]());
-	copy(dev_num_handles_buffer, num_handles_buffer);
-	let num_handles = *(num_handles_buffer.data as &mut i32);
-	release(num_handles_buffer);
-	release(dev_num_handles_buffer);
+	fn release_node(node: node_ref) -> () {
+		runtime_release(0, node as &mut [i8]);
+	}
 
-	assert(0 < num_handles, "this device does not expose its max_concurrency");
+	let nodes = Allocator[node_t] {
+		alloc = @|| { new_node() },
+		free = @|n:node_ref| { release_node(n); },
+		alloc_ptr = @|| { assert(false, "alloc_ptr() not supported for Allocator[node_t]"); 0 as &mut node_t },
+		free_ptr = @|_:&mut node_t| { assert(false, "free_ptr() not supported for Allocator[node_t]"); },
+		clear = @|| { },
+		release = @|| { },
+		alignment = nodes_align as i64
+	};
 
-	print_string("num_handles: "); print_i32(num_handles); print_char('\n');
-	*/
-	// let handle_buffer_size = num_handles * sizeof[YangMellorCrummey::Handle]();
-	// let handle_buffer_alignment = alignof[YangMellorCrummey::Handle]();
 
-	// let handle_data_offset = round_up_i64(queue_state_size, handle_buffer_alignment);
-
-	// let queue_device_state_alloc = device.alloc(handle_data_offset + handle_buffer_size);
-	// let queue_device_memory = queue_device_state_alloc.data as &mut addrspace(1) [u8];
-
-	// let queue = &mut queue_device_memory(0) as &mut addrspace(1) [u8];
-	// let handle = &mut queue_device_memory(handle_data_offset) as &mut addrspace(1) [u8];
-
-	let mut queue:WFQHandle = wfqueue_create_internal(device, default_num_handles);
+	let mut queue:WFQHandle = wfqueue_create_internal(device, default_num_handles, nodes);
 
 	//let q = (*queue).q;
 	//device.print_i32("queue.q.Ei  %d\n", q.Ei);
@@ -732,7 +714,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			let id = thread.uid();
 			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
 			let value = source() as u64 | 0x00ff000000000000;
-			let success = enqueue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id), value);
+			let success = enqueue_internal(thread, &mut (*queue).q, &mut (*queue).h(id), value, nodes);
 			//device.print_3xi32("push handle: %d - %d / %d\n", handle, value as i32, success);
 			if success > 0 {
 				thread.atomic_add_global_i32(&mut (*queue).size as &mut addrspace(1) i32, 1, mem_rlx);
@@ -745,7 +727,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
 			let mut value:u32 = thread.idx(0);
 
-			let v = dequeue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id));
+			let v = dequeue_internal(device, thread, &mut (*queue).q, &mut (*queue).h(id), nodes);
 			let success = (v != EMPTY);
 			value = (v & 0xffffffff) as u32;
 
@@ -769,8 +751,9 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 			for thread in grid.threads() {
 				if thread.idx(0) == 0 {
-					wfqueue_destroy_internal(queue);
-					queue = wfqueue_create_internal(device, num_handles);
+					wfqueue_destroy_internal(queue, nodes);
+					nodes.clear();
+					queue = wfqueue_create_internal(device, num_handles, nodes);
 				}
 			}
 		},
@@ -779,7 +762,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		},
 
 		release = @|| {
-			wfqueue_destroy_internal(queue);
+			wfqueue_destroy_internal(queue, nodes);
+			nodes.release();
 		}
 	}
 }

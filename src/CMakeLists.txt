@@ -37,6 +37,7 @@ set(COMMON_ARTIC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/queue.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/ringbuffer_allocator.art
 	# ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.art
+	${CMAKE_CURRENT_SOURCE_DIR}/memory_pool.art
 	${CMAKE_CURRENT_SOURCE_DIR}/utils-$<IF:$<CONFIG:Debug>,debug,release>.art
 )
 
