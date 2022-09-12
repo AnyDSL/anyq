@@ -457,7 +457,7 @@ typedef struct
   queue_t q;
   volatile long size;
   handle_t* volatile tail;
-  handle_t h[];
+  handle_t* h;
 } wfqueue_t;
 
 int wfqueue_create(int32_t nprocs, wfqueue_t** queue_ptr)
@@ -466,6 +466,7 @@ int wfqueue_create(int32_t nprocs, wfqueue_t** queue_ptr)
   queue_init(&queue->q, nprocs);
   queue->size = 0;
   queue->tail = NULL;
+  queue->h = (handle_t*)((uint8_t*)queue + sizeof(wfqueue_t));
 
   for (int i = 0; i < nprocs; ++i) {
     queue_register(&queue->q, &queue->tail, queue->h + i, i);
