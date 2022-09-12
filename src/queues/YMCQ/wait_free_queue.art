@@ -128,6 +128,22 @@ fn @do_while(body: fn() -> bool) -> fn()->() {
 	}
 }
 
+fn new_node(nodes: NodeAllocator) -> node_ref {
+	let n = nodes.alloc();
+
+	let p:&mut [u64] = n as &mut [u64];
+	for i in range(0, (sizeof[node_t]() / sizeof[u64]()) as i32) {
+		p(i) = 0;
+	}
+
+	//let p:&mut [i8] = n as &mut [i8];
+	//for i in range(0, s as i32) {
+	//	p(i) = 0;
+	//}
+
+	n
+}
+
 fn wfqueue_create_internal(device: AccDevice, nprocs: i32, nodes: NodeAllocator) -> &mut wfqueue_t
 {
 	//device.print_3xi32("sizeof(wfqueue_t): %d\nsizeof(queue_t): %d\nsizeof(handle_t): %d\n", sizeof[wfqueue_t]() as i32, sizeof[queue_t]() as i32, sizeof[handle_t]() as i32);
@@ -145,7 +161,7 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32, nodes: NodeAllocator)
 	let handles = &dev_data(handles_offset) as &mut [handle_t];
 
 	queue.q.Hi = 0;
-	queue.q.Hp = nodes.alloc();
+	queue.q.Hp = new_node(nodes);
 
 	queue.q.Ei = 1;
 	queue.q.Di = 1;
@@ -169,7 +185,7 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32, nodes: NodeAllocator)
 		(*th).Dr.idx = -1;
 
 		(*th).Ei = 0;
-		(*th).spare = nodes.alloc();
+		(*th).spare = new_node(nodes);
 
 		(*th).next = &mut queue.h(i + 1) as u64;
 		(*th).Eh = th.next;
@@ -322,7 +338,7 @@ fn @find_cell_internal(thread: thread_context, p: &mut node_ref, i: i32, th: &mu
 			let mut t:node_ref = (*th).spare;
 
 			if (t == 0 as node_ref) {
-				t = nodes.alloc();
+				t = new_node(nodes);
 				(*th).spare = t;
 			}
 
@@ -650,7 +666,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 
 	if ((*th).spare == 0 as node_ref) {
 		cleanup_internal(device, thread, q, th, nodes);
-		(*th).spare = nodes.alloc();
+		(*th).spare = new_node(nodes);
 	}
 
 	v
@@ -662,40 +678,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 
 	let num_max_nodes = 1 << 14;
 	let nodes_align = 4096;
-	//let nodes = createPool[node_t](num_max_nodes, nodes_align);
-	print_flush();
-
-
-	fn new_node() -> node_ref {
-		let s = sizeof[node_t]();
-		// alignment of 4k
-		let b = alloc_host(device.platform_device, s);
-		let p:&mut [u64] = b.data as &mut [u64];
-		for i in range(0, (s / sizeof[u64]()) as i32) {
-			p(i) = 0;
-		}
-		// alignment of 32
-		//let b = device.alloc(s);
-		//for i in range(0, s as i32) {
-		//	b.data(i) = 0;
-		//}
-		b.data as node_ref
-	}
-
-	fn release_node(node: node_ref) -> () {
-		runtime_release(0, node as &mut [i8]);
-	}
-
-	let nodes = Allocator[node_t] {
-		alloc = @|| { new_node() },
-		free = @|n:node_ref| { release_node(n); },
-		alloc_ptr = @|| { assert(false, "alloc_ptr() not supported for Allocator[node_t]"); 0 as &mut node_t },
-		free_ptr = @|_:&mut node_t| { assert(false, "free_ptr() not supported for Allocator[node_t]"); },
-		clear = @|| { },
-		release = @|| { },
-		alignment = nodes_align as i64
-	};
-
+	let nodes = createPool[node_t](num_max_nodes, nodes_align);
 
 	let mut queue:WFQHandle = wfqueue_create_internal(device, default_num_handles, nodes);
 
