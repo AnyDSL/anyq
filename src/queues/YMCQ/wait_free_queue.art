@@ -676,9 +676,36 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 
 fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
 
+	let use_static_pool = true;
 	let num_max_nodes = 1 << 14;
 	let nodes_align = 4096;
-	let nodes = createPool[node_t](num_max_nodes, nodes_align);
+
+	let nodes = if use_static_pool {
+		createPool[node_t](num_max_nodes, nodes_align)
+	} else {
+		fn @alloc_node() -> node_ref {
+			let s = sizeof[node_t]();
+			// alignment of 4k
+			let b = alloc_host(device.platform_device, s);
+			// alignment of 32
+			//let b = cpu_alloc(s);
+			b.data as node_ref
+		}
+
+		fn @release_node(node: node_ref) -> () {
+			runtime_release(0, node as &mut [i8]);
+		}
+
+		Allocator[node_t] {
+			alloc = @|| { alloc_node() },
+			free = @|n:node_ref| { release_node(n); },
+			alloc_ptr = @|| { assert(false, "alloc_ptr() not supported for Allocator[node_t]"); 0 as &mut node_t },
+			free_ptr = @|_:&mut node_t| { assert(false, "free_ptr() not supported for Allocator[node_t]"); },
+			clear = @|| { },
+			release = @|| { },
+			alignment = nodes_align as i64
+		}
+	};
 
 	let mut queue:WFQHandle = wfqueue_create_internal(device, default_num_handles, nodes);
 
