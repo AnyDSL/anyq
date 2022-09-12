@@ -131,7 +131,7 @@ fn @do_while(body: fn() -> bool) -> fn()->() {
 #[import(cc = "C", name = "memset")] fn cpu_memset(_dst: &mut [i8], _val: i32, _size: i64) -> &mut [i8];
 
 
-fn new_node(nodes: NodeAllocator) -> node_ref {
+fn @new_node(nodes: NodeAllocator) -> node_ref {
 	let n = nodes.alloc();
 
 	/* let p:&mut [u64] = n as &mut [u64];
@@ -236,9 +236,9 @@ fn @volatile_store_i32(thread: thread_context, ptr: &mut i32, val: i32) -> () = 
 
 
 
-fn cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> () {
+fn @cleanup_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> () {
 
-	fn update(pPn: &mut node_ref, cur_: node_ref, pHp: &mut node_ref) -> node_ref {
+	fn @update(pPn: &mut node_ref, cur_: node_ref, pHp: &mut node_ref) -> node_ref {
 		let mut ptr:node_ref = volatile_load_u64(thread, pPn);
 		let mut cur:node_ref = cur_;
 
@@ -368,9 +368,9 @@ fn @find_cell_internal(thread: thread_context, p: &mut node_ref, i: i32, th: &mu
 	c_i
 }
 
-fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64, nodes: NodeAllocator) -> i32
+fn @enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, v: u64, nodes: NodeAllocator) -> i32
 {
-	fn enq_fast(v: u64, id: &mut i32) -> bool
+	fn @enq_fast(v: u64, id: &mut i32) -> bool
 	{
 		let i = thread.atomic_add_global_i32(&mut (*q).Ei as &mut addrspace(1) i32, 1, mem_seq);
 
@@ -380,7 +380,7 @@ fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, 
 		if res.1 { true } else { *id = i; false }
 	}
 
-	fn enq_slow(v: u64, id: i32) -> ()
+	fn @enq_slow(v: u64, id: i32) -> ()
 	{
 		let enq:&mut enq_t = &mut (*th).Er;
 		let mut mid:i32 = id;
@@ -438,7 +438,7 @@ fn enqueue_internal(thread: thread_context, q: &mut queue_t, th: &mut handle_t, 
 }
 
 
-fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> u64
+fn @dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, th: &mut handle_t, nodes: NodeAllocator) -> u64
 {
 	fn @spin(ptr: &u64) -> u64 {
 		let mut p = MAX_SPIN;
@@ -452,7 +452,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		v
 	}
 
-	fn help_enq_internal(c: &mut cell_t, i: i32) -> u64
+	fn @help_enq_internal(c: &mut cell_t, i: i32) -> u64
 	{
 		let v:u64 = spin(&mut (*c).val);
 
@@ -532,7 +532,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		volatile_load_u64(thread, &mut (*c).val)
 	}
 	
-	fn help_deq_internal(ph: &mut handle_t) -> ()
+	fn @help_deq_internal(ph: &mut handle_t) -> ()
 	{
 		let deq:&mut deq_t = (*ph).Dr;
 		let mut idx:i32 = thread.atomic_load_global_i32(&mut (*deq).idx as &mut addrspace(1) i32, mem_acq);
@@ -602,7 +602,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		}
 	}
 
-	fn deq_fast(id: &mut i32) -> u64
+	fn @deq_fast(id: &mut i32) -> u64
 	{
 		let i:i32 = thread.atomic_add_global_i32(&mut (*q).Di as &mut addrspace(1) i32, 1, mem_seq);
 		let c:&mut cell_t = @find_cell_internal(thread, &mut (*th).Dp, i, th, nodes);
@@ -621,7 +621,7 @@ fn dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t, 
 		}
 	}
 
-	fn deq_slow(id: i32) -> u64
+	fn @deq_slow(id: i32) -> u64
 	{
 		let deq:&mut deq_t = &mut (*th).Dr;
 
