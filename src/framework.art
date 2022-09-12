@@ -75,18 +75,21 @@ fn @wrap_dim_3d(idx: fn(i32) -> u32) -> fn(i32) -> u32 {
 	}
 }
 
-fn @print_hex(val: i32, skip_leading_zeros: bool) -> () {
+fn @print_hex[T](val: T, skip_leading_zeros: bool) -> () {
 	print_char('0'); print_char('x');
 	let mut leading = skip_leading_zeros;
-	let l = 2 * sizeof[i32]() as i32;
+	let l = 2 * sizeof[T]() as i32;
+	let p = &val as &[u8];
 	for i in range(0, l) {
-		let curr = (val as u32 >> 4*(l-i-1) as u32) & 0xf as u32;
+		let j = l - i - 1;
+		let v:u8 = p(j / 2);
+		let curr = (v >> (4*(j%2) as u8) & 0xf);
 		leading = leading && (curr == 0) && i < l-1;
 		if leading {
 			continue()
 		}
 		let off = if curr < 10 { '0' } else { 'A' - 10 };
-		print_char(off + curr as u8);
+		print_char(off + curr);
 	}
 }
 
