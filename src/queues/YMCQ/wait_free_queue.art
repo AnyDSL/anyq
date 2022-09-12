@@ -27,8 +27,13 @@ static WFQUEUE_NODE_SIZE = ((1 << 10) - 2);
 
 struct node_t {
 	next: u64, // &mut node_t
+
+	// align id to 64
+	_: [u8*56],
 	id: i32,
-	pad: PADDING,
+
+	// align cells to 128
+	_: [u8*60],
 	cells: [cell_t*1022],
 }
 
@@ -37,20 +42,27 @@ type node_ref = u64;
 struct queue_t {
 	// Index of the next position for enqueue.
 	Ei: i32, // DOUBLE_CACHE_ALIGNED
+
+	// align Di to 128
+	_: [u8*124],
 	// Index of the next position for dequeue.
 	Di: i32, // DOUBLE_CACHE_ALIGNED
+
+	// align Hi to 256
+	_: [u8*124],
 	// Index of the head of the queue.
 	Hi: i32, // DOUBLE_CACHE_ALIGNED
-
-	pad1: PADDING,
+	_: [u8*4],
 
 	// Pointer to the head node of the queue.
 	Hp: node_ref, //&mut node_t,
 
 	// Number of processors.
 	nprocs: i32,
+	_: [u8*4],
 
-	pad2: PADDING,
+	// pad to 384 bytes
+	_: [u8*104],
 }
 
 type handle_ref = u64;
@@ -66,19 +78,28 @@ struct handle_t {
 	// Pointer to the node for dequeue.
 	Dp: node_ref,
 
+	// align Er to 64
+	_: [u8*32],
 	// Enqueue request.
 	Er: enq_t,
+
+	// align Dr to 128
+	_: [u8*48],
 	// Dequeue request.
 	Dr: deq_t,
 
+	// align Eh to 192
+	_: [u8*56],
 	// Handle of the next enqueuer to help.
 	Eh: handle_ref,
 	Ei: i32,
 
-	pad1: PADDING,
+	_: [u8*4],
 
 	// Handle of the next dequeuer to help.
 	Dh: handle_ref,
+
+	_: [u8*40],
 
 	// Pointer to a spare node to use, to speedup adding a new node.
 	spare: node_ref,
@@ -86,7 +107,10 @@ struct handle_t {
 	// Count the delay rounds of helping another dequeuer.
 	delay: i32,
 
-	pad2: PADDING,
+	_: [u8*4],
+
+	// fill up to 320 bytes for array alignment
+	_: [u8*48],
 }
 
 struct wfqueue_t
@@ -155,15 +179,24 @@ fn wfqueue_create_internal(device: AccDevice, nprocs: i32, nodes: NodeAllocator)
 	//device.print_3xi32("sizeof(enq_t): %d\nsizeof(deq_t): %d\nsizeof(node_t): %d\n", sizeof[enq_t]() as i32, sizeof[deq_t]() as i32, sizeof[node_t]() as i32);
 
 	let queue_size = sizeof[wfqueue_t]();
+	//let queue_align = 128;
+
+	//device.print_2xi32("wfqueue_t  size(%d)  align(%d)\n", sizeof[wfqueue_t]() as i32, alignof[wfqueue_t]() as i32);
 
 	let handles_offset = round_up_i64(queue_size, 64);
 	let handles_size = nprocs as i64 * sizeof[handle_t]();
 
-	let dev_queue_buffer = device.alloc(handles_offset + handles_size);
+	// use alloc_host to get page aligned memory for queue_t
+	let dev_queue_buffer = alloc_host(device.platform_device, handles_offset + handles_size);
+	//let dev_queue_buffer = device.alloc(handles_offset + handles_size);
 	let dev_data = dev_queue_buffer.data;
 
 	let queue = &dev_data(0) as &mut wfqueue_t;
 	let handles = &dev_data(handles_offset) as &mut [handle_t];
+
+	//print_string("queue:   "); print_hex[u64](queue as u64, false); print_char('\n');
+	//print_string("queue.q: "); print_hex[u64](&(*queue).q as u64, false); print_char('\n');
+	//print_string("handles: "); print_hex[u64](handles as u64, false); print_char('\n');
 
 	queue.q.Hi = 0;
 	queue.q.Hp = new_node(nodes);
@@ -723,6 +756,41 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 	//print_string("queue.tail        "); print_i64((*queue).tail as i64); print_char('\n');
 	//print_string("queue.h(0)        "); print_i64((&mut (*queue).h(0)) as i64); print_char('\n');
 	//print_string("queue.h(-1).next  "); print_i64((*queue).h(q.nprocs - 1).next as i64); print_char('\n');
+	/*
+	let h:&handle_t = (*queue).tail;
+	let mut p:u64 = h as u64;
+
+	device.print_i32("handle_t -- size %d | offsets\n", sizeof[handle_t]() as i32);
+	device.print_i32("    next %d\n", (&(*h).next as u64 - p) as i32);
+	device.print_i32("    Hp %d\n", (&(*h).Hp as u64 - p) as i32);
+	device.print_i32("    Ep %d\n", (&(*h).Ep as u64 - p) as i32);
+	device.print_i32("    Dp %d\n", (&(*h).Dp as u64 - p) as i32);
+	device.print_i32("    Er %d\n", (&(*h).Er as u64 - p) as i32);
+	device.print_i32("    Dr %d\n", (&(*h).Dr as u64 - p) as i32);
+	device.print_i32("    Eh %d\n", (&(*h).Eh as u64 - p) as i32);
+	device.print_i32("    Ei %d\n", (&(*h).Ei as u64 - p) as i32);
+	device.print_i32("    Dh %d\n", (&(*h).Dh as u64 - p) as i32);
+	device.print_i32("    spare %d\n", (&(*h).spare as u64 - p) as i32);
+	device.print_i32("    delay %d\n", (&(*h).delay as u64 - p) as i32);
+
+	let q:&queue_t = &(*queue).q;
+	p = q as u64;
+
+	device.print_i32("queue_t -- size %d | offsets\n", sizeof[queue_t]() as i32);
+	device.print_i32("    Ei %d\n", (&(*q).Ei as u64 - p) as i32);
+	device.print_i32("    Di %d\n", (&(*q).Di as u64 - p) as i32);
+	device.print_i32("    Hi %d\n", (&(*q).Hi as u64 - p) as i32);
+	device.print_i32("    Hp %d\n", (&(*q).Hp as u64 - p) as i32);
+	device.print_i32("    nprocs %d\n", (&(*q).nprocs as u64 - p) as i32);
+
+	let n:&node_t = &(*q).Hp as &node_t;
+	p = n as u64;
+
+	device.print_i32("node_t -- size %d | offsets\n", sizeof[node_t]() as i32);
+	device.print_i32("    next %d\n", (&(*n).next as u64 - p) as i32);
+	device.print_i32("    id %d\n", (&(*n).id as u64 - p) as i32);
+	device.print_i32("    cells %d\n", (&(*n).cells as u64 - p) as i32);
+	*/
 
 	ProducerConsumerQueue[u32] {
 		push = @|source:fn()->u32| @|thread| {
