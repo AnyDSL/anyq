@@ -128,18 +128,23 @@ fn @do_while(body: fn() -> bool) -> fn()->() {
 	}
 }
 
+#[import(cc = "C", name = "memset")] fn cpu_memset(_dst: &mut [i8], _val: i32, _size: i64) -> &mut [i8];
+
+
 fn new_node(nodes: NodeAllocator) -> node_ref {
 	let n = nodes.alloc();
 
-	let p:&mut [u64] = n as &mut [u64];
+	/* let p:&mut [u64] = n as &mut [u64];
 	for i in range(0, (sizeof[node_t]() / sizeof[u64]()) as i32) {
+		p(i) = 0;
+	} */
+
+	let p:&mut [i8] = n as &mut [i8];
+	for i in range(0, sizeof[node_t]() as i32) {
 		p(i) = 0;
 	}
 
-	//let p:&mut [i8] = n as &mut [i8];
-	//for i in range(0, s as i32) {
-	//	p(i) = 0;
-	//}
+	//cpu_memset(n as &mut [i8], 0, sizeof[node_t]());
 
 	n
 }
