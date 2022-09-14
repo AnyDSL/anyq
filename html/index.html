@@ -21,9 +21,9 @@
 				<div class="col">
 					<h2>Result database</h2>
 					<ul>
-						<li><a href="baseline/">Baseline data of all queue algorithms</a></li>
-						<li><a href="cuda-its/">Effect of CUDA Indipendent thread scheduling</a></li>
-						<li><a href="arm-lse/">Effect of ARM LSE atomics</a></li>
+						<li><a href="baseline/?queue_size=10000&block_size=32&p_enq=0-5&p_deq=0-5&workload_size=1&attempts_per_thread=20">Baseline data of all queue algorithms</a></li>
+						<li><a href="cuda-its/?device=nvidia-geforce-rtx-2080-super-cuda&queue_size=10000&block_size=32&p_enq=0-5&p_deq=0-5&workload_size=1">Effect of CUDA Independent Thread Scheduling (ITS)</a></li>
+						<li><a href="arm-lse/?device=apple-m1-cpu&queue_type=cpcq&queue_type=msq&queue_size=10000&block_size=32&p_enq=0-5&p_deq=0-5&workload_size=1">Effect of ARM atomics (LSE)</a></li>
 					</ul>
 					<!-- <hr/> -->
 				</div>
