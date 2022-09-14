@@ -14,7 +14,7 @@ from results import *
 default_bin_dir = Path(__file__).parent / "build" / "bin"
 default_results_dir = Path(__file__).parent / "results"
 default_export_dir = Path(__file__).parent / "plot_data"
-default_template_file = Path(__file__).parent / "html" / "index.html"
+default_template_file = Path(__file__).parent / "html" / "base.html"
 
 
 def device_id(name):
