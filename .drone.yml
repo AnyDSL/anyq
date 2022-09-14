@@ -30,6 +30,7 @@ steps:
         - arm-lse/index.html
         - arm-lse/main.js
         - arm-lse/*.json
+        - html/index.html:./
     when:
       branch:
         - master
