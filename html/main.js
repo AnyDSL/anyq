@@ -764,7 +764,11 @@ function createPlot(plotElem, menuElem, line_style_map)
 						'# params: ', active, '\n',
 						'# x-axis: ', plot.label.x.text(), '\n',
 						'# y-axis: ', plot.label.y.text(), '\n',
-						lines.map(function (idx) { return '# line' + idx + ' -- ' + this.params; }).get().join('\n'), '\n',
+						lines.map(function (idx) {
+							let params = this.params;
+							let props = Object.getOwnPropertyNames(params);
+							return '# line' + idx + ' -- ' + 'LineParams {' + $(props).map(function () { return this + ': ' + params[this] }).get().join(', ') + '}';
+						}).get().join('\n'), '\n',
 						headers.join(','), '\n',
 						linedata.join('\n'), '\n'
 					], {type: 'text/csv'});
