@@ -13,7 +13,9 @@ fn bwd_comparison_benchmark(device: AccDevice, block_size: i32, attempts_per_thr
 		reset = @|_| {},
 
 		run = @|queue_instrumentation, num_threads, _i| {
-			for grid in device.launch_1d(div_up(num_threads, block_size), block_size) {
+			let B = min(num_threads, block_size);
+
+			for grid in device.launch_1d(div_up(num_threads, B), B) {
 				for wave in grid.waves() {
 					for thread in wave.threads() {
 						let thread_id = wave.idx() * wave.num_threads() + thread.idx(0);
