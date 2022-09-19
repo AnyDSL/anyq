@@ -137,6 +137,14 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
+	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "scalar")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+	endif()
+
+	if (${_platform} STREQUAL "scalar")
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+	endif()
+
 	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art)
 
 	if (${_platform} STREQUAL "cuda" AND ${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")

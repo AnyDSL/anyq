@@ -1,0 +1,24 @@
+
+fn @describe_benchmark_params(params: BenchmarkParams) {
+	params.add_int("num-threads-min")
+	      .add_int("num-threads-max")
+	      .add_int("block-size")
+	      .add_float("p-enq")
+	      .add_float("p-deq")
+	      .add_int("workload-size")
+}
+
+fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, block_size: i32, p_enq: f32, p_deq: f32, workload_size: i32) {
+	let num_attempts = 20;
+
+	run_queue_benchmark(
+		device,
+		block_size,
+		producer_consumer_queue_concurrent_push_pop_benchmark(device, block_size, num_attempts, p_enq, p_deq, workload_size, true),
+		"@queue_short_name@",
+		@queue_constructor_name@,
+		@queue_size@,
+		num_threads_min,
+		num_threads_max,
+		create_queue_instrumentation_none)
+}
