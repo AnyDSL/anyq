@@ -133,7 +133,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 
-	if (${_platform} STREQUAL "cuda" OR ${_platform} STREQUAL "nvvm")
+	if (${_platform} STREQUAL "cuda" OR ${_platform} STREQUAL "nvvm" OR ${_platform} STREQUAL "scalar")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
