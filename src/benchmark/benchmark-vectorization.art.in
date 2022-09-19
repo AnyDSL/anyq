@@ -20,5 +20,5 @@ fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32,
 		@queue_size@,
 		num_threads_min,
 		num_threads_max,
-		create_queue_instrumentation_none)
+		create_queue_instrumentation_full)
 }
