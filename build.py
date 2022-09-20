@@ -258,7 +258,8 @@ class AnyQ(Build):
 			BOOST_ROOT=boost.build_dir,
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake",
 			BUILD_TESTING=True,
-			CMAKE_EXPORT_COMPILE_COMMANDS=True
+			CMAKE_EXPORT_COMPILE_COMMANDS=True,
+			AnyQ_CUDA_SANITIZER_TOOLS=""
 		)
 
 @component(depends_on=(AnyQ,))
