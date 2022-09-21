@@ -3,7 +3,7 @@
 #ifndef PRIMITIVES_H
 #define PRIMITIVES_H
 
-#if defined(__GNUC__) && __GNUC__ >= 4 && __GNUC_MINOR__ > 7
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 7))
 /**
  * An atomic fetch-and-add.
  */
@@ -26,16 +26,16 @@
  */
 #define CAScs(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-/**
 #define CAScs_PTR CAScs
+/**
  * An atomic compare-and-swap that ensures release semantic when succeed
  * or acquire semantic when failed.
  */
 #define CASra(ptr, cmp, val) __atomic_compare_exchange_n(ptr, cmp, val, 0, \
     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)
-/**
 #define CASra_LONG CASra
 #define CASra_PTR CASra
+/**
  * An atomic compare-and-swap that ensures acquire semantic when succeed
  * or relaxed semantic when failed.
  */
