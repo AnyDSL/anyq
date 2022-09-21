@@ -9,9 +9,9 @@ block_sizes = [32, 512]
 
 
 def generate_benchmark_variants(test_name):
-	if test_name.startswith("benchmark-queue-concurrent") or test_name.startswith("benchmark-vectorization"):
+	def generate(num_threads_min, num_threads_max, workload_sizes, p_enqs, p_deqs, block_sizes):
 		for workload_size in workload_sizes:
-			for p_enq in p_deqs:
+			for p_enq in p_enqs:
 				for p_deq in p_deqs:
 					for block_size in block_sizes:
 						yield (
@@ -26,8 +26,14 @@ def generate_benchmark_variants(test_name):
 							f"{block_size}-{int(p_enq * 100)}-{int(p_deq * 100)}-{workload_size}"
 						)
 
+	if test_name.startswith("benchmark-queue-concurrent"):
+		yield from generate(num_threads_min, num_threads_max, workload_sizes, p_enqs, p_deqs, block_sizes)
+
+	elif test_name.startswith("benchmark-vectorization"):
+		yield from generate(1, 1 << 18, [1], [0.5], [0.5], [32])
+
 	elif test_name == "benchmark-pipeline-simple":
-		return
+		pass
 		# for workload_size_producer in workload_sizes:
 		# 	for workload_size_consumer in workload_sizes:
 		# 		for num_input_elements in [1000, 1000000]:
