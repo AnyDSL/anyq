@@ -207,53 +207,14 @@ class AnyDSLRuntime(Build):
 class AnyDSL(PhonyBuild):
 	pass
 
-@component()
-class ZLIB(Build):
-	def __init__(self, dir, buildsystem):
-		super().__init__(buildsystem, dir/"dependencies"/"zlib"/"build")
-		self.install_dir = dir/"dependencies"/"zlib"
-		self.source_dir = dir/"dependencies"/"zlib"/"source"
-
-	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/madler/zlib.git")
-
-	def configure(self, configs):
-		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			CMAKE_INSTALL_PREFIX=self.install_dir
-		)
-
-	def build(self, config):
-		self.buildsystem.build(self.build_dir, config, "install")
-
-@component(depends_on=(ZLIB,))
-class LPNG(Build):
-	def __init__(self, dir, buildsystem):
-		super().__init__(buildsystem, dir/"dependencies"/"libpng"/"build")
-		self.install_dir = dir/"dependencies"/"libpng"
-		self.source_dir = dir/"dependencies"/"libpng"/"source"
-
-	def pull(self):
-		pull_git_dependency(self.source_dir, "git://git.code.sf.net/p/libpng/code")
-
-	def configure(self, configs, zlib):
-		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			CMAKE_INSTALL_PREFIX=self.install_dir,
-			ZLIB_ROOT=zlib.install_dir
-		)
-
-	def build(self, config):
-		self.buildsystem.build(self.build_dir, config, "install")
-
-@component(depends_on=(ZLIB, LPNG, Boost, AnyDSLRuntime))
+@component(depends_on=(Boost, AnyDSLRuntime))
 class AnyQ(Build):
 	def __init__(self, dir, buildsystem):
 		super().__init__(buildsystem, dir/"build")
 		self.source_dir = dir
 
-	def configure(self, configs, zlib, libpng, boost, runtime):
+	def configure(self, configs, boost, runtime):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
-			ZLIB_ROOT=zlib.install_dir,
-			PNG_ROOT=libpng.install_dir,
 			Boost_NO_SYSTEM_PATHS=True,
 			BOOST_ROOT=boost.build_dir,
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake",
@@ -267,7 +228,7 @@ class All(PhonyBuild):
 	pass
 
 
-dependency_name_map = { "boost": Boost, "zlib": ZLIB, "libpng": LPNG, "llvm": LLVM, "thorin": Thorin, "artic": Artic, "runtime": AnyDSLRuntime, "anydsl": AnyDSL, "anyq": AnyQ, "all": All }
+dependency_name_map = { "boost": Boost, "llvm": LLVM, "thorin": Thorin, "artic": Artic, "runtime": AnyDSLRuntime, "anydsl": AnyDSL, "anyq": AnyQ, "all": All }
 
 def lookup_dependency(name):
 	d = dependency_name_map.get(name)
