@@ -36,6 +36,7 @@ class Boost:
 			"libs/function",
 			"libs/function_types",
 			"libs/fusion",
+			"libs/headers",
 			"libs/integer",
 			"libs/intrusive",
 			"libs/io",
@@ -81,7 +82,7 @@ class Boost:
 
 	def build(self, config):
 		print("-------- building", self.build_dir, "--------")
-		if cmd(self.source_dir/"b2", "install", f"--prefix={self.build_dir}", "--with-fiber", cwd=self.source_dir) != 0:
+		if cmd(self.source_dir/"b2", "install", f"--prefix={self.build_dir}", cwd=self.source_dir) != 0:
 			raise Exception("failed to build boost")
 
 @component()
