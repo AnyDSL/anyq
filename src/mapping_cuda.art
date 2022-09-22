@@ -187,13 +187,12 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 
 		atomic_inc_global_u32 = cuda_atomic_inc_global_u32,
 
-		memory_barrier = @|_:memory_order| cuda_threadfence(),
+		memory_barrier = @|_| cuda_threadfence(),
 
 		timestamp = @|| cuda_globaltimer() as i64,
 		timestamp32 = @|| cuda_globaltimer_lo() as i32,
 
-		// atomic_wait_and_transition_global_u32 = cuda_atomic_wait_and_transition[u32](cuda_atomic_cas_global_u32, @|a, b| a == b)
-		wait = @|f:fn() -> bool, _debug_msg:&[u8]| -> () {
+		wait = @|f, _debug_msg| {
 			while !f() {
 				yield();
 			}

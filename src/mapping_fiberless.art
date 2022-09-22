@@ -189,8 +189,6 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		timestamp = get_nano_time,
 		timestamp32 = @|| get_nano_time() as i32,
 
-		// yield = @|_msg| { do_once(@|_, _| { /* yield(); */ }); }
-		// atomic_wait_and_transition_global_u32 = cpu_atomic_wait_and_transition[u32]
 		wait = @|f, debug_msg| {
 			let mut retry = 50;
 			while !f() {

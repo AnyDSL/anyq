@@ -209,12 +209,9 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 		timestamp = get_nano_time,
 		timestamp32 = @|| get_nano_time() as i32,
 
-		// yield = @|msg| { do_once(@|_, _| { fibers_yield(msg); }); }
-		// atomic_wait_and_transition_global_u32 = cpu_atomic_wait_and_transition[u32]
 		wait = @|f, debug_msg| {
 			let mut retry = 50;
 			while !f() {
-				// fibers_yield(debug_msg);
 				retry =- 1;
 				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
 			}
