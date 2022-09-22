@@ -137,7 +137,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
-	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "scalar")
+	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "scalar" OR ${_platform} STREQUAL "fiberless")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 

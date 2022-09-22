@@ -55,10 +55,10 @@ endfunction()
 source_group("Source Files" FILES ${COMMON_ARTIC_FILES})
 source_group("Runtime Files" REGULAR_EXPRESSION ".*/runtime/platforms/.+[.](impala|art)$")
 
+find_package(Threads REQUIRED)
 find_package(Boost 1.65 COMPONENTS fiber)
 
 if (Boost_FOUND)
-	find_package(Threads REQUIRED)
 	add_library(fiber-support STATIC)
 	target_sources(fiber-support
 		PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/fibers.h
@@ -80,7 +80,10 @@ else()
 	message(STATUS "Boost is required for fiber-support used in the CPU mapping.")
 endif()
 
-set(AnyQ_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(fiberless-support ${CMAKE_CURRENT_SOURCE_DIR}/fiberless.cpp)
+target_link_libraries(fiberless-support Threads::Threads)
+
+set(ADDITIONAL_LINK_DEPENDENCY_fiberless fiberless-support)
 
 set(AnyQ_PLATFORMS)
 
@@ -106,7 +109,7 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT)
-	# list(APPEND AnyQ_PLATFORMS fiberless)
+	list(APPEND AnyQ_PLATFORMS fiberless)
 	if (AnyQ_FIBER_SUPPORT)
 		list(APPEND AnyQ_PLATFORMS cpu)
 	endif()
@@ -116,6 +119,8 @@ if (AnyQ_FIBER_SUPPORT)
 	list(APPEND AnyQ_PLATFORMS scalar)
 endif()
 
+
+set(AnyQ_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(queues/queues.cmake)
 
