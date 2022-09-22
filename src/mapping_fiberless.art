@@ -100,8 +100,6 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 	let vec_width = num_threads() as i32;
 
 	let do_once = do_once_op(self, vec_width);
-	let atomic_add = cpu_atomic_rmw[u32](1);
-	let atomic_sub = cpu_atomic_rmw[u32](2);
 
 	@body(thread_context {
 		idx = tid,
@@ -171,22 +169,22 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		atomic_cas_global_i64_weak = cpu_atomic_cas_weak[i64],
 		atomic_cas_global_u64_weak = cpu_atomic_cas_weak[u64],
 
-		atomic_inc_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
-			let wrap_around = (val + 1);
-			let old = atomic_add(addr, 1, memory_order::relaxed);
-			if old >= wrap_around { atomic_sub(addr, wrap_around, memory_order::relaxed); }
-			(old % wrap_around)
-		},
-		atomic_dec_global_u32 = @|addr: &mut addrspace(1) u32, val: u32| -> u32 {
-			let wrap_around = (val + 1);
-			let old = atomic_sub(addr, 1, memory_order::relaxed) as i32;
-			if old <= 0 { atomic_add(addr, wrap_around, memory_order::relaxed); }
-			let result = (old % wrap_around as i32);
-			assert(result >= 0, "casting between i32/u32 shall not effect the result being >= 0");
-			result as u32
+		atomic_inc_global_u32 = @|addr, val| {
+			let atomic_add = cpu_atomic_rmw[u32](1);
+			atomic_add(addr, 1, memory_order::relaxed) % (val + 1)
+			// let mut old = cpu_atomic_load[u32](addr, memory_order::relaxed);
+			// while true {
+			// 	let (curr, succ) = cpu_atomic_cas_weak[u32](addr, old, if old >= val { 0 } else { old + 1 }, memory_order::relaxed, memory_order::relaxed);
+
+			// 	if succ { break() }
+
+			// 	old = curr;
+			// }
+
+			// old
 		},
 
-		memory_barrier = @|order:memory_order| { fence(builtin_memory_order(order), ""); },
+		memory_barrier = @|order| { fence(builtin_memory_order(order), ""); },
 
 		timestamp = get_nano_time,
 		timestamp32 = @|| get_nano_time() as i32,

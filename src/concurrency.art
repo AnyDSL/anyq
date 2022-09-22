@@ -189,7 +189,6 @@ struct thread_context {
 	atomic_cas_global_u64_weak: fn(&mut addrspace(1) u64, u64, u64, memory_order, memory_order) -> (u64, bool),
 
 	atomic_inc_global_u32: fn(&mut addrspace(1) u32, u32) -> u32,
-	atomic_dec_global_u32: fn(&mut addrspace(1) u32, u32) -> u32,
 
 	memory_barrier: fn(memory_order) -> (),
 
