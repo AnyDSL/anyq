@@ -82,17 +82,6 @@ fn @unroll_reduction_step(body: fn(i32) -> ()) {
 }
 */
 
-fn @do_once_op(_self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
-	@|body:fn(u32, u32)->()| {
-		//let mask = rv_ballot(true) as u32;
-		//let lsb = mask & -mask;
-		//if 1 << self == lsb {
-		//	body(self, mask)
-		//}
-		body(0, 1)
-	}
-}
-
 fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
 	= atomic_load[T](location as &T, builtin_memory_order(order), "");
 
@@ -120,8 +109,6 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
-
-	let do_once = do_once_op(self, vec_width);
 
 	@body(thread_context {
 		idx = tid,
@@ -215,7 +202,7 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 			let mut retry = 50;
 			while !f() {
 				retry =- 1;
-				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
+				if retry <= 0 { fibers_yield(debug_msg); }
 			}
 		}
 	});
@@ -296,7 +283,6 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid:
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
 
 	let vec_width = warp_size as i32;
-	let do_once = do_once_op(idx.local_id, vec_width);
 
 	@body(group_context {
 		// TODO: dispatch ndim-block_id
@@ -306,34 +292,29 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		num_waves = num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads = @|_i:i32| num_threads(),
-		barrier = @|| -> () { do_once(@|_, _| { fibers_sync_block(idx.block_id as i32); }); },
+		barrier = @|| -> () { fibers_sync_block(idx.block_id as i32); },
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if predicate { 1 } else { 0 };
-			do_once(@|_, _| {
+
 				// atomic_and_global_i32
 				atomic[i32](3, addr(1), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
-			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any = @|predicate:bool| -> bool {
 			let warp_pred = if predicate { 1 } else { 0 };
-			do_once(@|_, _| {
 				// atomic_or_global_i32
 				atomic[i32](5, addr(2), warp_pred, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
-			});
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count = @|predicate:bool| -> i32 {
 			let warp_count = if predicate { 1 } else { 0 }; //cpu_popcount_u32(rv_ballot_u32(predicate));
-			do_once(@|_, _| {
 				// atomic_add_global_i32
 				atomic[i32](1, addr(3), warp_count, 7, "");
 				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
-			});
 			let result = *(addr(0));
 			result
 		},
