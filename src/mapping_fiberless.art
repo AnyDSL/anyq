@@ -192,7 +192,7 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 		wait = @|f, debug_msg| {
 			let mut retry = 50;
 			while !f() {
-				retry =- 1;
+				retry -= 1;
 				do_once(@|_, _| { if retry <= 0 { fiberless_yield(debug_msg); } });
 			}
 		}

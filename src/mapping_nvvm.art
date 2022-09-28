@@ -1,18 +1,11 @@
 
 fn @createAccDevice(device: i32) {
 	let platform_device = runtime_device(1, device);
-	let its = false; // runtime_device_check_feature_support(platform_device, "ITS");
+	let its = runtime_device_check_feature_support(platform_device, "ITS");
 
 	AccDevice {
-		launch_1d = if its {
-			@|body|@|num_groups, group_size| {
-				nvvm_launch(device, true, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
-			}
-		}
-		else {
-			@|body|@|num_groups, group_size| {
-				nvvm_launch(device, false, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
-			}
+		launch_1d = @|body|@|num_groups, group_size| {
+			nvvm_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
 		},
 		synchronize = || synchronize_cuda(device),
 		alloc = |size| alloc_cuda(device, size),
@@ -93,9 +86,7 @@ fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: 
 // 	}
 // }
 
-fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(thread_context) -> ()) -> () {
-	let yield = if its { @|| nvvm_nanosleep(0) } else { nvvm_threadfence };
-
+fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) -> ()) -> () {
 	@body(thread_context {
 		idx = idx,
 
@@ -172,14 +163,16 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, its: bool, body: fn(threa
 		timestamp32 = @|| nvvm_globaltimer_lo() as i32,
 
 		wait = @|f, _debug_msg| {
+			let mut t = 2 as u32;
 			while !f() {
-				yield();
+				nvvm_nanosleep(t);
+				if t < 200 { t = t * 3 / 2; }
 			}
 		}
 	});
 }
 
-fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, its: bool, body: fn(wave_context) -> ()) -> () {
+fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, body: fn(wave_context) -> ()) -> () {
 	let thread_idx = @|i: i32| match i { 0 => nvvm_laneid(), _ => 0 };
 
 	//  1 00000001 -> 00011111
@@ -206,7 +199,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 
 		membermask = @|| membermask as u64,
 
-		threads = @|body|@|| nvvm_thread(thread_idx, @|| gid() * num_threads + thread_idx(0), its, body),
+		threads = @|body|@|| nvvm_thread(thread_idx, @|| gid() * num_threads + thread_idx(0), body),
 
 		num_threads = @|| num_threads,
 
@@ -268,7 +261,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 	});
 }
 
-fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, its: bool, body: fn(group_context) -> ()) -> () {
+fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, body: fn(group_context) -> ()) -> () {
 	let linear_thread_idx = @|| {
 		(thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0)
 	};
@@ -282,8 +275,8 @@ fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 
 	@body(group_context {
 		idx = idx,
-		waves = @|body|@|| nvvm_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, its, body),
-		threads = @|body|@|| nvvm_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), its, body),
+		waves = @|body|@|| nvvm_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u32(warp_size), warp_size, body),
+		threads = @|body|@|| nvvm_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), body),
 		num_waves = num_warps,
 		num_threads = block_size,
 		barrier = nvvm_block_sync,
@@ -293,7 +286,7 @@ fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 	});
 }
 
-fn @nvvm_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context) -> ()) -> () {
+fn @nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context) -> ()) -> () {
 	// TODO: assert(warp_size == 32)
 	let warp_size: u32 = 32;
 
@@ -344,9 +337,9 @@ fn @nvvm_launch(device: i32, its: bool, (grid_dim_x: i32, grid_dim_y: i32, grid_
 	nvvm(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(grid_context {
 		device = device,
 		max_concurrency = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) as i32 * num_threads_per_block() as i32,
-		groups = @|body|@|| nvvm_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, its, body),
-		waves = @|body|@|| nvvm_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, its, body),
-		threads = @|body|@|| nvvm_thread(global_thread_idx, global_linear_thread_idx, its, body),
+		groups = @|body|@|| nvvm_block(block_idx, linear_block_idx, thread_idx, block_size, warp_size, body),
+		waves = @|body|@|| nvvm_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u32(warp_size), warp_size, body),
+		threads = @|body|@|| nvvm_thread(global_thread_idx, global_linear_thread_idx, body),
 		num_groups = num_blocks,
 		num_waves = num_warps,
 		num_threads = num_threads

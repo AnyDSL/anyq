@@ -212,7 +212,7 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 		wait = @|f, debug_msg| {
 			let mut retry = 50;
 			while !f() {
-				retry =- 1;
+				retry -= 1;
 				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
 			}
 		}
