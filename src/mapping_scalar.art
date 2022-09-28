@@ -1,5 +1,4 @@
 static cpu_threads = 0;
-//static vec_width = 1u;
 static warp_size:u32 = 1;
 static max_num_blocks_in_flight:i32 = 32;
 
@@ -38,50 +37,6 @@ fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_
 #[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
 
 
-//#[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;
-//#[import(cc = "C", name = "rv_extract")] fn rv_extract_u32(u32, i32) -> u32;
-//#[import(cc = "C", name = "rv_insert")] fn rv_insert_i32(i32, i32, i32) -> i32;
-//#[import(cc = "C", name = "rv_insert")] fn rv_insert_u32(u32, i32, u32) -> u32;
-//#[import(cc = "C", name = "rv_ballot")] fn rv_ballot_u32(bool) -> u32;
-//
-//#[import(cc = "device", name = "llvm.ctpop.i32")] fn cpu_popcount_u32(u32) -> i32;
-
-/*
-fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
-	@|value: i32, src_lane: i32| -> i32 {
-		let mut result:i32 = self as i32; // self is needed to make result marked as varying
-		for l in unroll(0, vec_width) {
-			let lane_src_lane = rv_extract_i32(src_lane, l);
-			let lane_value = rv_extract_i32(value, lane_src_lane);
-			result = rv_insert_i32(result, l, lane_value);
-		}
-		result
-	}
-}
-
-fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
-	@|value: u32, src_lane: i32| -> u32 {
-		let mut result:u32 = self; // self is needed to make result marked as varying
-		for l in unroll(0, vec_width) {
-			let lane_src_lane = rv_extract_i32(src_lane, l);
-			let lane_value = rv_extract_u32(value, lane_src_lane);
-			result = rv_insert_u32(result, l, lane_value);
-		}
-		result
-	}
-}
-
-fn @unroll_reduction_step(body: fn(i32) -> ()) {
-	fn @(?width) loop(mask: i32, width: i32) -> () {
-		if width > 0 {
-			@body(mask);
-			loop(mask << 1, width >> 1)
-		}
-	}
-	loop
-}
-*/
-
 fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
 	= atomic_load[T](location as &T, builtin_memory_order(order), "");
 
@@ -106,9 +61,9 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 // 	}
 // }
 
-fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
+fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, _num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
+
 	let self = idx.local_id;
-	let vec_width = num_threads() as i32;
 
 	@body(thread_context {
 		idx = tid,
@@ -211,31 +166,7 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid: fn() -> i32, idx: Index, body: fn(wave_context) -> ()) -> () {
 
 	let self = idx.local_id;
-	let _vec_width = num_threads() as i32;
 
-	//let warp_shuffle_i32 = shuffle_i32(self, vec_width);
-	//let warp_shuffle_u32 = shuffle_u32(self, vec_width);
-/*
-	fn @lanemask_eq() -> u64 {
-		1 << self as u64
-	}
-
-	fn @lanemask_lt() -> u64 {
-		let ballot = rv_ballot_u32(true) as u64;
-		let mask = (1 << self as u64) - 1;
-		mask & ballot
-	}
-
-	fn @lanemask_gt() -> u64 {
-		if (vec_width == 64 && self == 63) || (vec_width == 32 && self == 31) {
-			0
-		} else {
-			let ballot = rv_ballot_u32(true) as u64;
-			let mask = (!0:u64) << (self as u64 + 1);
-			mask & ballot
-		}
-	}
-*/
 	@body(wave_context{
 		idx = @|| idx.warp_id,
 
@@ -281,9 +212,6 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid:
 }
 
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
-
-	let vec_width = warp_size as i32;
-
 	@body(group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
@@ -343,9 +271,6 @@ fn @scalar_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()
 	//print_string("  num_threads_per_block: "); print_u32(num_threads_per_block); print_char('\n');
 	//print_string("  num_blocks_in_flight: "); print_i32(num_blocks_in_flight); print_char('\n');
 
-	// TODO: assert(warp_size/l == vec_width)
-	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
-	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| range(body)(0, l as i32);
 	fn @warp_loop(body: fn(i32)->()) = @|_:u32| body(0);
 
 	// we need a buffer to accumulate block level results of barriers
