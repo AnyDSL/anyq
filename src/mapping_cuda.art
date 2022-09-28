@@ -1,9 +1,10 @@
 
 fn @createAccDevice(device: i32) {
 	let platform_device = runtime_device(1, device);
-	let its = false; // runtime_device_check_feature_support(platform_device, "ITS");
+	let its = runtime_device_check_feature_support(platform_device, "ITS");
 
 	AccDevice {
+		its = its,
 		launch_1d = @|body|@|num_groups, group_size| {
 			cuda_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
 		},

@@ -111,6 +111,7 @@ fn @print_binary(value: u32) -> () {
 
 
 struct AccDevice {
+	its: bool,
 	launch_1d: fn(fn(grid_context) -> ()) -> fn(i32, i32) -> (),
 	synchronize: fn() -> (),
 	alloc: fn(i64) -> Buffer,
