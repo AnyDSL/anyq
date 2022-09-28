@@ -46,6 +46,7 @@ fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(thread_context)-
         idx = idx,
 
         gid = gid,
+        uid = @|| gid() as i32,
 
         atomic_load_global_i32 = amdgpu_atomic_load[i32],
         atomic_load_global_u32 = amdgpu_atomic_load[u32],
@@ -280,6 +281,7 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
 
     amdgpu(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| body(grid_context {
         device  = device,
+        max_concurrency = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) as i32 * num_threads_per_block() as i32,
         groups  = @|body| @|| amdgpu_block(block_idx, linear_block_idx, thread_idx, block_size, wavefront_size, body),
         waves   = @|body| @|| amdgpu_subwarp(global_warp_idx, global_warp_idx, get_member_mask_u64(wavefront_size), wavefront_size, body),
         threads = @|body| @|| amdgpu_thread(global_thread_idx, global_linear_thread_idx, body),
