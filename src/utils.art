@@ -18,6 +18,22 @@ fn @round_down(num: i32, multiple: i32) -> i32 { (num / multiple) * multiple }
 fn @round_down_u32(num: u32, multiple: u32) -> u32 { (num / multiple) * multiple }
 fn @round_down_i64(num: i64, multiple: i64) -> i64 { (num / multiple) * multiple }
 
+
+fn @exponential_backoff(body: fn(i32) -> bool) {
+    fn @loop(min: i32, max: i32) -> () {
+        if @body(min) {
+            if min < max {
+                loop(min * 3 / 2, max);
+            }
+            else {
+                while @body(min) {}
+            }
+        }
+    }
+    loop
+}
+
+
 static mut total_kernel_timing: i64 = 0;
 static mut total_cpu_timing: i64 = 0;
 

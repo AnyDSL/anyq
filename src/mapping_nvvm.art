@@ -1,4 +1,7 @@
 
+#[import(cc = "device", name = "__nvvm_reflect")] fn nvvm_reflect(&[u8]) -> i32;
+fn @nvvm_device_arch() = nvvm_reflect("__CUDA_ARCH");
+
 fn @createAccDevice(device: i32) {
 	let platform_device = runtime_device(1, device);
 	let its = runtime_device_check_feature_support(platform_device, "ITS");
@@ -88,6 +91,15 @@ fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: 
 // }
 
 fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) -> ()) -> () {
+	let sleep = @|t: u32| {
+		if nvvm_device_arch() >= 700 {
+			nvvm_nanosleep(t);
+		}
+		else {
+			nvvm_threadfence();
+		}
+	};
+
 	@body(thread_context {
 		idx = idx,
 
@@ -164,10 +176,8 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 		timestamp32 = @|| nvvm_globaltimer_lo() as i32,
 
 		wait = @|f, _debug_msg| {
-			let mut t = 2 as u32;
-			while !f() {
-				nvvm_nanosleep(t);
-				if t < 200 { t = t * 3 / 2; }
+			for t in exponential_backoff(2, 128) {
+				if f() { false } else { sleep(t as u32); true }
 			}
 		}
 	});

@@ -1,4 +1,6 @@
 
+#[import(cc = "device", name = "[]{return __CUDA_ARCH__;}")] fn cuda_device_arch() -> i32;  // HACK
+
 fn @createAccDevice(device: i32) {
 	let platform_device = runtime_device(1, device);
 	let its = runtime_device_check_feature_support(platform_device, "ITS");
@@ -109,6 +111,15 @@ fn @cuda_atomic_wait_and_transition[T](f: fn(&mut addrspace(1) T, T, T) -> T, cm
 }
 
 fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) -> ()) -> () {
+	let sleep = @|t: u32| {
+		if cuda_device_arch() >= 700 {
+			asm("nanosleep.u32 %0;\n" :: "r"(t) :: "volatile");  // use asm to avoid compilation error on devices < 700 due to __nanosleep not being defined
+		}
+		else {
+			cuda_threadfence();
+		}
+	};
+
 	@body(thread_context {
 		idx = idx,
 
@@ -185,10 +196,8 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 		timestamp32 = @|| cuda_globaltimer_lo() as i32,
 
 		wait = @|f, _debug_msg| {
-			let mut t = 2 as u32;
-			while !f() {
-				cuda_nanosleep(t);
-				if t < 200 { t = t * 3 / 2; }
+			for t in exponential_backoff(2, 128) {
+				if f() { false } else { sleep(t as u32); true }
 			}
 		}
 	});
