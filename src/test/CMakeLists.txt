@@ -175,8 +175,8 @@ set(TEST_SUITE_FILES
 )
 
 set(TEST_QUEUE_FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-queue-concurrent.art.in
 	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-queue-sequential.art.in
+	${CMAKE_CURRENT_SOURCE_DIR}/queues/test-queue-concurrent.art.in
 )
 
 foreach(_test_platform ${AnyQ_PLATFORMS})
