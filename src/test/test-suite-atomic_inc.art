@@ -28,8 +28,8 @@ fn @wrap_around_value(value: i32) -> u32 {
 	match value {
 		0 => 16, /* group_size / 8 */
 		1 => 32, /* group_size / 4 */
-		2 => 43, /* some prime number */
-		_ => 96  /* 3/4 of group_size */
+		2 => 64, /* group_size / 2 */
+		_ => 128 /* group_size */
 	}
 }
 
