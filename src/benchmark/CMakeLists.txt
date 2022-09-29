@@ -131,30 +131,30 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	set_target_properties(benchmark-${_platform} PROPERTIES FOLDER "benchmarks")
 
-	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 
 	if (${_platform} STREQUAL "cuda" OR ${_platform} STREQUAL "nvvm" OR ${_platform} STREQUAL "scalar")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
 	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "scalar" OR ${_platform} STREQUAL "fiberless")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
 	if (${_platform} STREQUAL "scalar")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization-its.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization-its.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
-	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in "${queue_types_${_platform}}" "10000;1000000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art)
+	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-pipeline-simple.art)
 
 	if (${_platform} STREQUAL "cuda" AND ${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "100000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "131072" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
 		add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
 		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)
 	endif()
 
 	if (${_platform} STREQUAL "scalar")
-		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "YangMellorCrummeyQueue;YangMellorCrummeyQueue_ref" "100000" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
+		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "YangMellorCrummeyQueue;YangMellorCrummeyQueue_ref" "131072" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
 	endif()
 endforeach()
