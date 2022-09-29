@@ -2,7 +2,8 @@ static cpu_threads = 0;
 static warp_size:u32 = 1;
 
 fn @createAccDevice(device: i32) = AccDevice {
-	its = true,
+	supports_its = true,
+	supports_npot_atomic_inc = false,
 	launch_1d = @|body|@|num_groups, group_size| {
 		scalar_launch_1d(num_groups, group_size, body)
 	},
