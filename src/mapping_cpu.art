@@ -191,7 +191,7 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 		atomic_cas_global_u64_weak = cpu_atomic_cas_weak[u64],
 
 		atomic_inc_global_u32 = @|addr, val| {
-			assert(cpu_popcount_u32(val) == 1, "atomic_inc requires power of two range");
+			assert(cpu_popcount_u32(val + 1) == 1, "atomic_inc requires power of two range");
 			let atomic_add = cpu_atomic_rmw[u32](1);
 			atomic_add(addr, 1, memory_order::relaxed) % (val + 1)
 			// let mut old = cpu_atomic_load[u32](addr, memory_order::relaxed);
