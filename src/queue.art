@@ -14,3 +14,5 @@ enum create_queue_result[T] {
 	Ok(ProducerConsumerQueue[T]),
 	Err(&[u8])
 }
+
+type queue_constructor[T] = fn(AccDevice, i32) -> create_queue_result[T];

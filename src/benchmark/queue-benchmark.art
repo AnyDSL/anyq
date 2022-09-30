@@ -24,7 +24,7 @@ struct QueueBenchmark {
 	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
 
-fn @run_queue_benchmark(device: AccDevice, block_size: i32, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> create_queue_result[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
+fn @run_queue_benchmark(device: AccDevice, block_size: i32, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: queue_constructor[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
 	match create_queue(device, queue_size) {
 		create_queue_result[u32]::Ok(queue) => {
 			let instrumentation = create_instrumentation(device);

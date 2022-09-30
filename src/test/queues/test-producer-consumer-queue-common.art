@@ -3,7 +3,7 @@ struct QueueTest[T] {
 	finish: fn() -> i32
 }
 
-fn createQueueTest[T](device: AccDevice, block_dim: i32, create_queue: fn(AccDevice, i32) -> create_queue_result[T], additional_mem: i64) -> QueueTest[T] {
+fn createQueueTest[T](device: AccDevice, block_dim: i32, create_queue: queue_constructor[T], additional_mem: i64) -> QueueTest[T] {
 	let test = createBaseTest(device, additional_mem);
 
 	QueueTest[T] {

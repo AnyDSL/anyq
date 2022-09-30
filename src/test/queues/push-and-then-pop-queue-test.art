@@ -1,6 +1,6 @@
 
 
-fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size: i32, create_queue: fn(AccDevice, i32) -> create_queue_result[T], test_element: QueueTestElement[T]) -> i32 {
+fn push_and_then_pop_queue_test[T](num_threads: i32, block_dim: i32, queue_size: i32, create_queue: queue_constructor[T], test_element: QueueTestElement[T]) -> i32 {
 	let device = createDefaultAccDevice();
 
 	let push_buffer_size = num_threads;
