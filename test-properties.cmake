@@ -11,6 +11,7 @@ endfunction()
 
 disable_tests(
 	test-suite-atomic_cas-reverse-tbb
+	test-suite-atomic_cas-reverse-tbb-scalar
 	test-suite-atomic_cas-reverse-cpu-scalar
 	test-suite-atomic_cas-reverse-cuda
 	test-suite-atomic_cas-reverse-nvvm
@@ -20,6 +21,11 @@ disable_tests(
 	test-suite-shfl_bfly-tbb
 	test-barriers-tbb
 	test-shuffles-tbb
+
+	test-suite-basics-tbb-scalar
+	test-suite-shfl_bfly-tbb-scalar
+	test-barriers-tbb-scalar
+	test-shuffles-tbb-scalar
 
 	test-suite-basics-cpu-scalar
 	test-suite-shfl_bfly-cpu-scalar
