@@ -19,6 +19,9 @@ fn @round_down_u32(num: u32, multiple: u32) -> u32 { (num / multiple) * multiple
 fn @round_down_i64(num: i64, multiple: i64) -> i64 { (num / multiple) * multiple }
 
 
+fn @is_pot(value: u32) = (value != 0) && ((value & (value - 1)) == 0);
+
+
 fn @exponential_backoff(body: fn(i32) -> bool) {
     fn @loop(min: i32, max: i32) -> () {
         if @body(min) {
