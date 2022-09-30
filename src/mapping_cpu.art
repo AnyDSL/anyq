@@ -6,6 +6,7 @@ static max_num_blocks_in_flight:i32 = 32;
 fn @createAccDevice(device: i32) = AccDevice {
 	supports_its = false,
 	supports_npot_atomic_inc = false,
+
 	launch_1d = @|body|@|num_groups, group_size| {
 		cpu_launch_1d(num_groups, group_size, body)
 	},

@@ -8,6 +8,7 @@ fn @createAccDevice(device: i32) {
 	AccDevice {
 		supports_its = its,
 		supports_npot_atomic_inc = true,
+
 		launch_1d = @|body|@|num_groups, group_size| {
 			cuda_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
 		},
