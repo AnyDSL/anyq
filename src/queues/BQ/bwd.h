@@ -220,7 +220,7 @@ struct BWDIndexQueue
 	}
 };
 
-template struct BWDIndexQueue<1000>;
-template struct BWDIndexQueue<10000>;
-template struct BWDIndexQueue<100000>;
-template struct BWDIndexQueue<1000000>;
+template struct BWDIndexQueueIndirect<1024>;
+template struct BWDIndexQueueIndirect<16384>;
+template struct BWDIndexQueueIndirect<131072>;
+template struct BWDIndexQueueIndirect<1048576>;
