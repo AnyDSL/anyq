@@ -3,10 +3,12 @@
 // In Proceedings of the 2018 International Conference on Supercomputing (ICS '18), pages 76–85
 // https://doi.org/10.1145/3205289.3205291
 
-struct BrokerWorkDistributorQueue {
-	head: u32,
-	tail: u32,
-	size: i32,
+mod BWD {
+	struct Queue {
+		head: u32,
+		tail: u32,
+		size: i32,
+	}
 }
 
 enum bwd_alloc_result {
@@ -30,9 +32,9 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, allocator: BWD
 
 	let tickets_offset = 0 as i64;
 	let buffer_offset = round_up_i64(tickets_offset + queue_size as i64 * sizeof[u32](), alignof[T]());
-	let queue_offset = round_up_i64(buffer_offset + queue_size as i64 * sizeof[T](), sizeof[BrokerWorkDistributorQueue]());
+	let queue_offset = round_up_i64(buffer_offset + queue_size as i64 * sizeof[T](), sizeof[BWD::Queue]());
 
-	let alloc_size = queue_offset + sizeof[BrokerWorkDistributorQueue]();
+	let alloc_size = queue_offset + sizeof[BWD::Queue]();
 
 	let queue_device_alloc = match allocator.alloc(alloc_size) {
 		bwd_alloc_result::Ok(buffer) => { buffer },
@@ -45,7 +47,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, allocator: BWD
 
 	let tickets = &mut queue_device_memory(tickets_offset) as &mut addrspace(1) [u32];
 	let buffer = &mut queue_device_memory(buffer_offset) as &mut addrspace(1) [T];
-	let queue = &mut queue_device_memory(queue_offset) as &mut addrspace(1) BrokerWorkDistributorQueue;
+	let queue = &mut queue_device_memory(queue_offset) as &mut addrspace(1) BWD::Queue;
 
 
 	fn @wait_for_ticket(i: u32, number: u32, thread: thread_context) -> () {

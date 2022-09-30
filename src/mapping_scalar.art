@@ -228,25 +228,25 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		barrier_all = @|predicate:bool| -> bool {
 			let warp_pred = if predicate { 1 } else { 0 };
 
-				// atomic_and_global_i32
-				atomic[i32](3, addr(1), warp_pred, 7, "");
-				fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
+			// atomic_and_global_i32
+			atomic[i32](3, addr(1), warp_pred, 7, "");
+			fibers_sync_block_with_result(addr(0), addr(1), 1, idx.block_id as i32);
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_any = @|predicate:bool| -> bool {
 			let warp_pred = if predicate { 1 } else { 0 };
-				// atomic_or_global_i32
-				atomic[i32](5, addr(2), warp_pred, 7, "");
-				fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
+			// atomic_or_global_i32
+			atomic[i32](5, addr(2), warp_pred, 7, "");
+			fibers_sync_block_with_result(addr(0), addr(2), 0, idx.block_id as i32);
 			let result = *(addr(0));
 			result != 0
 		},
 		barrier_count = @|predicate:bool| -> i32 {
 			let warp_count = if predicate { 1 } else { 0 };
-				// atomic_add_global_i32
-				atomic[i32](1, addr(3), warp_count, 7, "");
-				fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
+			// atomic_add_global_i32
+			atomic[i32](1, addr(3), warp_count, 7, "");
+			fibers_sync_block_with_result(addr(0), addr(3), 0, idx.block_id as i32);
 			let result = *(addr(0));
 			result
 		},
