@@ -712,7 +712,10 @@ fn @dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t,
 
 
 
-fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_queue_result[u32] {
+	if queue_size < 0 {
+		return(create_queue_result[u32]::Err("invalid queue size"))
+	}
 
 	let use_static_pool = true;
 	let num_max_nodes = 1 << 14;
@@ -792,7 +795,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 	device.print_i32("    cells %d\n", (&(*n).cells as u64 - p) as i32);
 	*/
 
-	ProducerConsumerQueue[u32] {
+	create_queue_result[u32]::Ok(ProducerConsumerQueue[u32] {
 		push = @|source:fn()->u32| @|thread| {
 			let id = thread.uid();
 			assert(0 <= id && id < (*queue).q.nprocs, "thread handle out of range");
@@ -848,5 +851,5 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 			wfqueue_destroy_internal(queue, nodes);
 			nodes.release();
 		}
-	}
+	})
 }

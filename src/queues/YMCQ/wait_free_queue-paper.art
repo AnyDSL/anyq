@@ -121,7 +121,11 @@ fn createPoolAllocator[T](device: AccDevice, capacity: u32) -> fn(thread_context
 }
 */
 
-fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[u32] {
+fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_queue_result[u32] {
+	if queue_size < 0 {
+		return(create_queue_result[u32]::Err("invalid queue size"))
+	}
+
 	let queue_state_size = sizeof[YMC::Queue]();
 	// let queue_state_alignment = alignof[YMC::Queue]();
 
@@ -522,7 +526,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		}
 	};
 
-	ProducerConsumerQueue[u32] {
+	create_queue_result[u32]::Ok(ProducerConsumerQueue[u32] {
 		push = @|source| @|thread| {
 			thread.atomic_add_global_i32(queue.size, 1, mem_rlx);
 
@@ -579,5 +583,5 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, _queue_size: i32) -> Produce
 		release = @|| {
 			release(queue_device_state_alloc);
 		}
-	}
+	})
 }

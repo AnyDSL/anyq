@@ -24,59 +24,67 @@ struct QueueBenchmark {
 	run: fn(QueueInstrumentationScope, i32, i32) -> ()
 }
 
-fn @run_queue_benchmark(device: AccDevice, block_size: i32, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> ProducerConsumerQueue[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
-	let queue = create_queue(device, queue_size);
+fn @run_queue_benchmark(device: AccDevice, block_size: i32, benchmark: QueueBenchmark, queue_name: &[u8], create_queue: fn(AccDevice, i32) -> create_queue_result[u32], queue_size: i32, num_threads_min: i32, num_threads_max: i32, create_queue_instrumentation: fn(AccDevice) -> QueueInstrumentation) -> i32 {
+	match create_queue(device, queue_size) {
+		create_queue_result[u32]::Ok(queue) => {
+			let instrumentation = create_instrumentation(device);
+			let queue_instrumentation = create_queue_instrumentation(device);
 
-	let instrumentation = create_instrumentation(device);
-	let queue_instrumentation = create_queue_instrumentation(device);
 
+			let csv = make_csv_printer();
 
-	let csv = make_csv_printer();
+			// doing this during printing messes with the PE, probably due to the external calls
+			let device_name = runtime_device_name(device.platform_device);
+			let fingerprint = FINGERPRINT();
 
-	// doing this during printing messes with the PE, probably due to the external calls
-	let device_name = runtime_device_name(device.platform_device);
-	let fingerprint = FINGERPRINT();
+			for r in csv.row() { r.enum_string("queue_type"); r.enum_string("queue_size"); benchmark.enum_param_names(r.enum_string); }
+			for r in csv.row() { r.enum_string(queue_name); r.enum_i32(queue_size); benchmark.enum_param_values(r); }
+			for _ in csv.row() { }
+			for r in csv.row() { r.enum_string("platform"); r.enum_string("device_name"); r.enum_string("fingerprint"); }
+			for r in csv.row() { r.enum_string(device.platform_name); r.enum_string(device_name); r.enum_string(fingerprint); }
+			for _ in csv.row() { }
+			for r in csv.row() { r.enum_string("num_threads"); r.enum_string("t/ms"); queue_instrumentation.enum_result_names(r.enum_string); }
 
-	for r in csv.row() { r.enum_string("queue_type"); r.enum_string("queue_size"); benchmark.enum_param_names(r.enum_string); }
-	for r in csv.row() { r.enum_string(queue_name); r.enum_i32(queue_size); benchmark.enum_param_values(r); }
-	for _ in csv.row() { }
-	for r in csv.row() { r.enum_string("platform"); r.enum_string("device_name"); r.enum_string("fingerprint"); }
-	for r in csv.row() { r.enum_string(device.platform_name); r.enum_string(device_name); r.enum_string(fingerprint); }
-	for _ in csv.row() { }
-	for r in csv.row() { r.enum_string("num_threads"); r.enum_string("t/ms"); queue_instrumentation.enum_result_names(r.enum_string); }
+			let N = 10;
 
-	let N = 10;
+			for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
+				for i in range(0, N) {
+					for r in csv.row() {
+						r.enum_i32(num_threads);
 
-	for num_threads in upsweep_exponential(num_threads_min, num_threads_max, 2) {
-		for i in range(0, N) {
-			for r in csv.row() {
-				r.enum_i32(num_threads);
+						// TODO: better launch config (launch based on occupancy?)
+						// TODO: the queue reset may require launch config of benchmark
+						for grid in device.launch_1d(1, block_size) {
+							queue.reset(grid);
+							queue_instrumentation.reset(grid);
+							benchmark.reset(grid);
+						}
 
-				// TODO: better launch config (launch based on occupancy?)
-				// TODO: the queue reset may require launch config of benchmark
-				for grid in device.launch_1d(1, block_size) {
-					queue.reset(grid);
-					queue_instrumentation.reset(grid);
-					benchmark.reset(grid);
-				}
+						device.synchronize();
 
-				device.synchronize();
+						let t = for instrumentation.time() {
+							for qis in queue_instrumentation.record(queue) {
+								benchmark.run(qis, num_threads, i);
+							}
+						};
 
-				let t = for instrumentation.time() {
-					for qis in queue_instrumentation.record(queue) {
-						benchmark.run(qis, num_threads, i);
+						device.synchronize();
+
+						r.enum_f32(t);
+
+						queue_instrumentation.results().enum_values(r);
 					}
-				};
-
-				device.synchronize();
-
-				r.enum_f32(t);
-
-				queue_instrumentation.results().enum_values(r);
+					csv.flush();
+				}
 			}
-			csv.flush();
+
+			0
+		},
+
+		create_queue_result[u32]::Err(msg) => {
+			print_string(msg);
+			print_endl();
+			-1
 		}
 	}
-
-	0
 }

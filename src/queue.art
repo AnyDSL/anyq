@@ -9,3 +9,8 @@ struct ProducerConsumerQueue[T] {
 	validate: fn(&mut addrspace(1) u32, grid_context) -> (),
 	release: fn() -> ()
 }
+
+enum create_queue_result[T] {
+	Ok(ProducerConsumerQueue[T]),
+	Err(&[u8])
+}

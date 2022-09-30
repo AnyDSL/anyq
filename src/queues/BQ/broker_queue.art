@@ -9,14 +9,38 @@ struct BrokerWorkDistributorQueue {
 	size: i32,
 }
 
-fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64) -> Buffer, dealloc: fn(Buffer) -> (), reference_impl: bool) -> ProducerConsumerQueue[T] {
+enum bwd_alloc_result {
+	Ok(Buffer),
+	Failed
+}
+
+struct BWDAllocator {
+	alloc: fn(i64) -> bwd_alloc_result,
+	release: fn(Buffer) -> ()
+}
+
+fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, allocator: BWDAllocator, reference_impl: bool) -> create_queue_result[T] {
+	if queue_size < 0 {
+		return(create_queue_result[T]::Err("invalid queue size"))
+	}
+
+	if !is_pot(queue_size as u32) {
+		return(create_queue_result[T]::Err("queue size must be power of two"))
+	}
+
 	let tickets_offset = 0 as i64;
 	let buffer_offset = round_up_i64(tickets_offset + queue_size as i64 * sizeof[u32](), alignof[T]());
 	let queue_offset = round_up_i64(buffer_offset + queue_size as i64 * sizeof[T](), sizeof[BrokerWorkDistributorQueue]());
 
 	let alloc_size = queue_offset + sizeof[BrokerWorkDistributorQueue]();
 
-	let queue_device_alloc = alloc(alloc_size);
+	let queue_device_alloc = match allocator.alloc(alloc_size) {
+		bwd_alloc_result::Ok(buffer) => { buffer },
+		bwd_alloc_result::Failed => {
+			return(create_queue_result[T]::Err("failed to allocate queue memory"))
+		}
+	};
+
 	let queue_device_memory = queue_device_alloc.data as &mut addrspace(1) [u8];
 
 	let tickets = &mut queue_device_memory(tickets_offset) as &mut addrspace(1) [u32];
@@ -32,7 +56,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 			@|| thread.atomic_load_global_u32(tickets(i), memory_order::relaxed)
 		};
 
-		thread.wait(@|| load_ticket() == number, "BWD waiting for ticket");
+			thread.wait(@|| load_ticket() == number, "BWD waiting for ticket");
 	}
 
 	fn @ensure_dequeue(thread: thread_context) -> bool {
@@ -122,7 +146,7 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		store_ticket(p, b + 1);
 	}
 
-	ProducerConsumerQueue[T] {
+	create_queue_result[T]::Ok(ProducerConsumerQueue[T] {
 		push = @|source| @|thread| {
 			if ensure_enqueue(thread) {
 				put_data(source, thread);
@@ -170,31 +194,42 @@ fn @createBrokerWorkDistributorQueue_internal[T](queue_size: i32, alloc: fn(i64)
 		},
 
 		release = @|| {
-			dealloc(queue_device_alloc);
+			allocator.release(queue_device_alloc);
 		}
-	}
+	})
 }
+
+fn @bwd_dynamic_alloc(device: AccDevice) = BWDAllocator {
+	alloc = @|size: i64| bwd_alloc_result::Ok(device.alloc(size)),
+	release = @|buffer| release(buffer)
+};
 
 fn @createBrokerWorkDistributorQueue[T](device: AccDevice, queue_size: i32) {
-	createBrokerWorkDistributorQueue_internal[T](queue_size, device.alloc, @|buffer| release(buffer), false)
+	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_dynamic_alloc(device), false)
 }
 
-static mut static_queue_buffer: [u8 * 268435456];
+static mut bwd_static_queue_buffer: [u8 * 268435456];
 
-fn @bwd_static_alloc(size: i64) {
-	assert(size <= 268435456, "size of statically-allocated queue exceeds static allocation size");
+fn @bwd_static_alloc(device: AccDevice) = BWDAllocator {
+	alloc = @|size: i64| {
+		if size <= 268435456 {
+			bwd_alloc_result::Ok(Buffer {
+				data = &mut bwd_static_queue_buffer as &mut [i8],
+				size = size,
+				device = device.platform_device
+			})
+		}
+		else {
+			bwd_alloc_result::Failed
+		}
+	},
+	release = @|_buffer| {}
+};
 
-	Buffer {
-		data = &mut static_queue_buffer as &mut [i8],
-		size = -1,
-		device = -1
-	}
+fn @createBrokerWorkDistributorQueueStatic[T](device: AccDevice, queue_size: i32) {
+	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc(device), false)
 }
 
-fn @createBrokerWorkDistributorQueueStatic[T](_device: AccDevice, queue_size: i32) {
-	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, false)
-}
-
-fn @createBrokerWorkDistributorQueueOrig[T](_device: AccDevice, queue_size: i32) {
-	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc, @|_|{}, true)
+fn @createBrokerWorkDistributorQueueOrig[T](device: AccDevice, queue_size: i32) {
+	createBrokerWorkDistributorQueue_internal[T](queue_size, bwd_static_alloc(device), true)
 }

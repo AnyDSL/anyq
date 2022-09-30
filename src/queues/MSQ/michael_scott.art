@@ -17,7 +17,11 @@ mod MichaelScott {
 	}
 }
 
-fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerConsumerQueue[T] {
+fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) -> create_queue_result[T] {
+	if queue_size < 0 {
+		return(create_queue_result[T]::Err("invalid queue size"))
+	}
+
 	let pool_size = (1 << 21) * 20 * 2;
 	let buffer_size = (pool_size as i64 + 1) * sizeof[MichaelScott::QueueNode[T]]();
 	let buffer_alignment = alignof[MichaelScott::QueueNode[T]]();
@@ -48,7 +52,7 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 		// TODO: stack-based recycling of nodes, don't forget about ABA problem
 	};
 
-	ProducerConsumerQueue[T] {
+	create_queue_result[T]::Ok(ProducerConsumerQueue[T] {
 		push = @|source| @|thread| {
 			let new_node = alloc_node(thread);
 
@@ -160,5 +164,5 @@ fn @createMichaelScottQueue[T](device: AccDevice, _queue_size: i32) -> ProducerC
 		release = @|| {
 			release(queue_device_state_alloc);
 		}
-	}
+	})
 }
