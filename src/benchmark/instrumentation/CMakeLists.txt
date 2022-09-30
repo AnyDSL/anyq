@@ -1,8 +1,8 @@
 
 
-if (cpu IN_LIST AnyQ_PLATFORMS OR fiberless IN_LIST AnyQ_PLATFORMS OR scalar IN_LIST AnyQ_PLATFORMS)
+if (cpu IN_LIST AnyQ_PLATFORMS OR tbb IN_LIST AnyQ_PLATFORMS OR scalar IN_LIST AnyQ_PLATFORMS)
 	add_subdirectory(cpu)
-	add_library(instrumentation_fiberless ALIAS instrumentation_cpu)
+	add_library(instrumentation_tbb ALIAS instrumentation_cpu)
 	add_library(instrumentation_scalar ALIAS instrumentation_cpu)
 endif()
 

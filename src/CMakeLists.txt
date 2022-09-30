@@ -44,7 +44,7 @@ set(COMMON_ARTIC_FILES
 set(mapping_source_files_amdgpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_amdgpu.art")
 set(mapping_source_files_cpu "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cpu.art")
 set(mapping_source_files_scalar "${CMAKE_CURRENT_SOURCE_DIR}/mapping_scalar.art")
-set(mapping_source_files_fiberless "${CMAKE_CURRENT_SOURCE_DIR}/mapping_fiberless.art")
+set(mapping_source_files_tbb "${CMAKE_CURRENT_SOURCE_DIR}/mapping_tbb.art")
 set(mapping_source_files_cuda "${CMAKE_CURRENT_SOURCE_DIR}/mapping_cuda.art")
 set(mapping_source_files_nvvm "${CMAKE_CURRENT_SOURCE_DIR}/mapping_nvvm.art")
 
@@ -83,7 +83,7 @@ endif()
 add_library(fiberless-support ${CMAKE_CURRENT_SOURCE_DIR}/fiberless.cpp)
 target_link_libraries(fiberless-support Threads::Threads)
 
-set(ADDITIONAL_LINK_DEPENDENCY_fiberless fiberless-support)
+set(ADDITIONAL_LINK_DEPENDENCY_tbb fiberless-support)
 
 set(AnyQ_PLATFORMS)
 
@@ -109,7 +109,9 @@ if (AnyDSL_runtime_HAS_HSA_SUPPORT)
 endif()
 
 if (Thorin_HAS_RV_SUPPORT)
-	list(APPEND AnyQ_PLATFORMS fiberless)
+	if (AnyDSL_runtime_HAS_TBB_SUPPORT)
+		list(APPEND AnyQ_PLATFORMS tbb)
+	endif()
 	if (AnyQ_FIBER_SUPPORT)
 		list(APPEND AnyQ_PLATFORMS cpu)
 	endif()

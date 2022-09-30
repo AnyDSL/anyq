@@ -10,8 +10,13 @@ endfunction()
 
 
 disable_tests(
-	test-suite-atomic_cas-reverse-fiberless
+	test-suite-atomic_cas-reverse-tbb
 	test-suite-atomic_cas-reverse-cuda
 	test-suite-atomic_cas-reverse-nvvm
 	test-suite-atomic_cas-reverse-amdgpu
+
+	test-suite-basics-tbb
+	test-suite-shfl_bfly-tbb
+	test-barriers-tbb
+	test-shuffles-tbb
 )
