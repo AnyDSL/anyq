@@ -95,15 +95,18 @@ class QueueBenchmarkBinary:
 
 		return asyncio.run(run())
 
+benchmark_pattern = re.compile(r'^(benchmark-.+)-(.+)-([0-9]+)-([a-z0-9\-]+)$')
 
 def benchmark_binaries(bin_dir, include):
 	for f in bin_dir.iterdir():
 		if f.name.startswith("benchmark-") and f.suffix in ['', '.exe']:
 			for pattern in include:
 				if pattern.match(f.name):
-					test_name, queue_type, queue_size, platform = f.stem.rsplit('-', 3)
-					yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
-					break
+					m = benchmark_pattern.match(f.stem)
+					if m is not None:
+						test_name, queue_type, queue_size, platform = m.groups()
+						yield QueueBenchmarkBinary(f, test_name, queue_type, int(queue_size), platform)
+						break
 
 class QueueBenchmarkRun:
 	def __init__(self, output_path, device_name, binary, **args):
@@ -562,8 +565,9 @@ def main(args):
 
 		devices = {
 			"cpu": [0],
-			"fiberless": [0],
-			"scalar": [0],
+			"cpu-scalar": [0],
+			"tbb": [0],
+			"tbb-scalar": [0],
 			"cuda": device_list(args.cuda_device),
 			"nvvm": device_list(args.cuda_device),
 			"amdgpu": device_list(args.amdgpu_device)
