@@ -1,16 +1,16 @@
 static cpu_threads = 0;
-static warp_size:u32 = 8;
+static warp_size:u32 = 1;
 
 fn @createAccDevice(device: i32) = AccDevice {
-	its = false,
+	its = true,
 	launch_1d = @|body|@|num_groups, group_size| {
-		fiberless_launch_1d(num_groups, group_size, body)
+		scalar_launch_1d(num_groups, group_size, body)
 	},
 	synchronize = @|| { },
 	alloc = @|size| alloc_cpu(size),
 	platform_device = runtime_device(0, device),
 
-	platform_name = "tbb",
+	platform_name = "tbb-scalar",
 
 	print_i32 = @|_msg: &[u8], _i: i32| {
 		//anyq_print_3xi32(msg, i, 0, 0);
@@ -27,50 +27,16 @@ fn @createAccDevice(device: i32) = AccDevice {
 
 fn @createDefaultAccDevice() = createAccDevice(0);
 
-#[import(cc = "C", name = "anydsl_fiberless_yield")] fn fiberless_yield(&[u8]) -> ();
 
-#[import(cc = "C", name = "rv_extract")] fn rv_extract_i32(i32, i32) -> i32;
-#[import(cc = "C", name = "rv_extract")] fn rv_extract_u32(u32, i32) -> u32;
-#[import(cc = "C", name = "rv_insert")] fn rv_insert_i32(i32, i32, i32) -> i32;
-#[import(cc = "C", name = "rv_insert")] fn rv_insert_u32(u32, i32, u32) -> u32;
-#[import(cc = "C", name = "rv_ballot")] fn rv_ballot_u32(bool) -> u32;
+//#[import(cc = "thorin", name = "fibers")] fn thorin_fibers(_num_threads: i32, _num_blocks: i32, _num_warps: i32, _body: fn(i32, i32) -> ()) -> ();
+//fn @fibers(body: fn(i32, i32) -> ()) = @|num_threads: i32, num_blocks: i32, num_warps: i32| thorin_fibers(num_threads, num_blocks, num_warps, body);
 
-#[import(cc = "device", name = "llvm.ctpop.i32")] fn cpu_popcount_u32(u32) -> i32;
+//#[import(cc = "C", name = "anydsl_fibers_sync_block"              )] fn fibers_sync_block(i32) -> ();
+//#[import(cc = "C", name = "anydsl_fibers_sync_block_with_result"  )] fn fibers_sync_block_with_result(&mut i32, &mut i32, i32, i32) -> ();
+//#[import(cc = "C", name = "anydsl_fibers_yield"                   )] fn fibers_yield(&[u8]) -> ();
+fn fibers_yield(&[u8]) -> () { /* noop */ }
+//#[import(cc = "C")] fn anyq_print_3xi32(&[u8], i32, i32, i32) -> i32;
 
-
-fn @shuffle_i32(self: u32, vec_width: i32) -> fn(i32, i32) -> i32 {
-	@|value: i32, src_lane: i32| -> i32 {
-		let mut result:i32 = self as i32; // self is needed to make result marked as varying
-		for l in unroll(0, vec_width) {
-			let lane_src_lane = rv_extract_i32(src_lane, l);
-			let lane_value = rv_extract_i32(value, lane_src_lane);
-			result = rv_insert_i32(result, l, lane_value);
-		}
-		result
-	}
-}
-
-fn @shuffle_u32(self: u32, vec_width: i32) -> fn(u32, i32) -> u32 {
-	@|value: u32, src_lane: i32| -> u32 {
-		let mut result:u32 = self; // self is needed to make result marked as varying
-		for l in unroll(0, vec_width) {
-			let lane_src_lane = rv_extract_i32(src_lane, l);
-			let lane_value = rv_extract_u32(value, lane_src_lane);
-			result = rv_insert_u32(result, l, lane_value);
-		}
-		result
-	}
-}
-
-fn @do_once_op(self: u32, _vec_width: i32) -> fn(fn(u32, u32) -> ()) -> () {
-	@|body:fn(u32, u32)->()| {
-		let mask = rv_ballot(true) as u32;
-		let lsb = mask & -mask;
-		if 1 << self == lsb {
-			body(self, mask)
-		}
-	}
-}
 
 fn @cpu_atomic_load[T](location: &addrspace(1) T, order: memory_order)
 	= atomic_load[T](location as &T, builtin_memory_order(order), "");
@@ -92,21 +58,19 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 
 // fn @cpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
 // 	while !cpu_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
-// 		// yield(debug_msg);
+// 		// fibers_yield(debug_msg);
 // 	}
 // }
 
-fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
-	let self = idx.local_id;
-	let vec_width = num_threads() as i32;
+fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, _num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
 
-	let do_once = do_once_op(self, vec_width);
+	let self = idx.local_id;
 
 	@body(thread_context {
 		idx = tid,
 
 		gid = @|| gid_offset + self,
-		uid = @|| -1, // TODO
+		uid = uid,
 
 		atomic_load_global_i32 = cpu_atomic_load[i32],
 		atomic_load_global_u32 = cpu_atomic_load[u32],
@@ -194,39 +158,15 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 			let mut retry = 50;
 			while !f() {
 				retry -= 1;
-				do_once(@|_, _| { if retry <= 0 { fiberless_yield(debug_msg); } });
+				if retry <= 0 { fibers_yield(debug_msg); }
 			}
 		}
 	});
 }
 
-fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(wave_context) -> ()) -> () {
+fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid: fn() -> i32, idx: Index, body: fn(wave_context) -> ()) -> () {
 
 	let self = idx.local_id;
-	let vec_width = num_threads() as i32;
-
-	let warp_shuffle_i32 = shuffle_i32(self, vec_width);
-	let warp_shuffle_u32 = shuffle_u32(self, vec_width);
-
-	fn @lanemask_eq() -> u64 {
-		1 << self as u64
-	}
-
-	fn @lanemask_lt() -> u64 {
-		let ballot = rv_ballot_u32(true) as u64;
-		let mask = (1 << self as u64) - 1;
-		mask & ballot
-	}
-
-	fn @lanemask_gt() -> u64 {
-		if (vec_width == 64 && self == 63) || (vec_width == 32 && self == 31) {
-			0
-		} else {
-			let ballot = rv_ballot_u32(true) as u64;
-			let mask = (!0:u64) << (self as u64 + 1);
-			mask & ballot
-		}
-	}
 
 	@body(wave_context{
 		idx = @|| idx.warp_id,
@@ -234,58 +174,57 @@ fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32
 		membermask = @|| membermask,
 
 		// TODO: return simd_lane
-		threads = @|body| @|| fiberless_thread(@|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
+		threads = @|body| @|| cpu_thread(uid, @|_i:i32| self, num_threads, gid_offset + idx.warp_id * num_threads(), idx, body),
 
 		num_threads = num_threads,
 
 		barrier = @|| { },
-		barrier_all = @|predicate:bool| -> bool { rv_all(predicate) },
-		barrier_any = @|predicate:bool| -> bool { rv_any(predicate) },
-		barrier_count = @|predicate:bool| -> i32 { cpu_popcount_u32(rv_ballot_u32(predicate)) },
-		barrier_vote = @|predicate:bool| -> u64 { rv_ballot_u32(predicate) as u64 },
+		barrier_all = @|predicate:bool| -> bool { predicate },
+		barrier_any = @|predicate:bool| -> bool { predicate },
+		barrier_count = @|predicate:bool| -> i32 { if predicate { 1 } else { 0 } },
+		barrier_vote = @|predicate:bool| -> u64 { if predicate { 1 } else { 0 } },
 
 		/* TODO: assert width <= num_threads == warp_size */
 		/* TODO: assert width 2^n */
-		shfl_i32 = @|x:i32, src_lane:i32, _width:u32| warp_shuffle_i32(x, src_lane),
-		shfl_u32 = @|x:u32, src_lane:i32, _width:u32| warp_shuffle_u32(x, src_lane),
+		shfl_i32 = @|_x:i32, _src_lane:i32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_u32 = @|_x:u32, _src_lane:i32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
 		//shfl_f32 = @|x:f32, src_lane:i32, width:u32| undef[f32](),
 
 		//shfl_up_i32 = @|x:i32, delta:u32, width:u32| rv_shuffle_i32(x, -(delta as i32)),
 		//shfl_up_u32 = @|x:u32, delta:u32, width:u32| rv_shuffle_u32(x, -(delta as i32)),
-		shfl_up_i32 = @|x:i32, delta:u32, width:u32| warp_shuffle_i32(x, if (self & (width - 1)) < delta { self } else { self - delta } as i32),
-		shfl_up_u32 = @|x:u32, delta:u32, width:u32| warp_shuffle_u32(x, if (self & (width - 1)) < delta { self } else { self - delta } as i32),
+		shfl_up_i32 = @|_x:i32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_up_u32 = @|_x:u32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
 		//shfl_up_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
 
-		shfl_down_i32 = @|x:i32, delta:u32, width:u32| warp_shuffle_i32(x, if (self & (width - 1)) + delta >= width { self } else { self + delta } as i32),
-		shfl_down_u32 = @|x:u32, delta:u32, width:u32| warp_shuffle_u32(x, if (self & (width - 1)) + delta >= width { self } else { self + delta } as i32),
+		shfl_down_i32 = @|_x:i32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_down_u32 = @|_x:u32, _delta:u32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
 		//shfl_down_f32 = @|x:f32, delta:u32, width:u32| undef[f32](),
 
-		shfl_bfly_i32 = @|x:i32, lane_mask:i32, width:u32| warp_shuffle_i32(x, (((self ^ lane_mask as u32) & (width - 1)) | (self & !(width - 1))) as i32),
-		shfl_bfly_u32 = @|x:u32, lane_mask:i32, width:u32| warp_shuffle_u32(x, (((self ^ lane_mask as u32) & (width - 1)) | (self & !(width - 1))) as i32),
+		shfl_bfly_i32 = @|_x:i32, _lane_mask:i32, _width:u32| { assert(false, "no warp communication supported"); undef[i32]() },
+		shfl_bfly_u32 = @|_x:u32, _lane_mask:i32, _width:u32| { assert(false, "no warp communication supported"); undef[u32]() },
 		//shfl_bfly_f32 = @|x:f32, lane_mask:i32, width:u32| undef[f32](),
 
-		lanemask =    @|| lanemask_eq(),
-		lanemask_le = @|| lanemask_lt() | lanemask_eq(),
-		lanemask_lt = @|| lanemask_lt(),
-		lanemask_ge = @|| lanemask_gt() | lanemask_eq(),
-		lanemask_gt = @|| lanemask_gt()
+		lanemask =    @|| 1,
+		lanemask_le = @|| 1,
+		lanemask_lt = @|| 0,
+		lanemask_ge = @|| 1,
+		lanemask_gt = @|| 0
 	});
 }
 
-fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(group_context) -> ()) -> () {
-
+fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, _addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
 	@body(group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
-		waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), idx, body),
-		threads = @|body| @|| fiberless_thread(@|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
+		waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, gid_offset + logical_block_id * num_threads(), @|| (idx.block_id * num_threads() + idx.warp_id * warp_size + idx.local_id) as i32, idx, body),
+		threads = @|body| @|| cpu_thread(@|| (idx.block_id * num_threads() + idx.warp_id * warp_size + idx.local_id) as i32, @|_i:i32| idx.warp_id * warp_size + idx.local_id, @|| warp_size, gid_offset + logical_block_id * num_threads() + idx.warp_id * warp_size, idx, body),
 		num_waves = num_warps,
 		// TODO: dispatch ndim-thread_id
 		num_threads = @|_i:i32| num_threads(),
-		barrier = @|| -> () { assert(false, "no block barriers supported"); },
-		barrier_all = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
-		barrier_any = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
-		barrier_count = @|_predicate:bool| -> i32 { assert(false, "no block barriers supported"); 0 },
+		barrier = @|| -> () { assert(false, "no block communication supported"); },
+		barrier_all = @|_predicate:bool| -> bool { assert(false, "no block communication supported"); undef[bool]() },
+		barrier_any = @|_predicate:bool| -> bool { assert(false, "no block communication supported"); undef[bool]() },
+		barrier_count = @|_predicate:bool| -> i32 { assert(false, "no block communication supported"); undef[i32]() },
 	});
 }
 
@@ -295,7 +234,8 @@ struct Index {
 	local_id: u32
 }
 
-fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -> () {
+fn @scalar_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -> () {
+	// TODO: assert(warp_size == 32)
 
 	let num_threads_per_block = block_dim as u32;
 	let num_warps_per_block = (num_threads_per_block + warp_size - 1) / warp_size;
@@ -303,8 +243,15 @@ fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) ->
 	let num_warps = num_blocks * num_warps_per_block;
 	let num_threads = num_blocks * num_threads_per_block;
 
-	fn @warp_loop(body: fn(i32)->()) = @|l:u32| vectorize(l as i32, body);
-	//fn @warp_loop(body: fn(i32)->()) = @|l:u32| range(body)(0, l as i32);
+	//print_string("launch config (scalar):\n");
+	//print_string("  num_blocks: "); print_u32(num_blocks); print_char('\n');
+	//print_string("  num_warps_per_block: "); print_u32(num_warps_per_block); print_char('\n');
+	//print_string("  num_threads_per_block: "); print_u32(num_threads_per_block); print_char('\n');
+	//print_string("  num_blocks_in_flight: "); print_i32(num_blocks_in_flight); print_char('\n');
+
+	fn @warp_loop(body: fn(i32)->()) = @|_:u32| body(0);
+
+	//let addr:&mut[i32] { assert(false, "no block communication supported"); undef[i32]() }
 
 	for warp_id in parallel(cpu_threads, 0, num_warps as i32) {
 
@@ -321,9 +268,9 @@ fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) ->
 			let context = grid_context {
 				device = 0,
 				max_concurrency = @|| -1, // TODO
-				groups = @|body| @|| fiberless_block(logical_block_id, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, body),
-				waves = @|body| @|| fiberless_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, Index { block_id = logical_block_id, warp_id = warp_id as u32, local_id = idx.local_id }, body),
-				threads = @|body| @|| fiberless_thread(@|_i:i32| warp_id as u32 * warp_size + idx.local_id, @|| warp_size, warp_id as u32 * warp_size, idx, body),
+				groups = @|body| @|| cpu_block(logical_block_id, @|| num_warps_per_block, @|| num_threads_per_block, 0, idx, @|_x| { assert(false, "no block communication supported"); undef[&mut i32]() }, body),
+				waves = @|body| @|| cpu_subwarp(get_member_mask_u64(warp_size), @|| warp_size, 0, @|| ((idx.block_id * num_warps_per_block + idx.warp_id) * warp_size + idx.local_id) as i32, Index { block_id = logical_block_id, warp_id = logical_block_id * num_warps_per_block + idx.warp_id, local_id = idx.local_id }, body),
+				threads = @|body| @|| cpu_thread(@|| ((idx.block_id * num_warps_per_block + idx.warp_id) * warp_size + idx.local_id) as i32, @|_i:i32| logical_block_id * num_threads_per_block + idx.warp_id * warp_size + idx.local_id, @|| warp_size, logical_block_id * num_threads_per_block + idx.warp_id * warp_size, idx, body),
 				num_groups = @|_i:i32| num_blocks,
 				num_waves = @|| num_warps,
 				num_threads = @|_i:i32| num_threads
