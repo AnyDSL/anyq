@@ -133,15 +133,15 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 
-	if (${_platform} STREQUAL "cuda" OR ${_platform} STREQUAL "nvvm" OR ${_platform} STREQUAL "scalar")
+	if (${_platform} STREQUAL "cuda" OR ${_platform} STREQUAL "nvvm" OR ${_platform} STREQUAL "cpu-scalar" OR ${_platform} STREQUAL "tbb-scalar")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-queue-concurrent-its.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
-	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "scalar" OR ${_platform} STREQUAL "fiberless")
+	if (${_platform} STREQUAL "cpu" OR ${_platform} STREQUAL "cpu-scalar" OR ${_platform} STREQUAL "tbb" OR ${_platform} STREQUAL "tbb-scalar")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
-	if (${_platform} STREQUAL "scalar")
+	if (${_platform} STREQUAL "cpu-scalar" OR ${_platform} STREQUAL "tbb-scalar")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-vectorization-its.art.in "${queue_types_${_platform}}" "16384;1048576" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-producer-consumer-queue-concurrent-push-pop.art)
 	endif()
 
@@ -154,7 +154,7 @@ foreach(_platform ${AnyQ_PLATFORMS})
 		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)
 	endif()
 
-	if (${_platform} STREQUAL "scalar")
+	if (${_platform} STREQUAL "cpu-scalar" OR ${_platform} STREQUAL "tbb-scalar")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "YangMellorCrummeyQueue;YangMellorCrummeyQueue_ref" "131072" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
 	endif()
 endforeach()
