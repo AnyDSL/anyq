@@ -1,6 +1,6 @@
 static cpu_threads = 0;
 static warp_size:u32 = 1;
-static max_num_blocks_in_flight:i32 = 32;
+static max_num_blocks_in_flight:i32 = 4;
 
 fn @createAccDevice(device: i32) = AccDevice {
 	supports_its = true,
