@@ -718,7 +718,7 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_q
 	}
 
 	let use_static_pool = true;
-	let num_max_nodes = 1 << 14;
+	let num_max_nodes = 1 << 16;
 	let nodes_align = 4096;
 
 	let nodes = if use_static_pool {
