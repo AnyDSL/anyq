@@ -711,13 +711,15 @@ fn @dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t,
 }
 
 
+#[import(cc = "C", name = "_aligned_malloc")] fn crt_aligned_malloc(_: u64, _: u64) -> u64;
+
 
 fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_queue_result[u32] {
 	if queue_size < 0 {
 		return(create_queue_result[u32]::Err("invalid queue size"))
 	}
 
-	let use_static_pool = true;
+	let use_static_pool = false;
 	let num_max_nodes = 1 << 16;
 	let nodes_align = 4096;
 
@@ -727,10 +729,13 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_q
 		fn @alloc_node() -> node_ref {
 			let s = sizeof[node_t]();
 			// alignment of 4k
-			let b = alloc_host(device.platform_device, s);
+			//let b = alloc_host(device.platform_device, s);
 			// alignment of 32
 			//let b = cpu_alloc(s);
-			b.data as node_ref
+			//b.data as node_ref
+			// directly use C runtime to allocate memory
+			let b = crt_aligned_malloc(s as u64, 4096);
+			b
 		}
 
 		fn @release_node(node: node_ref) -> () {
