@@ -162,7 +162,7 @@ def run(results_dir, bin_dir, include, devices, *, rerun = False, dryrun = False
 
 			# print(binary)
 
-			for args, file_name_args in benchmarks.generate_benchmark_variants(binary.test_name):
+			for args, file_name_args in benchmarks.generate_benchmark_variants(binary.test_name, platform=binary.platform):
 				output_path = results_dir/f"{binary.test_name}--{binary.queue_type}-{binary.queue_size}-{file_name_args}-{device_id(device_name)}-{binary.platform}.csv"
 				bm = QueueBenchmarkRun(output_path, device_name, binary, device=device, **args)
 

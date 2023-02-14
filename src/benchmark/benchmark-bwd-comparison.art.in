@@ -6,7 +6,8 @@ fn @describe_benchmark_params(params: BenchmarkParams) {
 }
 
 fn @run_benchmark(device: AccDevice, num_threads_min: i32, num_threads_max: i32, block_size: i32) {
-	let num_attempts = 20;
+	// on cpu increase queue operation per single thread
+	let num_attempts = if device.platform_device == 0 { 1600 } else { 20 };
 
 	run_queue_benchmark(
 		device,

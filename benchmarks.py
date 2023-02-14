@@ -8,7 +8,7 @@ p_deqs = [0.25, 0.5, 1.0]
 block_sizes = [32, 512]
 
 
-def generate_benchmark_variants(test_name):
+def generate_benchmark_variants(test_name, **kwargs):
 	def generate(num_threads_min, num_threads_max, workload_sizes, p_enqs, p_deqs, block_sizes):
 		for workload_size in workload_sizes:
 			for p_enq in p_enqs:
@@ -51,11 +51,18 @@ def generate_benchmark_variants(test_name):
 		# 				)
 
 	elif test_name == "benchmark-bwd-comparison":
-		for block_size in block_sizes:
+		if "cpu" in kwargs.get("platform", ""):
+			selected_threads_max = 2048
+			selected_block_sizes = [16, 32]
+		else:
+			selected_threads_max = num_threads_max
+			selected_block_sizes = block_sizes
+
+		for block_size in selected_block_sizes:
 			yield (
 				{
 					"num_threads_min": num_threads_min,
-					"num_threads_max": num_threads_max,
+					"num_threads_max": selected_threads_max,
 					"block_size": block_size,
 				},
 				f"{block_size}"
