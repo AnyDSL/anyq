@@ -458,7 +458,7 @@ class StatsAggregatorOpStats(StatsAggregatorOpTimes):
 		self.dequeue_stats_fail = dequeue_stats_fail
 
 	def record(self, num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
-		super().reset(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
+		super().record(*StatsAggregatorOpStats.translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail))
 		self.t += t
 		self.n += 1
 		self.enqueue_stats_succ += enqueue_stats_succ
