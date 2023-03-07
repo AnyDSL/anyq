@@ -330,24 +330,28 @@ def plot(results_dir, include):
 
 
 class Statistics:
-	def __init__(self, t):
-		self.t_avg = self.t_min = self.t_max = t
+	def __init__(self, value):
+		self.mean = self.min = self.max = value
+		self.M2 = 0
 		self.n = 1
 
 	def get(self):
-		return self.t_avg / self.n, self.t_min, self.t_max, self.n
+		return self.mean, self.min, self.max, self.M2 / (self.n - 1), self.n
 
-	def add(self, t):
-		self.t_avg += t
+	def add(self, value):
 		self.n += 1
-		self.add_min(t)
-		self.add_max(t)
+		delta = value - self.mean
+		self.mean += delta / self.n
+		delta_2 = value - self.mean
+		self.M2 += delta * delta_2
+		self.add_min(value)
+		self.add_max(value)
 
-	def add_min(self, t):
-		self.t_min = min(self.t_min, t)
+	def add_min(self, value):
+		self.min = min(self.min, value)
 
-	def add_max(self, t):
-		self.t_max = max(self.t_max, t)
+	def add_max(self, value):
+		self.max = max(self.max, value)
 
 class StatsAggregator:
 	def __init__(self, *, burn_in = 3):
@@ -380,7 +384,7 @@ class StatsAggregatorKernelTimes(StatsAggregator):
 		self.stats_t.add(t)
 
 	def leave(self):
-		t_avg, t_min, t_max, _ = self.stats_t.get()
+		t_avg, t_min, t_max, *_ = self.stats_t.get()
 		self.kernel_run_time.result(self.cur_num_threads, t_avg, t_min, t_max)
 
 class StatsAggregatorEqDqStats(StatsAggregatorKernelTimes):
@@ -422,11 +426,11 @@ class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
 		super().leave()
 
 		if self.stats_enq:
-			t_avg, t_min, t_max, _ = self.stats_enq.get()
+			t_avg, t_min, t_max, *_ = self.stats_enq.get()
 			self.enqueue_time.result(self.cur_num_threads, t_avg * self.op_time_scale, t_min * self.op_time_scale, t_max * self.op_time_scale)
 
 		if self.stats_deq:
-			t_avg, t_min, t_max, _ = self.stats_deq.get()
+			t_avg, t_min, t_max, *_ = self.stats_deq.get()
 			self.dequeue_time.result(self.cur_num_threads, t_avg * self.op_time_scale, t_min * self.op_time_scale, t_max * self.op_time_scale)
 
 class StatsAggregatorOpStats(StatsAggregatorOpTimes):
