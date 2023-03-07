@@ -279,11 +279,10 @@ def collect_datasets(results_dir, include):
 			for pattern in include:
 				m = pattern.match(f.name)
 				if m is not None:
-					with open(f, "rb") as file:
-						params = parse_benchmark_output_header(file)
-						if len(m.groups()) > 0:
-							params.properties['result_group'] = m.group(1)
-						yield Dataset(params, f, file.tell())
+					dataset = read_benchmark_output(f)
+					if len(m.groups()) > 0:
+						dataset.params.properties['result_group'] = m.group(1)
+					yield dataset
 					break
 
 
@@ -490,10 +489,8 @@ class DatasetAggregationVisitor(DatasetVisitor):
 	def visit_op_stats(self):
 		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
 
-def export(out_dir, results_dir, template_file, include):
-	import plot_data
-	import shutil
 
+def collate_datasets(results_dir, include):
 	datasets = [d for d in collect_datasets(results_dir, include)]
 
 	# platform > device > queue_type > queue_size > block_size > p_enq > p_deq > workload_size
@@ -511,6 +508,15 @@ def export(out_dir, results_dir, template_file, include):
 	datasets.sort(key=lambda d: d.params.properties['queue_type'])
 	datasets.sort(key=lambda d: d.params.device)
 	datasets.sort(key=lambda d: d.params.platform)
+
+	return datasets
+
+
+def export(out_dir, results_dir, template_file, include):
+	import plot_data
+	import shutil
+
+	datasets = collate_datasets(results_dir, include)
 
 	with open(out_dir/"kernel_run_time.json", "wt") as kernel_run_time_out, open(out_dir/"enqueue_time.json", "wt") as enqueue_time_out, open(out_dir/"dequeue_time.json", "wt") as dequeue_time_out, open(out_dir/"queue_op_stats.json", "wt") as queue_op_stats_out:
 		with plot_data.Writer(kernel_run_time_out, "kernel_run_time") as kernel_run_time_writer, plot_data.Writer(enqueue_time_out, "enqueue_time") as enqueue_time_writer, plot_data.Writer(dequeue_time_out, "dequeue_time") as dequeue_time_writer, plot_data.Writer(queue_op_stats_out, "queue_op_stats") as queue_op_stats_writer:

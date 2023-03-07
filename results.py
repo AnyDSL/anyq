@@ -159,3 +159,8 @@ def parse_benchmark_output_header(file):
 		return QueueBenchmarkParams(platform, device, fingerprint, zip(params, values))
 	except (StopIteration, ValueError, TypeError):
 		raise Exception("failed to parse benchmark output")
+
+def read_benchmark_output(path):
+	with open(path, "rb") as file:
+		params = parse_benchmark_output_header(file)
+		return Dataset(params, path, file.tell())
