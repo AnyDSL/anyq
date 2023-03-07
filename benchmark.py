@@ -356,23 +356,22 @@ class StatsAggregator:
 		self.cur_num_threads = None
 
 	def visit(self, num_threads, *args):
-		if self.cur_num_threads != num_threads:
-			if self.cur_num_threads is not None:
+		if num_threads != self.cur_num_threads:
+			if self.cur_num_threads is not None and self.i >= 0:
 				self.leave()
 			self.cur_num_threads = num_threads
 			self.i = -self.burn_in
+
+		if self.i == 0:
 			self.reset(num_threads, *args)
-		else:
+		elif self.i > 0:
 			self.record(num_threads, *args)
 		self.i = self.i + 1
 
 class StatsAggregatorKernelTimes(StatsAggregator):
-	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats):
+	def __init__(self, kernel_run_time):
 		super().__init__()
 		self.kernel_run_time = kernel_run_time
-		self.enqueue_time = enqueue_time
-		self.dequeue_time = dequeue_time
-		self.queue_op_stats = queue_op_stats
 
 	def reset(self, num_threads, t):
 		self.stats_t = Statistics(t)
@@ -395,8 +394,10 @@ class StatsAggregatorEqDqStats(StatsAggregatorKernelTimes):
 	# 	super().leave()
 
 class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
-	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale):
-		super().__init__(kernel_run_time, enqueue_time, dequeue_time, queue_op_stats)
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, op_time_scale):
+		super().__init__(kernel_run_time)
+		self.enqueue_time = enqueue_time
+		self.dequeue_time = dequeue_time
 		self.op_time_scale = op_time_scale
 
 	def reset(self, num_threads, t, queue_stats, queue_timings):
@@ -429,6 +430,10 @@ class StatsAggregatorOpTimes(StatsAggregatorEqDqStats):
 			self.dequeue_time.result(self.cur_num_threads, t_avg * self.op_time_scale, t_min * self.op_time_scale, t_max * self.op_time_scale)
 
 class StatsAggregatorOpStats(StatsAggregatorOpTimes):
+	def __init__(self, kernel_run_time, enqueue_time, dequeue_time, queue_op_stats, op_time_scale):
+		super().__init__(kernel_run_time, enqueue_time, dequeue_time, op_time_scale)
+		self.queue_op_stats = queue_op_stats
+
 	@staticmethod
 	def translate_stats(num_threads, t, enqueue_stats_succ, enqueue_stats_fail, dequeue_stats_succ, dequeue_stats_fail):
 		queue_stats = EnqueueDequeueStatistics(
@@ -478,13 +483,13 @@ class DatasetAggregationVisitor(DatasetVisitor):
 		self.op_time_scale = op_time_scale
 
 	def visit_kernel_times(self):
-		return StatsAggregatorKernelTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
+		return StatsAggregatorKernelTimes(self.kernel_run_time)
 
 	def visit_eqdq_stats(self):
-		return StatsAggregatorEqDqStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats)
+		return StatsAggregatorEqDqStats(self.kernel_run_time)
 
 	def visit_op_times(self):
-		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
+		return StatsAggregatorOpTimes(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.op_time_scale)
 
 	def visit_op_stats(self):
 		return StatsAggregatorOpStats(self.kernel_run_time, self.enqueue_time, self.dequeue_time, self.queue_op_stats, self.op_time_scale)
