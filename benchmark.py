@@ -539,6 +539,41 @@ def export(out_dir, results_dir, template_file, include):
 	shutil.copy(Path(__file__).parent / "html" / "main.js", out_dir / "main.js")
 
 
+def query(results_dir, include):
+	import math
+
+	datasets = collate_datasets(results_dir, [re.compile("benchmark-ref-comparison-.*")])
+	# print(datasets)
+
+	class DatasetQueryVisitor(DatasetVisitor, StatsAggregator):
+		def visit_kernel_times(self):
+			return self
+
+		def visit_eqdq_stats(self):
+			return self
+
+		def visit_op_times(self):
+			return self
+
+		def visit_op_stats(self):
+			return self
+
+		def reset(self, num_threads, t, *args):
+			self.stats_t = Statistics(t)
+
+		def record(self, num_threads, t, *args):
+			self.stats_t.add(t)
+
+		def leave(self):
+			t_avg, t_min, t_max, t_var, n = self.stats_t.get()
+			print(f"{self.cur_num_threads:4}:\t{t_avg:6.2f}\t{math.sqrt(t_var):2.3f}")
+
+	for d in datasets:
+		print(d.params)
+		d.visit(DatasetQueryVisitor())
+
+
+
 def serve(port):
 	import http.server
 	import socketserver
@@ -597,6 +632,8 @@ def main(args):
 		if not out_dir.is_dir():
 			out_dir.mkdir(exist_ok=True, parents=True)
 		export(out_dir, results_dir, args.template, include)
+	elif args.command == query:
+		query(results_dir, include)
 	elif args.command == fixup:
 		fixup(results_dir, include)
 	elif args.command == serve:
@@ -629,6 +666,8 @@ if __name__ == "__main__":
 	export_cmd = add_command("export", export, help="export benchmark data as JavaScript")
 	export_cmd.add_argument("--out", "-o", type=Path, default=default_export_dir)
 	export_cmd.add_argument("--template", "-t", type=Path, default=default_template_file)
+
+	query_cmd = add_command("query", query, help="query benchmark results")
 
 	# fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
 
