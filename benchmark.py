@@ -354,7 +354,7 @@ class Statistics:
 		self.max = max(self.max, value)
 
 class StatsAggregator:
-	def __init__(self, *, burn_in = 3):
+	def __init__(self, *, burn_in = 2):
 		super().__init__()
 		self.burn_in = burn_in
 		self.cur_num_threads = None
