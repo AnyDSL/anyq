@@ -566,7 +566,7 @@ def query(results_dir, include):
 
 		def leave(self):
 			t_avg, t_min, t_max, t_var, n = self.stats_t.get()
-			print(f"{self.cur_num_threads:4}:\t{t_avg:6.2f}\t{math.sqrt(t_var):2.3f}")
+			print(f"{self.cur_num_threads:4}:\t{t_avg:6.4f}\t{math.sqrt(t_var):2.4f}")
 
 	for d in datasets:
 		print(d.params)

@@ -144,6 +144,7 @@ class Dataset:
 				sink(cols)
 
 			data_visitor.leave()
+			return visitor
 
 
 def parse_benchmark_output_header(file):
