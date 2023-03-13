@@ -601,9 +601,8 @@ def fixup(results_dir, include):
 
 
 def main(args):
-	results_dir = default_results_dir
-
-	include = [re.compile(pattern) for pattern in args.include]
+	def include_patterns(args):
+		return [re.compile(pattern) for pattern in args.include]
 
 	if args.command == run:
 		bin_dir = args.bin_dir
@@ -623,19 +622,19 @@ def main(args):
 			"amdgpu": device_list(args.amdgpu_device)
 		}
 
-		run(results_dir, bin_dir, include, devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout, retry_timeout=args.retry_timeout, verbose=args.verbose)
+		run(args.results_dir, bin_dir, include_patterns(args), devices, rerun=args.rerun, dryrun=args.dryrun, timeout=args.timeout, retry_timeout=args.retry_timeout, verbose=args.verbose)
 
 	elif args.command == plot:
-		plot(results_dir, include)
+		plot(args.results_dir, include_patterns(args))
 	elif args.command == export:
 		out_dir = args.out
 		if not out_dir.is_dir():
 			out_dir.mkdir(exist_ok=True, parents=True)
-		export(out_dir, results_dir, args.template, include)
+		export(out_dir, args.results_dir, args.template, include_patterns(args))
 	elif args.command == query:
-		query(results_dir, include)
+		query(args.results_dir, include_patterns(args))
 	elif args.command == fixup:
-		fixup(results_dir, include)
+		fixup(args.results_dir, include_patterns(args))
 	elif args.command == serve:
 		serve(args.port)
 
@@ -646,12 +645,17 @@ if __name__ == "__main__":
 
 	def add_command(name, function, **kwargs):
 		args = sub_args.add_parser(name, **kwargs)
-		args.add_argument("include", nargs="*", type=str, default=['.*'])
 		args.set_defaults(command=function)
 		return args
 
+	def add_command_with_results(name, function, **kwargs):
+		args = add_command(name, function, **kwargs)
+		args.add_argument("include", nargs="*", type=str, default=['.*'])
+		args.add_argument("--results", type=Path, dest="results_dir", default=default_results_dir)
+		return args
 
-	run_cmd = add_command("run", run, help="run benchmarks")
+
+	run_cmd = add_command_with_results("run", run, help="run benchmarks")
 	run_cmd.add_argument("--bin-dir", type=Path, default=default_bin_dir)
 	run_cmd.add_argument("-dev-cuda", "--cuda-device", type=int, action="append")
 	run_cmd.add_argument("-dev-amdgpu", "--amdgpu-device", type=int, action="append")
@@ -663,13 +667,13 @@ if __name__ == "__main__":
 
 	# plot_cmd = add_command("plot", plot, help="generate plots from benchmark data")
 
-	export_cmd = add_command("export", export, help="export benchmark data as JavaScript")
+	export_cmd = add_command_with_results("export", export, help="export benchmark data as JavaScript")
 	export_cmd.add_argument("--out", "-o", type=Path, default=default_export_dir)
 	export_cmd.add_argument("--template", "-t", type=Path, default=default_template_file)
 
-	query_cmd = add_command("query", query, help="query benchmark results")
+	query_cmd = add_command_with_results("query", query, help="query benchmark results")
 
-	# fixup_cmd = add_command("fixup", fixup, help="restore result file names based on data contained in each file")
+	# fixup_cmd = add_command_with_results("fixup", fixup, help="restore result file names based on data contained in each file")
 
 	serve_cmd = add_command("serve", serve, help="serve the exported benchmark results using a local server")
 	serve_cmd.add_argument("-p", "--port", type=int, default=8000)
