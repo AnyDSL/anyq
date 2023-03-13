@@ -41,8 +41,5 @@ steps:
       event:
         - push
 
-node:
-  env: cguds-warrior
-
 image_pull_secrets:
   - REGISTRY_AUTH_CREDENTIALS
