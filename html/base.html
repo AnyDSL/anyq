@@ -105,48 +105,25 @@
 
 			<div class="row justify-content-center">
 				<div class="col">
-					<h2>Total benchmark runtimes</h2>
+					<h2>queue throughput</h2>
+					<div class="plot plot-throughput" data-src="queue_op_stats.json"></div>
+					<hr/>
+				</div>
+				<div class="col">
+					<h2>benchmark runtime</h2>
 					<div class="plot plot-time" data-src="kernel_run_time.json"></div>
 					<hr/>
 				</div>
 			</div>
 
 			<div class="row justify-content-center">
-				<div class="col">
-					<h2>Enqueue performance</h2>
-					<div class="plot plot-ops" data-src="enqueue_time.json"></div>
-					<hr/>
-				</div>
-			</div>
-			<div class="row justify-content-center">
-				<div class="col">
-					<h2>Dequeue performance</h2>
-					<div class="plot plot-ops" data-src="dequeue_time.json"></div>
-					<hr/>
-				</div>
-			</div>
-
-			<div class="row justify-content-center">
 				<div class="col-12 col-xl-6">
-					<h2>Enqueue Latency (success)</h2>
-					<div class="plot plot-latency plot-latency-enq-success" data-src="queue_op_stats.json"></div>
-					<hr/>
-				</div>
-				<div class="col-12 col-xl-6">
-					<h2>Enqueue Latency (failed)</h2>
-					<div class="plot plot-latency plot-latency-enq-failure" data-src="queue_op_stats.json"></div>
-					<hr/>
-				</div>
-			</div>
-
-			<div class="row justify-content-center">
-				<div class="col-12 col-xl-6">
-					<h2>Enqueue success ratio</h2>
+					<h2>enqueue success rate</h2>
 					<div class="plot plot-percent plot-ratio-enq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 				<div class="col-12 col-xl-6">
-					<h2>Dequeue success ratio</h2>
+					<h2>dequeue success rate</h2>
 					<div class="plot plot-percent plot-ratio-deq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
@@ -154,12 +131,25 @@
 
 			<div class="row justify-content-center">
 				<div class="col-12 col-xl-6">
-					<h2>Dequeue Latency (success)</h2>
+					<h2>enqueue latency (success)</h2>
+					<div class="plot plot-latency plot-latency-enq-success" data-src="queue_op_stats.json"></div>
+					<hr/>
+				</div>
+				<div class="col-12 col-xl-6">
+					<h2>enqueue latency (failed)</h2>
+					<div class="plot plot-latency plot-latency-enq-failure" data-src="queue_op_stats.json"></div>
+					<hr/>
+				</div>
+			</div>
+
+			<div class="row justify-content-center">
+				<div class="col-12 col-xl-6">
+					<h2>dequeue latency (success)</h2>
 					<div class="plot plot-latency plot-latency-deq-success" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
 				<div class="col-12 col-xl-6">
-					<h2>Dequeue Latency (failed)</h2>
+					<h2>dequeue latency (failed)</h2>
 					<div class="plot plot-latency plot-latency-deq-failure" data-src="queue_op_stats.json"></div>
 					<hr/>
 				</div>
@@ -167,12 +157,17 @@
 
 			<div class="row justify-content-center">
 				<div class="col">
-					<h2>Overall throughput</h2>
-					<div class="plot plot-throughput" data-src="queue_op_stats.json"></div>
+					<h2>enqueue performance</h2>
+					<div class="plot plot-ops" data-src="enqueue_time.json"></div>
+					<hr/>
+				</div>
+				<div class="col">
+					<h2>dequeue performance</h2>
+					<div class="plot plot-ops" data-src="dequeue_time.json"></div>
 					<hr/>
 				</div>
 			</div>
-	    </div>
+		</div>
 
 
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"></script>

@@ -289,7 +289,7 @@ class Plot {
 class RatioPlot extends Plot {
 
 	update() {
-		super.update([0, 100]);
+		super.update([0, 1]);
 	}
 
 }
@@ -466,7 +466,7 @@ function fillButtonTable(menuElem, line_map, line_style_map, plot)
 
 function createTimePlot(svgElem)
 {
-	let plot = new Plot(svgElem, "run time (ms)", d3.scaleLog, TimingLine, { top: 8, right: 48, bottom: 48, left: 48});
+	let plot = new Plot(svgElem, "run time / ms", d3.scaleLog, TimingLine, { top: 8, right: 48, bottom: 48, left: 48});
 	plot.y_tickFormat = formatLog10;
 	return plot;
 }
@@ -484,7 +484,7 @@ function createOpsPlot(svgElem)
 		}
 	}
 
-	let plot = new Plot(svgElem, "ops/sec per thread", d3.scaleLog, OpsLine, { top: 8, right: 48, bottom: 48, left: 48});
+	let plot = new Plot(svgElem, "ops / s per thread", d3.scaleLog, OpsLine, { top: 8, right: 48, bottom: 48, left: 48});
 	plot.y_tickFormat = formatSILog10;
 	plot.y_min = 0.001;
 
@@ -512,7 +512,7 @@ function createThroughputPlot(svgElem)
 		}
 	}
 
-	let plot = new Plot(svgElem, "queue elements per sec", d3.scaleLog, ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
+	let plot = new Plot(svgElem, "elements / s", d3.scaleLog, ThroughputLine, { top: 8, right: 48, bottom: 48, left: 48});
 	plot.y_tickFormat = formatSILog10;
 	plot.y_min = 10.0;
 
@@ -539,7 +539,7 @@ function createLatencyPlot(svgElem, opField)
 		}
 	}
 
-	plot = new Plot(svgElem, "avg time / operation (\u00B5s)", d3.scaleLog, LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot = new Plot(svgElem, "avg time / µs", d3.scaleLog, LatencyLine, { top: 8, right: 48, bottom: 48, left: 48});
 	plot.y_tickFormat = formatLog10;
 	plot.y_min = 0.01;
 
@@ -556,20 +556,17 @@ function createRatioPlot(svgElem, opField1, opField2)
 		map_y_data(d) {
 			let f1 = opField1(d);
 			let f2 = opField2(d);
-			// let total = f1.num_operations + f2.num_operations;
-			// return 100.0 * f1.num_operations / total;
 			let total = f1[0] + f2[0];
-			return 100.0 * f1[0] / total;
+			return f1[0] / total;
 		}
 		defined(d) {
 			let f1 = opField1(d);
 			let f2 = opField2(d);
-			// return f1.num_operations > 0 || f2.num_operations > 0;
 			return f1[0] > 0 || f2[0] > 0;
 		}
 	}
 
-	plot = new RatioPlot(svgElem, "%", d3.scaleLinear, RatioLine, { top: 8, right: 48, bottom: 48, left: 48});
+	plot = new RatioPlot(svgElem, "η", d3.scaleLinear, RatioLine, { top: 8, right: 48, bottom: 48, left: 48});
 
 	return plot;
 }
