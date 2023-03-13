@@ -280,9 +280,17 @@ def collect_datasets(results_dir, include):
 				m = pattern.match(f.name)
 				if m is not None:
 					dataset = read_benchmark_output(f)
+
+					if "queue" in dataset.params.properties and "queue_type" not in dataset.params.properties:
+						# backwards compat with old results format
+						dataset.params.properties["queue_type"] = dataset.params.properties["queue"]
+						del dataset.params.properties["queue"]
+
 					if len(m.groups()) > 0:
 						dataset.params.properties['result_group'] = m.group(1)
+
 					yield dataset
+
 					break
 
 
