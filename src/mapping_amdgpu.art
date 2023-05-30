@@ -42,8 +42,8 @@ fn @amdgpu_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:
     }
 }
 
-fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(thread_context)->()) -> () {
-    body(thread_context {
+fn @amdgpu_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) -> ()) -> () {
+    @body(thread_context {
         idx = idx,
 
         gid = gid,
@@ -123,10 +123,10 @@ fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(thread_context)-
                 if f() { false } else { amdgcn_s_sleep(div_up(t, 64)); true }
             }
         }
-    });
+    })
 }
 
-fn @amdgpu_subwarp(idx: fn()->u32, gid: fn() -> u32, membermask: u64, num_threads: u32, body: fn(wave_context)->()) -> () {
+fn @amdgpu_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u64, num_threads: u32, body: fn(wave_context) -> ()) -> () {
     let thread_idx = @|i: i32| match i { 0 => amdgcn_lane_id() as u32, _ => 0 };
 
     @body(wave_context {
@@ -165,10 +165,10 @@ fn @amdgpu_subwarp(idx: fn()->u32, gid: fn() -> u32, membermask: u64, num_thread
         lanemask_lt = amdgcn_lanemask_lt,
         lanemask_ge = amdgcn_lanemask_ge,
         lanemask_gt = amdgcn_lanemask_gt
-    });
+    })
 }
 
-fn @amdgpu_block(idx: fn(i32)->u32, gid: fn() -> u32, thread_idx: fn(i32)->u32, block_size: fn(i32)->u32, warp_size: u32, body: fn(group_context)->()) -> () {
+fn @amdgpu_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, body: fn(group_context) -> ()) -> () {
     let linear_thread_idx = @|| {
         (thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0)
     };
@@ -238,10 +238,10 @@ fn @amdgpu_block(idx: fn(i32)->u32, gid: fn() -> u32, thread_idx: fn(i32)->u32, 
     })
 }
 
-fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context)->()) -> () {
+fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context) -> ()) -> () {
     let wavefront_size: u32 = 32;
 
-    let block_size = wrap_dim(@|i| {
+    let block_size = wrap_dim(@|i: i32| {
         match i {
             0 => if ?block_dim_x { block_dim_x as u32 } else { (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(2) as u32 },
             1 => if ?block_dim_y { block_dim_y as u32 } else { (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(3) as u32 },
@@ -250,7 +250,7 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
         }
     });
 
-    let num_blocks = wrap_dim(@|i| {
+    let num_blocks = wrap_dim(@|i: i32| {
         match i {
             0 => if ?grid_dim_x { grid_dim_x as u32 } else { div_up((amdgcn_dispatch_ptr() as &addrspace(4)[u32])(3) as i32, (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(2) as i32) as u32 },
             1 => if ?grid_dim_y { grid_dim_y as u32 } else { div_up((amdgcn_dispatch_ptr() as &addrspace(4)[u32])(4) as i32, (amdgcn_dispatch_ptr() as &addrspace(4)[u16])(3) as i32) as u32 },
@@ -267,15 +267,22 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
 
     let num_threads = @|i: i32| num_blocks(i) * block_size(i);
 
-    let block_idx = wrap_index(@|i| {
+    let block_idx = wrap_index(@|i: i32| {
         match i { 0 => amdgcn_workgroup_id_x() as u32, 1 => amdgcn_workgroup_id_y() as u32, 2 => amdgcn_workgroup_id_z() as u32, _ => 0 }
     });
 
     let linear_block_idx = @|| (block_idx(2) * num_blocks(1) + block_idx(1)) * num_blocks(0) + block_idx(0);
-    let thread_idx = wrap_index(@|i| match i { 0 => amdgcn_workitem_id_x() as u32, 1 => amdgcn_workitem_id_y() as u32, 2 => amdgcn_workitem_id_z() as u32, _ => 0 });
+
+    let thread_idx = wrap_index(@|i: i32| {
+        match i { 0 => amdgcn_workitem_id_x() as u32, 1 => amdgcn_workitem_id_y() as u32, 2 => amdgcn_workitem_id_z() as u32, _ => 0 }
+    });
+
     let global_thread_idx = @|i: i32| block_idx(i) * block_size(i) + thread_idx(i);
+
     let linear_thread_idx = @|| (thread_idx(2) * block_size(1) + thread_idx(1)) * block_size(0) + thread_idx(0);
+
     let global_linear_thread_idx = @|| linear_block_idx() * num_threads_per_block() + linear_thread_idx();
+
     let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / wavefront_size;
 
     amdgpu(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(grid_context {
@@ -287,5 +294,5 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
         num_groups  = num_blocks,
         num_waves   = num_warps,
         num_threads = num_threads
-    }));
+    }))
 }

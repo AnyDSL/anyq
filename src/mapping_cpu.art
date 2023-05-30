@@ -7,9 +7,7 @@ fn @createAccDevice(device: i32) = AccDevice {
 	supports_its = false,
 	supports_npot_atomic_inc = false,
 
-	launch_1d = @|body|@|num_groups, group_size| {
-		cpu_launch_1d(num_groups, group_size, body)
-	},
+	launch_1d = @|body|@|num_groups, group_size| cpu_launch_1d(num_groups, group_size, body),
 	synchronize = @|| { },
 	alloc = @|size| alloc_cpu(size),
 	platform_device = runtime_device(0, device),
@@ -220,11 +218,10 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, num_threads: fn() -> u32, 
 				do_once(@|_, _| { if retry <= 0 { fibers_yield(debug_msg); } });
 			}
 		}
-	});
+	})
 }
 
 fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid: fn() -> i32, idx: Index, body: fn(wave_context) -> ()) -> () {
-
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
@@ -251,7 +248,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid:
 		}
 	}
 
-	@body(wave_context{
+	@body(wave_context {
 		idx = @|| idx.warp_id,
 
 		membermask = @|| membermask,
@@ -292,11 +289,10 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid:
 		lanemask_lt = @|| lanemask_lt(),
 		lanemask_ge = @|| lanemask_gt() | lanemask_eq(),
 		lanemask_gt = @|| lanemask_gt()
-	});
+	})
 }
 
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
-
 	let vec_width = warp_size as i32;
 	let do_once = do_once_op(idx.local_id, vec_width);
 
@@ -339,7 +335,7 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 			let result = *(addr(0));
 			result
 		},
-	});
+	})
 }
 
 struct Index {

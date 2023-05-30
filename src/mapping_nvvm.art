@@ -1,4 +1,3 @@
-
 #[import(cc = "device", name = "__nvvm_reflect")] fn nvvm_reflect(&[u8]) -> i32;
 fn @nvvm_device_arch() = nvvm_reflect("__CUDA_ARCH");
 
@@ -10,9 +9,7 @@ fn @createAccDevice(device: i32) {
 		supports_its = its,
 		supports_npot_atomic_inc = true,
 
-		launch_1d = @|body|@|num_groups, group_size| {
-			nvvm_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body);
-		},
+		launch_1d = @|body|@|num_groups, group_size| nvvm_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body),
 		synchronize = || synchronize_cuda(device),
 		alloc = |size| alloc_cuda(device, size),
 		platform_device = platform_device,
@@ -39,7 +36,7 @@ fn @createDefaultAccDevice() = createAccDevice(0);
 
 
 fn @nvvm_pred(b: bool) -> i32 {
-	if b {1} else {0}
+	if b { 1 } else { 0 }
 }
 
 fn @nvvm_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
@@ -182,7 +179,7 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 				if f() { false } else { sleep(t as u32); true }
 			}
 		}
-	});
+	})
 }
 
 fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_threads: u32, body: fn(wave_context) -> ()) -> () {
@@ -207,7 +204,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 		(shuffle_group_mask(width) << 8) as i32
 	}
 
-	@body(wave_context{
+	@body(wave_context {
 		idx = idx,
 
 		membermask = @|| membermask as u64,
@@ -271,7 +268,7 @@ fn @nvvm_subwarp(idx: fn() -> u32, gid: fn() -> u32, membermask: u32, num_thread
 		lanemask_lt = @|| nvvm_lanemask_lt() as u64,
 		lanemask_ge = @|| nvvm_lanemask_ge() as u64,
 		lanemask_gt = @|| nvvm_lanemask_gt() as u64
-	});
+	})
 }
 
 fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32, block_size: fn(i32) -> u32, warp_size: u32, body: fn(group_context) -> ()) -> () {
@@ -296,7 +293,7 @@ fn @nvvm_block(idx: fn(i32) -> u32, gid: fn() -> u32, thread_idx: fn(i32) -> u32
 		barrier_all = @|predicate| nvvm_block_sync_all(nvvm_pred(predicate)) != 0,
 		barrier_any = @|predicate| nvvm_block_sync_any(nvvm_pred(predicate)) != 0,
 		barrier_count = @|predicate| nvvm_block_sync_count(nvvm_pred(predicate))
-	});
+	})
 }
 
 fn @nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32), (block_dim_x: i32, block_dim_y: i32, block_dim_z: i32), wrap_index: index_wrapper, wrap_dim: dim_wrapper, body: fn(grid_context) -> ()) -> () {
@@ -356,5 +353,5 @@ fn @nvvm_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i32)
 		num_groups = num_blocks,
 		num_waves = num_warps,
 		num_threads = num_threads
-	}));
+	}))
 }

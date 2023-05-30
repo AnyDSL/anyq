@@ -5,9 +5,7 @@ fn @createAccDevice(device: i32) = AccDevice {
 	supports_its = true,
 	supports_npot_atomic_inc = false,
 
-	launch_1d = @|body|@|num_groups, group_size| {
-		scalar_launch_1d(num_groups, group_size, body)
-	},
+	launch_1d = @|body|@|num_groups, group_size| scalar_launch_1d(num_groups, group_size, body),
 	synchronize = @|| { },
 	alloc = @|size| alloc_cpu(size),
 	platform_device = runtime_device(0, device),
@@ -65,7 +63,6 @@ fn @cpu_atomic_cas_weak[T](location: &mut addrspace(1) T, expected: T, desired: 
 // }
 
 fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, _num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(thread_context) -> ()) -> () {
-
 	let self = idx.local_id;
 
 	@body(thread_context {
@@ -164,14 +161,13 @@ fn @cpu_thread(uid: fn() -> i32, tid: fn(i32) -> u32, _num_threads: fn() -> u32,
 				if retry <= 0 { fibers_yield(debug_msg); }
 			}
 		}
-	});
+	})
 }
 
 fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid: fn() -> i32, idx: Index, body: fn(wave_context) -> ()) -> () {
-
 	let self = idx.local_id;
 
-	@body(wave_context{
+	@body(wave_context {
 		idx = @|| idx.warp_id,
 
 		membermask = @|| membermask,
@@ -212,7 +208,7 @@ fn @cpu_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, uid:
 		lanemask_lt = @|| 0,
 		lanemask_ge = @|| 1,
 		lanemask_gt = @|| 0
-	});
+	})
 }
 
 fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, _addr: fn(i32) -> (&mut i32), body: fn(group_context) -> ()) -> () {
@@ -228,7 +224,7 @@ fn @cpu_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -
 		barrier_all = @|_predicate:bool| -> bool { assert(false, "no block communication supported"); undef[bool]() },
 		barrier_any = @|_predicate:bool| -> bool { assert(false, "no block communication supported"); undef[bool]() },
 		barrier_count = @|_predicate:bool| -> i32 { assert(false, "no block communication supported"); undef[i32]() },
-	});
+	})
 }
 
 struct Index {
@@ -257,7 +253,6 @@ fn @scalar_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()
 	//let addr:&mut[i32] { assert(false, "no block communication supported"); undef[i32]() }
 
 	for warp_id in parallel(cpu_threads, 0, num_warps as i32) {
-
 		let logical_block_id = warp_id as u32 / num_warps_per_block;
 		let logical_warp_id = warp_id as u32 % num_warps_per_block;
 
@@ -280,7 +275,5 @@ fn @scalar_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()
 			};
 			@body(context)
 		}
-
 	}
-
 }

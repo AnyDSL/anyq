@@ -1,4 +1,3 @@
-
 struct ProducerConsumerQueue[T] {
 	// [THREAD-SAFETY]: only functions that receive a thread_context (i.e. push/pop/size) are thread-safe
 	push: fn(fn() -> T) -> fn(thread_context) -> i32,

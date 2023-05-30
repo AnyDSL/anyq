@@ -204,7 +204,6 @@ fn @fiberless_thread(tid: fn(i32) -> u32, num_threads: fn() -> u32, gid_offset: 
 }
 
 fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(wave_context) -> ()) -> () {
-
 	let self = idx.local_id;
 	let vec_width = num_threads() as i32;
 
@@ -231,7 +230,7 @@ fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32
 		}
 	}
 
-	@body(wave_context{
+	@body(wave_context {
 		idx = @|| idx.warp_id,
 
 		membermask = @|| membermask,
@@ -272,11 +271,10 @@ fn @fiberless_subwarp(membermask: u64, num_threads: fn() -> u32, gid_offset: u32
 		lanemask_lt = @|| lanemask_lt(),
 		lanemask_ge = @|| lanemask_gt() | lanemask_eq(),
 		lanemask_gt = @|| lanemask_gt()
-	});
+	})
 }
 
 fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: fn() -> u32, gid_offset: u32, idx: Index, body: fn(group_context) -> ()) -> () {
-
 	@body(group_context {
 		// TODO: dispatch ndim-block_id
 		idx = @|_i:i32| logical_block_id,
@@ -289,7 +287,7 @@ fn @fiberless_block(logical_block_id: u32, num_warps: fn() -> u32, num_threads: 
 		barrier_all = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
 		barrier_any = @|_predicate:bool| -> bool { assert(false, "no block barriers supported"); false },
 		barrier_count = @|_predicate:bool| -> i32 { assert(false, "no block barriers supported"); 0 },
-	});
+	})
 }
 
 struct Index {
@@ -299,7 +297,6 @@ struct Index {
 }
 
 fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) -> ()) -> () {
-
 	let num_threads_per_block = block_dim as u32;
 	let num_warps_per_block = (num_threads_per_block + warp_size - 1) / warp_size;
 	let num_blocks = grid_dim as u32;
@@ -333,7 +330,5 @@ fn @fiberless_launch_1d(grid_dim: i32, block_dim: i32, body: fn(grid_context) ->
 			};
 			@body(context)
 		}
-
 	}
-
 }

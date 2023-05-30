@@ -1,4 +1,3 @@
-
 struct Allocator[T] {
 	alloc: fn() -> u64,
 	free: fn(u64) -> (),
