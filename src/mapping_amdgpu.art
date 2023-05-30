@@ -3,7 +3,7 @@
 fn @createAccDevice(device: i32) = AccDevice {
     supports_its = false,
     supports_npot_atomic_inc = true,
-    launch_1d = @|body| @|num_groups, group_size| amdgpu_launch_1d(device, num_groups, group_size, body),
+    launch_1d = @|body| @|num_groups, group_size| amdgpu_launch(device, (num_groups, 1, 1), (group_size, 1, 1), wrap_index_1d, wrap_dim_1d, body),
     synchronize = || synchronize_hsa(device),
     alloc = |size| alloc_hsa(device, size),
     platform_device = runtime_device(3, device),
@@ -129,7 +129,7 @@ fn @amdgpu_thread(idx: fn(i32)->u32, gid: fn() -> u32, body: fn(thread_context)-
 fn @amdgpu_subwarp(idx: fn()->u32, gid: fn() -> u32, membermask: u64, num_threads: u32, body: fn(wave_context)->()) -> () {
     let thread_idx = @|i: i32| match i { 0 => amdgcn_lane_id() as u32, _ => 0 };
 
-    body(wave_context{
+    @body(wave_context {
         idx = idx,
 
         membermask = @|| membermask,
@@ -225,7 +225,7 @@ fn @amdgpu_block(idx: fn(i32)->u32, gid: fn() -> u32, thread_idx: fn(i32)->u32, 
         res
     }
 
-    body(group_context {
+    @body(group_context {
         idx = idx,
         waves = @|body| @|| amdgpu_subwarp(warp_idx, @|| gid() * num_warps() + warp_idx(), get_member_mask_u64(warp_size), warp_size, body),
         threads = @|body| @|| amdgpu_thread(thread_idx, @|| gid() * num_threads() + linear_thread_idx(), body),
@@ -278,7 +278,7 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
     let global_linear_thread_idx = @|| linear_block_idx() * num_threads_per_block() + linear_thread_idx();
     let global_warp_idx = @|| linear_block_idx() * num_warps_per_block() + linear_thread_idx() / wavefront_size;
 
-    amdgpu(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| body(grid_context {
+    amdgpu(device, (grid_dim_x * block_dim_x, grid_dim_y * block_dim_y, grid_dim_z * block_dim_z), (block_dim_x, block_dim_y, block_dim_z), @|| @body(grid_context {
         device  = device,
         max_concurrency = @|| (num_blocks(0) * num_blocks(1) * num_blocks(2)) as i32 * num_threads_per_block() as i32,
         groups  = @|body| @|| amdgpu_block(block_idx, linear_block_idx, thread_idx, block_size, wavefront_size, body),
@@ -289,7 +289,3 @@ fn @amdgpu_launch(device: i32, (grid_dim_x: i32, grid_dim_y: i32, grid_dim_z: i3
         num_threads = num_threads
     }));
 }
-
-fn @amdgpu_launch_1d(device: i32, grid_dim: i32, block_dim: i32, body: fn(grid_context)->()) = amdgpu_launch(device, (grid_dim, 1, 1), (block_dim, 1, 1), wrap_index_1d, wrap_dim_1d, body);
-fn @amdgpu_launch_2d(device: i32, (grid_dim_x: i32, grid_dim_y: i32), (block_dim_x: i32, block_dim_y: i32), body: fn(grid_context)->()) = amdgpu_launch(device, (grid_dim_x, grid_dim_y, 1), (block_dim_x, block_dim_y, 1), wrap_index_2d, wrap_dim_2d, body);
-fn @amdgpu_launch_3d(device: i32, grid_dim: (i32, i32, i32), block_dim: (i32, i32, i32), body: fn(grid_context)->()) = amdgpu_launch(device, grid_dim, block_dim, wrap_index_3d, wrap_dim_3d, body);
