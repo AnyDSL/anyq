@@ -1,0 +1,4 @@
+[submodule "results"]
+	path = results
+	url = git@github.com:AnyDSL/anyq-results.git
+	branch = main
