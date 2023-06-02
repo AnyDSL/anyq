@@ -1,0 +1,49 @@
+name: Export AnyQ results
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Generate HTML content
+      run: |
+        python benchmark.py export --out _site/baseline "benchmark-queue-concurrent--.*"
+        python benchmark.py export --out _site/vectorization --template html/result_group.html "benchmark-(vectorization)--.*" "benchmark-(vectorization-its)--.*"
+        python benchmark.py export --out _site/cuda-its --template html/result_group.html "benchmark-(queue-concurrent)--.*-(?:cuda|nvvm|tbb-scalar)" "benchmark-(queue-concurrent-its)--.*-(?:cuda|nvvm|tbb-scalar)"
+        python benchmark.py export --out _site/arm-lse --template html/result_group.html "benchmark-(queue-concurrent)--.*-Apple_M1-tbb" "benchmark-(queue-concurrent-nolse)--.*-Apple_M1-tbb"
+    - name: Publishing landing page
+      run: |
+        cp html/index.html _site/
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v1
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
