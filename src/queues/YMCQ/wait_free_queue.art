@@ -711,7 +711,7 @@ fn @dequeue_internal(device: AccDevice, thread: thread_context, q: &mut queue_t,
 }
 
 
-#[import(cc = "C", name = "_aligned_malloc")] fn crt_aligned_malloc(_: u64, _: u64) -> u64;
+#[import(cc = "C", name = "anydsl_aligned_malloc")] fn aligned_malloc(size: u64, align: u64) -> u64;
 
 
 fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_queue_result[u32] {
@@ -733,8 +733,8 @@ fn @createYangMellorCrummeyQueue(device: AccDevice, queue_size: i32) -> create_q
 			// alignment of 32
 			//let b = cpu_alloc(s);
 			//b.data as node_ref
-			// directly use C runtime to allocate memory
-			let b = crt_aligned_malloc(s as u64, 4096);
+			// directly use runtime to allocate memory
+			let b = aligned_malloc(s as u64, 4096);
 			b
 		}
 
