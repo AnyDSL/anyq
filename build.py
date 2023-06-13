@@ -102,7 +102,7 @@ class LLVM(Build):
 		self.rv_source_dir = self.source_dir/"rv"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-14.0.0")
+		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-14.0.1")
 		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/14.x")
 
 	def configure(self, configs, anydsl):
@@ -146,7 +146,7 @@ class Thorin(Build):
 		self.half_source_dir = self.source_dir/"half"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="ipdps23")
 		pull_svn_dependency(self.half_source_dir, "https://svn.code.sf.net/p/half/code/tags/release-2.2.0")
 
 	def configure(self, configs, llvm):
@@ -167,7 +167,7 @@ class Artic(Build):
 		self.source_dir = dir/"dependencies"/"anydsl"/"artic"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/artic.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/artic.git", branch="ipdps23")
 
 	def configure(self, configs, thorin):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
@@ -184,7 +184,7 @@ class AnyDSLRuntime(Build):
 		self.source_dir = dir/"dependencies"/"anydsl"/"runtime"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git", branch="ipdps23")
 
 	def configure(self, configs, anydsl, llvm, thorin, artic):
 		if windows:
