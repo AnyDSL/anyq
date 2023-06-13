@@ -149,9 +149,9 @@ foreach(_platform ${AnyQ_PLATFORMS})
 
 	if (${_platform} STREQUAL "cuda" AND ${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
 		generate_benchmarks(${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-comparison.art.in "BrokerWorkDistributorQueue;BrokerWorkDistributorQueueOrig;BrokerWorkDistributorQueueOrigCUDA" "131072" ${_platform} ${CMAKE_CURRENT_SOURCE_DIR}/benchmark-bwd-compare.art)
-		add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-100000-cuda)
-		add_sass_output(benchmark-bwd-comparison-BWD_orig-100000-cuda)
-		add_sass_output(benchmark-bwd-comparison-BWD-100000-cuda)
+		#add_sass_output(benchmark-bwd-comparison-BWD_cuda_orig-131072-cuda)
+		#add_sass_output(benchmark-bwd-comparison-BWD_orig-131072-cuda)
+		#add_sass_output(benchmark-bwd-comparison-BWD-131072-cuda)
 	endif()
 
 	if (${_platform} STREQUAL "cpu-scalar" OR ${_platform} STREQUAL "tbb-scalar")

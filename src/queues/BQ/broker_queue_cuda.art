@@ -43,11 +43,11 @@
 
 fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) -> create_queue_result[u32] {
 	if queue_size < 0 {
-		return(create_queue_result[T]::Err("invalid queue size"))
+		return(create_queue_result[u32]::Err("invalid queue size"))
 	}
 
 	if queue_size != 1024 && queue_size != 16384 && queue_size != 131072 && queue_size != 1048576 {
-		return(create_queue_result[T]::Err("unsupported queue size"))
+		return(create_queue_result[u32]::Err("unsupported queue size"))
 	}
 
 	let bq_init = match (queue_size) {
@@ -98,7 +98,7 @@ fn @createBrokerWorkDistributorQueueCUDA(_device: AccDevice, queue_size: i32) ->
 		_ => bq_size_NA
 	};
 
-	create_queue_result[T]::Ok(ProducerConsumerQueue[u32] {
+	create_queue_result[u32]::Ok(ProducerConsumerQueue[u32] {
 		push = @|source| @|_thread| {
 			if bq_ensure_enqueue() {
 				bq_put_data(source());
