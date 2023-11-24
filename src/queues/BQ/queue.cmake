@@ -1,13 +1,15 @@
 set(BrokerWorkDistributorQueue_short_name BWD)
 set(BrokerWorkDistributorQueueStatic_short_name BWD_static)
 set(BrokerWorkDistributorQueueOrig_short_name BWD_orig)
-set(BrokerWorkDistributorQueueOrigCUDA_short_name BWD_cuda_orig)
+set(BrokerWorkDistributorQueueOrigStatic_short_name BWD_orig_static)
+set(BrokerWorkDistributorQueueOrigCUDA_short_name BWD_orig_cuda)
 set(BrokerWorkDistributorQueueCUDA_short_name BWD_cuda)
 set(BrokerWorkDistributorQueueCUDAIndirect_short_name BWD_cuda_indirect)
 
 set(BrokerWorkDistributorQueue_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue.art)
 set(BrokerWorkDistributorQueueStatic_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue.art)
 set(BrokerWorkDistributorQueueOrig_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue.art)
+set(BrokerWorkDistributorQueueOrigStatic_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue.art)
 set(BrokerWorkDistributorQueueOrigCUDA_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue_cuda.art)
 set(BrokerWorkDistributorQueueCUDA_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue_cuda.art)
 set(BrokerWorkDistributorQueueCUDAIndirect_sources ${CMAKE_CURRENT_LIST_DIR}/broker_queue_cuda_indirect.art)
@@ -27,7 +29,7 @@ function (BrokerWorkDistributorQueueCUDA_configure_target target patch_includes)
 	get_target_property(_bin_dir ${target} ANYDSL_BINARY_DIR)
 	get_target_property(_name ${target} NAME)
 
-	set(cuda_src "${_bin_dir}/${_name}")
+	set(cuda_src "${_bin_dir}/$<CONFIG>/${_name}")
 
 	add_custom_command(
 		OUTPUT ${cuda_src}.ll
