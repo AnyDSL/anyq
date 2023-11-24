@@ -218,7 +218,7 @@ class AnyQ(Build):
 	def configure(self, configs, boost, runtime):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
 			Boost_NO_SYSTEM_PATHS=True,
-			BOOST_ROOT=boost.build_dir,
+			Boost_ROOT=boost.build_dir,
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake",
 			BUILD_TESTING=True,
 			CMAKE_EXPORT_COMPILE_COMMANDS=True,
