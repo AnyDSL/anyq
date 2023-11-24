@@ -39,35 +39,55 @@ fn @nvvm_pred(b: bool) -> i32 {
 	if b { 1 } else { 0 }
 }
 
-fn @nvvm_legacy_atomic_memory_order_wrap(order:memory_order, f: fn() -> ()) {
+fn @nvvm_memory_barrier(order: memory_order) {
+	if nvvm_device_arch() >= 700 {
+		(@|| {
+			match order {
+				memory_order::acquire => asm("fence.acq_rel.gpu;" :::: "volatile"),
+				memory_order::release => asm("fence.acq_rel.gpu;" :::: "volatile"),
+				memory_order::acq_rel => asm("fence.acq_rel.gpu;" :::: "volatile"),
+				memory_order::seq_cst => asm("fence.sc.gpu;" :::: "volatile"),
+				_ => ()
+			}
+		})()
+	}
+	else {
+		nvvm_threadfence()
+	}
+}
+
+fn @nvvm_legacy_atomic_memory_barrier_pre(order:memory_order) {
 	match order {
-		memory_order::release => nvvm_threadfence(),
-		memory_order::acq_rel => nvvm_threadfence(),
-		memory_order::seq_cst => nvvm_threadfence(),
+		memory_order::release => nvvm_memory_barrier(memory_order::release),
+		memory_order::acq_rel => nvvm_memory_barrier(memory_order::acq_rel),
+		memory_order::seq_cst => nvvm_memory_barrier(memory_order::seq_cst),
 		_ => ()
 	}
+}
 
-	f();
-
+fn @nvvm_legacy_atomic_memory_barrier_post(order:memory_order) {
 	match order {
-		memory_order::acquire => nvvm_threadfence(),
-		memory_order::acq_rel => nvvm_threadfence(),
-		memory_order::seq_cst => nvvm_threadfence(),
+		memory_order::acquire => nvvm_memory_barrier(memory_order::acquire),
+		memory_order::acq_rel => nvvm_memory_barrier(memory_order::acq_rel),
+		memory_order::seq_cst => nvvm_memory_barrier(memory_order::seq_cst),
 		_ => ()
 	}
 }
 
 fn @nvvm_legacy_atomic_memory_order_wrap_load[T](f: fn(&addrspace(1) T) -> T) {
 	@|location:&addrspace(1) T, order:memory_order| -> T {
-		let mut res:T;
-		nvvm_legacy_atomic_memory_order_wrap(order, @|| res = f(location));
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		let res = f(location);
+		nvvm_legacy_atomic_memory_barrier_post(order);
 		res
 	}
 }
 
 fn @nvvm_legacy_atomic_memory_order_wrap_store[T](f: fn(&mut addrspace(1) T, T) -> ()) {
 	@|location:&mut addrspace(1) T, value:T, order:memory_order| -> () {
-		nvvm_legacy_atomic_memory_order_wrap(order, @|| f(location, value));
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		f(location, value);
+		nvvm_legacy_atomic_memory_barrier_post(order);
 	}
 }
 
@@ -169,7 +189,7 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 
 		atomic_inc_global_u32 = nvvm_atomic_inc_global_u32,
 
-		memory_barrier = @|_| nvvm_threadfence(),
+		memory_barrier = nvvm_memory_barrier,
 
 		timestamp = @|| nvvm_globaltimer() as i64,
 		timestamp32 = @|| nvvm_globaltimer_lo() as i32,
