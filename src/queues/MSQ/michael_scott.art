@@ -17,7 +17,7 @@ mod MichaelScott {
 	}
 }
 
-fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) -> create_queue_result[T] {
+fn @createMichaelScottQueue_internal[T](device: AccDevice, queue_size: i32, opt: bool) -> create_queue_result[T] {
 	if queue_size < 0 {
 		return(create_queue_result[T]::Err("invalid queue size"))
 	}
@@ -63,7 +63,12 @@ fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) -> create_que
 				node(new_node).next = nil;
 
 				while true {
-					let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
+					let tail = if opt {
+						thread.atomic_load_global_u32(queue.tail, memory_order::acquire)
+					} else {
+						thread.atomic_xor_global_u32(queue.tail, 0, memory_order::acquire)
+					};
+
 					let next = thread.atomic_load_global_u32(node(tail).next, memory_order::acquire);
 
 					if tail == thread.atomic_load_global_u32(queue.tail, memory_order::acquire) {
@@ -88,8 +93,18 @@ fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) -> create_que
 
 		pop = @|sink| @|thread| {
 			while true {
-				let head = thread.atomic_load_global_u32(queue.head, memory_order::acquire);
-				let tail = thread.atomic_load_global_u32(queue.tail, memory_order::acquire);
+				let head = if opt {
+					thread.atomic_load_global_u32(queue.head, memory_order::acquire)
+				} else {
+					thread.atomic_xor_global_u32(queue.head, 0, memory_order::acquire)
+				};
+
+				let tail = if opt {
+					thread.atomic_load_global_u32(queue.tail, memory_order::acquire)
+				} else {
+					thread.atomic_xor_global_u32(queue.tail, 0, memory_order::acquire)
+				};
+
 				let next = thread.atomic_load_global_u32(node(head).next, memory_order::acquire);
 
 				if head == thread.atomic_load_global_u32(queue.head, memory_order::acquire) {
@@ -166,3 +181,9 @@ fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) -> create_que
 		}
 	})
 }
+
+fn @createMichaelScottQueue[T](device: AccDevice, queue_size: i32) =
+	createMichaelScottQueue_internal[T](device, queue_size, false);
+
+fn @createMichaelScottQueueOpt[T](device: AccDevice, queue_size: i32) =
+	createMichaelScottQueue_internal[T](device, queue_size, true);

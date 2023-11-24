@@ -214,7 +214,6 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 			asm("nanosleep.u32 %0;\n" :: "r"(t) :: "volatile");  // use asm to avoid compilation error on devices < 700 due to __nanosleep not being defined
 		}
 		else {
-			cuda_threadfence();
 		}
 	};
 
@@ -294,9 +293,10 @@ fn @cuda_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 		timestamp32 = @|| cuda_globaltimer_lo() as i32,
 
 		wait = @|f, _debug_msg| {
-			for t in exponential_backoff(2, 128) {
-				if f() { false } else { sleep(t as u32); true }
-			}
+			while !f() { sleep(1); }
+			// for t in exponential_backoff(2, 128) {
+			// 	if f() { false } else { sleep(t as u32); true }
+			// }
 		}
 	})
 }
