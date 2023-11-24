@@ -3,3 +3,4 @@ __pycache__/**
 dependencies/**
 build/**
 html/**
+plot_data/**
