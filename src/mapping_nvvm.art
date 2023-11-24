@@ -103,6 +103,88 @@ fn @nvvm_atomic_cas[T](location:&mut addrspace(1) T, expected: T, desired: T, me
 fn @nvvm_atomic_cas_weak[T](location:&mut addrspace(1) T, expected: T, desired: T, memory_order_succ: memory_order, memory_order_fail: memory_order)
 	= cmpxchg_weak_p1[T](location, expected, desired, builtin_memory_order(memory_order_succ), builtin_memory_order(memory_order_fail), "");
 
+
+fn @atomic_load_global_i32(location: &addrspace(1) i32, order: memory_order) -> i32 = atomic_load_global_u32(location as &addrspace(1) u32, order) as i32;
+fn @atomic_load_global_u32(location: &addrspace(1) u32, order: memory_order) -> u32 {
+	let mut value: u32;
+
+	if nvvm_device_arch() >= 700 {
+		(@|| {
+				match order {
+				memory_order::relaxed => asm("ld.relaxed.gpu.b32 $0, [$1];" : "=r"(value) : "l"(location) : "memory"),
+				memory_order::acquire => asm("ld.acquire.gpu.b32 $0, [$1];" : "=r"(value) : "l"(location) : "memory"),
+				_ => nvvm_trap()
+			}
+		})();
+	}
+	else {
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		asm("ld.volatile.global.b32 $0, [$1];" : "=r"(value) : "l"(location) : "memory");
+		nvvm_legacy_atomic_memory_barrier_post(order);
+	}
+
+	value
+}
+
+fn @atomic_load_global_i64(location: &addrspace(1) i64, order: memory_order) = atomic_load_global_u64(location as &addrspace(1) u64, order) as i64;
+fn @atomic_load_global_u64(location: &addrspace(1) u64, order: memory_order) -> u64 {
+	let mut value: u64;
+
+	if nvvm_device_arch() >= 700 {
+		(@|| {
+			match order {
+				memory_order::relaxed => asm("ld.relaxed.gpu.b64 $0, [$1];" : "=l"(value) : "l"(location) : "memory"),
+				memory_order::acquire => asm("ld.acquire.gpu.b64 $0, [$1];" : "=l"(value) : "l"(location) : "memory"),
+				_ => nvvm_trap()
+			}
+		})();
+	}
+	else {
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		asm("ld.volatile.global.b64 $0, [$1];" : "=l"(value) : "l"(location) : "memory");
+		nvvm_legacy_atomic_memory_barrier_post(order);
+	}
+
+	value
+}
+
+fn @atomic_store_global_i32(location: &addrspace(1) i32, value: i32, order: memory_order) = atomic_store_global_u32(location as &addrspace(1) u32, value as u32, order);
+fn @atomic_store_global_u32(location: &addrspace(1) u32, value: u32, order: memory_order) -> () {
+	if nvvm_device_arch() >= 700 {
+		(@|| {
+			match order {
+				memory_order::relaxed => asm("st.relaxed.gpu.b32 [$0], $1;" : : "l"(location), "r"(value) : "memory"),
+				memory_order::release => asm("st.release.gpu.b32 [$0], $1;" : : "l"(location), "r"(value) : "memory"),
+				_ => nvvm_trap()
+			}
+		})()
+	}
+	else {
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		asm("st.volatile.global.b32 [$0], $1;" : : "l"(location), "r"(value) : "memory");
+		nvvm_legacy_atomic_memory_barrier_post(order);
+	}
+}
+
+fn @atomic_store_global_i64(location: &addrspace(1) i64, value: i64, order: memory_order) = atomic_store_global_u64(location as &addrspace(1) u64, value as u64, order);
+fn @atomic_store_global_u64(location: &addrspace(1) u64, value: u64, order: memory_order) -> () {
+	if nvvm_device_arch() >= 700 {
+		(@|| {
+			match order {
+				memory_order::relaxed => asm("st.relaxed.gpu.b64 [$0], $1;" : : "l"(location), "l"(value) : "memory"),
+				memory_order::release => asm("st.release.gpu.b64 [$0], $1;" : : "l"(location), "l"(value) : "memory"),
+				_ => nvvm_trap()
+			}
+		})()
+	}
+	else {
+		nvvm_legacy_atomic_memory_barrier_pre(order);
+		asm("st.volatile.global.b64 [$0], $1;" : : "l"(location), "l"(value) : "memory");
+		nvvm_legacy_atomic_memory_barrier_post(order);
+	}
+}
+
+
 // fn @nvvm_atomic_wait_and_transition[T](location:&mut addrspace(1) T, expected:T, desired:T, order:memory_order, _debug_msg:&[u8]) -> () {
 // 	while !nvvm_atomic_cas_weak[T](location, expected, desired, order, memory_order::relaxed).1 {
 // 		nvvm_threadfence();
@@ -125,20 +207,20 @@ fn @nvvm_thread(idx: fn(i32) -> u32, gid: fn() -> u32, body: fn(thread_context) 
 		gid = gid,
 		uid = @|| gid() as i32,
 
-		atomic_load_global_i32 = nvvm_legacy_atomic_memory_order_wrap_load[i32](@|location| { let mut res:i32; asm("atom.global.add.s32 $0, [$1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u32 = nvvm_legacy_atomic_memory_order_wrap_load[u32](@|location| { let mut res:u32; asm("atom.global.add.u32 $0, [$1], 0;" : "=r"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_i64 = nvvm_legacy_atomic_memory_order_wrap_load[i64](@|location| { let mut res:i64; asm("atom.global.add.u64 $0, [$1], 0;" : "=l"(res) : "l"(location) : "memory"); res }),
-		atomic_load_global_u64 = nvvm_legacy_atomic_memory_order_wrap_load[u64](@|location| { let mut res:u64; asm("atom.global.add.u64 $0, [$1], 0;" : "=l"(res) : "l"(location) : "memory"); res }),
+		atomic_load_global_i32 = atomic_load_global_i32,
+		atomic_load_global_u32 = atomic_load_global_u32,
+		atomic_load_global_i64 = atomic_load_global_i64,
+		atomic_load_global_u64 = atomic_load_global_u64,
 
 		atomic_load_global_i32_coalesced = nvvm_legacy_atomic_memory_order_wrap_load[i32](@|location| { let mut res:i32; asm("ld.volatile.global.b32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u32_coalesced = nvvm_legacy_atomic_memory_order_wrap_load[u32](@|location| { let mut res:u32; asm("ld.volatile.global.b32 $0, [$1];" : "=r"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_i64_coalesced = nvvm_legacy_atomic_memory_order_wrap_load[i64](@|location| { let mut res:i64; asm("ld.volatile.global.b64 $0, [$1];" : "=l"(res) : "l"(location) : "memory"); res }),
 		atomic_load_global_u64_coalesced = nvvm_legacy_atomic_memory_order_wrap_load[u64](@|location| { let mut res:u64; asm("ld.volatile.global.b64 $0, [$1];" : "=l"(res) : "l"(location) : "memory"); res }),
 
-		atomic_store_global_i32 = nvvm_legacy_atomic_memory_order_wrap_store[i32](@|location, value| { let mut res:i32; asm("atom.global.exch.b32 $0, [$1], $2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
-		atomic_store_global_u32 = nvvm_legacy_atomic_memory_order_wrap_store[u32](@|location, value| { let mut res:u32; asm("atom.global.exch.b32 $0, [$1], $2;" : "=r"(res) : "l"(location), "r"(value) : "memory"); }),
-		atomic_store_global_i64 = nvvm_legacy_atomic_memory_order_wrap_store[i64](@|location, value| { let mut res:i64; asm("atom.global.exch.b64 $0, [$1], $2;" : "=l"(res) : "l"(location), "l"(value) : "memory"); }),
-		atomic_store_global_u64 = nvvm_legacy_atomic_memory_order_wrap_store[u64](@|location, value| { let mut res:u64; asm("atom.global.exch.b64 $0, [$1], $2;" : "=l"(res) : "l"(location), "l"(value) : "memory"); }),
+		atomic_store_global_i32 = atomic_store_global_i32,
+		atomic_store_global_u32 = atomic_store_global_u32,
+		atomic_store_global_i64 = atomic_store_global_i64,
+		atomic_store_global_u64 = atomic_store_global_u64,
 
 		atomic_store_global_i32_coalesced = nvvm_legacy_atomic_memory_order_wrap_store[i32](@|location, value| asm("st.volatile.global.b32 [$0], $1;" : : "l"(location), "r"(value) : "memory")),
 		atomic_store_global_u32_coalesced = nvvm_legacy_atomic_memory_order_wrap_store[u32](@|location, value| asm("st.volatile.global.b32 [$0], $1;" : : "l"(location), "r"(value) : "memory")),
