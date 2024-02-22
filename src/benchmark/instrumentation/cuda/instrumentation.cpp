@@ -25,6 +25,16 @@ Instrumentation::Instrumentation(int device)
 			return;
 		}
 
+		if (err == CUPTI_ERROR_NOT_INITIALIZED)
+		{
+			std::cerr << "WARNING: CUDA driver version is not compatible with the CUPTI version, CUPTI not initialized\n";
+			return;
+		}
+
+		const char *err_str;
+		cuptiGetResultString(err, &err_str);
+		std::cerr << "CUPTI ERROR code " << err << ": " << err_str << std::endl;
+
 		throw std::runtime_error("cuptiProfilerInitialize() failed");
 	}
 }
