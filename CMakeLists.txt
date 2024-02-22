@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 set(CMAKE_CONFIGURATION_TYPES Debug Release)
 
-project(AnyQ CXX)
+project(AnyQ C CXX)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
