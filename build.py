@@ -102,8 +102,8 @@ class LLVM(Build):
 		self.rv_source_dir = self.source_dir/"rv"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-14.0.1")
-		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/14.x")
+		pull_git_dependency(self.source_dir, "https://github.com/llvm/llvm-project.git", branch="llvmorg-16.0.6")
+		pull_git_dependency(self.rv_source_dir, "https://github.com/cdl-saarland/rv.git", "--recurse-submodules", branch="release/16.x")
 
 	def configure(self, configs, anydsl):
 		for patch in [
@@ -129,6 +129,7 @@ class LLVM(Build):
 			LLVM_TOOL_RV_BUILD=True,
 			CLANG_INCLUDE_DOCS=False,
 			CLANG_INCLUDE_TESTS=False,
+			RV_ENABLE_PLUGIN=False,
 			LLVM_RVPLUG_LINK_INTO_TOOLS=False,
 			LLVM_BUILD_LLVM_DYLIB=False if windows else True,
 			LLVM_LINK_LLVM_DYLIB=False if windows else True
@@ -136,7 +137,7 @@ class LLVM(Build):
 
 	def build(self, config):
 		self.buildsystem.build(self.build_dir, config, "clang", "llvm-as", "lld", "LLVMExecutionEngine", "LLVMRuntimeDyld")
-		self.buildsystem.build(self.build_dir, config, "RV", "LLVMRV", "LLVMMCJIT")
+		self.buildsystem.build(self.build_dir, config, "RV", "LLVMMCJIT")
 
 @component(depends_on=(LLVM,))
 class Thorin(Build):
@@ -146,7 +147,7 @@ class Thorin(Build):
 		self.half_source_dir = self.source_dir/"half"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="ipdps23")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/thorin.git", branch="master")
 		pull_svn_dependency(self.half_source_dir, "https://svn.code.sf.net/p/half/code/tags/release-2.2.0")
 
 	def configure(self, configs, llvm):
@@ -167,7 +168,7 @@ class Artic(Build):
 		self.source_dir = dir/"dependencies"/"anydsl"/"artic"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/artic.git", branch="ipdps23")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/artic.git", branch="master")
 
 	def configure(self, configs, thorin):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
@@ -184,7 +185,7 @@ class AnyDSLRuntime(Build):
 		self.source_dir = dir/"dependencies"/"anydsl"/"runtime"
 
 	def pull(self):
-		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git", branch="ipdps23")
+		pull_git_dependency(self.source_dir, "https://github.com/AnyDSL/runtime.git", branch="master")
 
 	def configure(self, configs, anydsl, llvm, thorin, artic):
 		if windows:
@@ -217,7 +218,7 @@ class AnyQ(Build):
 	def configure(self, configs, boost, runtime):
 		self.buildsystem.configure(self.build_dir, configs, self.source_dir,
 			Boost_NO_SYSTEM_PATHS=True,
-			BOOST_ROOT=boost.build_dir,
+			Boost_ROOT=boost.build_dir,
 			AnyDSL_runtime_DIR=runtime.build_dir/"share"/"anydsl"/"cmake",
 			BUILD_TESTING=True,
 			CMAKE_EXPORT_COMPILE_COMMANDS=True,
